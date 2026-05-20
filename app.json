@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "your-app",
+    "android": {
+      "jsEngine": "hermes"
+    },
+    "ios": {
+      "jsEngine": "hermes"
+    }
+  }
+}
