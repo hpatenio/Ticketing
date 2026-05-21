@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Platform,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { db } from "./firebase"; // adjust path as needed
 import {
   collection,
@@ -140,6 +141,8 @@ async function fetchProfileFromFirestore(
 //  3. saveUserToFirestore()  ->  writes/updates IT_Users/{Full Name}
 //  4. Return user to the app
 //
+const STORAGE_KEY = "AD_USER_DATA";
+
 async function handleSignIn(
   username: string,
   password: string
@@ -196,6 +199,21 @@ export default function AuthScreen() {
   const [error, setError]       = useState<string>("");
   const [user, setUser]         = useState<ADUser | null>(null);
 
+  useEffect(() => {
+    const restoreUser = async (): Promise<void> => {
+      try {
+        const saved = await AsyncStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          setUser(JSON.parse(saved));
+        }
+      } catch (err) {
+        console.error("Restore auth error:", err);
+      }
+    };
+
+    restoreUser();
+  }, []);
+
   const handleLogin = async (): Promise<void> => {
     setError("");
 
@@ -214,6 +232,7 @@ export default function AuthScreen() {
 
       if (response.success && response.user) {
         setUser(response.user);
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(response.user));
       } else {
         setError(response.message || "Login failed. Please try again.");
       }
@@ -224,11 +243,17 @@ export default function AuthScreen() {
     }
   };
 
-  const handleLogout = (): void => {
+  const handleLogout = async (): Promise<void> => {
     setUser(null);
     setUsername("");
     setPassword("");
     setError("");
+
+    try {
+      await AsyncStorage.removeItem(STORAGE_KEY);
+    } catch (err) {
+      console.error("Logout storage clear error:", err);
+    }
   };
 
   return (
