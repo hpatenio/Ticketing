@@ -19,7 +19,7 @@ import {
 } from "firebase/firestore";
 
 // ─── Config ────────────────────────────────────────────────────────────────────
-const BACKEND_URL = "http://10.10.10.1:3000";
+const BACKEND_URL = "http://10.10.10.98:3000";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 type UserRole = "employee" | "it" | "admin";
