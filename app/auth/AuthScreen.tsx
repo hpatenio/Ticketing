@@ -9,7 +9,7 @@ import {
   Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { db } from "./firebase"; // adjust path as needed
+import { db } from "../../firebase"; // adjust path as needed
 import {
   collection,
   doc,
@@ -18,6 +18,7 @@ import {
   setDoc,
   where,
 } from "firebase/firestore";
+import { logout } from "./Logout";
 
 // ─── Config ────────────────────────────────────────────────────────────────────
 const BACKEND_URL = "http://10.10.10.98:3000";
@@ -55,7 +56,7 @@ type ADLoginResponse = {
 // ─── Step 1: Validate credentials against AD backend ──────────────────────────
 async function validateWithAD(
   username: string,
-  password: string
+  password: string,
 ): Promise<ADLoginResponse> {
   const res = await fetch(`${BACKEND_URL}/auth/login`, {
     method: "POST",
@@ -74,7 +75,10 @@ async function saveUserToFirestore(user: ADUser): Promise<void> {
 
     // Find the existing doc by matching the username field
     // This handles the case where the doc was manually created with the Full Name as ID
-    const q = query(usersRef, where("username", "==", user.username.toLowerCase().trim()));
+    const q = query(
+      usersRef,
+      where("username", "==", user.username.toLowerCase().trim()),
+    );
     const snapshot = await getDocs(q);
 
     if (!snapshot.empty) {
@@ -87,10 +91,10 @@ async function saveUserToFirestore(user: ADUser): Promise<void> {
     const resolvedEmail = user.email || `${user.username}@ocgbim.com`;
     const newDocRef = doc(db, "IT_Users", user.displayName);
     await setDoc(newDocRef, {
-      username:   user.username,
-      email:      resolvedEmail,
+      username: user.username,
+      email: resolvedEmail,
       Department: user.department,
-      role:       user.role,
+      role: user.role,
     });
     console.log("Firestore created:", user.displayName);
   } catch (err) {
@@ -101,7 +105,7 @@ async function saveUserToFirestore(user: ADUser): Promise<void> {
 
 // ─── Step 3: Fetch existing profile from Firestore (optional enrichment) ───────
 async function fetchProfileFromFirestore(
-  username: string
+  username: string,
 ): Promise<ADUser | null> {
   try {
     const usersRef = collection(db, "IT_Users");
@@ -110,7 +114,10 @@ async function fetchProfileFromFirestore(
     let snapshot = await getDocs(q);
 
     if (snapshot.empty) {
-      q = query(usersRef, where("username", "==", username.toLowerCase().trim()));
+      q = query(
+        usersRef,
+        where("username", "==", username.toLowerCase().trim()),
+      );
       snapshot = await getDocs(q);
     }
 
@@ -120,13 +127,13 @@ async function fetchProfileFromFirestore(
     const data = docSnap.data();
 
     return {
-      username:    data.username   ?? username,
-      displayName: docSnap.id,                        // doc ID = Full Name
-      email:       data.email      ?? `${username}@ocgbim.com`,
-      department:  data.Department ?? data.department ?? "",
-      title:       data.title      ?? "",
-      phone:       data.phone      ?? "",
-      role:        (data.role as UserRole) ?? "it",
+      username: data.username ?? username,
+      displayName: docSnap.id, // doc ID = Full Name
+      email: data.email ?? `${username}@ocgbim.com`,
+      department: data.Department ?? data.department ?? "",
+      title: data.title ?? "",
+      phone: data.phone ?? "",
+      role: (data.role as UserRole) ?? "it",
     };
   } catch (err) {
     console.error("Firestore fetch error:", err);
@@ -145,29 +152,33 @@ const STORAGE_KEY = "AD_USER_DATA";
 
 async function handleSignIn(
   username: string,
-  password: string
+  password: string,
 ): Promise<{ success: boolean; user?: ADUser; message?: string }> {
   // 1. Authenticate against AD
   const adResult = await validateWithAD(username, password);
   console.log("AD raw response:", JSON.stringify(adResult));
   if (!adResult.success) {
-    return { success: false, message: adResult.message || "Login failed. Please try again." };
+    return {
+      success: false,
+      message: adResult.message || "Login failed. Please try again.",
+    };
   }
 
   // 2. Build the user object from the AD backend response
   const adUser = adResult.user;
   const user: ADUser = {
-    username:    adUser?.username                          ?? username,
-    displayName: adUser?.displayName                       ?? username,
-    email:       adUser?.email                             ?? `${username}@ocgbim.com`,
-    department:  adUser?.department                        ?? "",
-    title:       adUser?.title                             ?? "",
-    phone:       adUser?.phone                             ?? "",
-    role:        (adUser?.role as UserRole)                ?? "it",
+    username: adUser?.username ?? username,
+    displayName: adUser?.displayName ?? username,
+    email: adUser?.email ?? `${username}@ocgbim.com`,
+    department: adUser?.department ?? "",
+    title: adUser?.title ?? "",
+    phone: adUser?.phone ?? "",
+    role: (adUser?.role as UserRole) ?? "it",
   };
 
   // 3. Fetch Firestore profile — role in Firestore overrides AD role
   const firestoreProfile = await fetchProfileFromFirestore(username);
+  console.log("Firestore profile found:", firestoreProfile); // ← add this
   if (firestoreProfile) {
     // Doc exists — use Firestore role (so you can manually change it for testing)
     user.role = firestoreProfile.role;
@@ -182,29 +193,41 @@ async function handleSignIn(
 }
 
 // ─── Role styles ───────────────────────────────────────────────────────────────
-function getRoleStyle(role: UserRole): { bg: string; text: string; label: string } {
+function getRoleStyle(role: UserRole): {
+  bg: string;
+  text: string;
+  label: string;
+} {
   const map: Record<UserRole, { bg: string; text: string; label: string }> = {
-    it:       { bg: "bg-blue-900",   text: "text-blue-300",   label: "IT" },
-    admin:    { bg: "bg-purple-900", text: "text-purple-300", label: "Admin" },
-    employee: { bg: "bg-slate-700",  text: "text-slate-300",  label: "Employee" },
+    it: { bg: "bg-blue-900", text: "text-blue-300", label: "IT" },
+    admin: { bg: "bg-purple-900", text: "text-purple-300", label: "Admin" },
+    employee: { bg: "bg-slate-700", text: "text-slate-300", label: "Employee" },
   };
   return map[role];
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────────
-export default function AuthScreen() {
+// ─── Component ─────────────────────────────────────────────────────────────────
+type Props = {
+  onLoginSuccess: (user: ADUser) => void;
+  onLogout: () => void;
+};
+
+export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
   const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
-  const [loading, setLoading]   = useState<boolean>(false);
-  const [error, setError]       = useState<string>("");
-  const [user, setUser]         = useState<ADUser | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
+  const [user, setUser] = useState<ADUser | null>(null);
 
   useEffect(() => {
     const restoreUser = async (): Promise<void> => {
       try {
         const saved = await AsyncStorage.getItem(STORAGE_KEY);
         if (saved) {
-          setUser(JSON.parse(saved));
+          const parsedUser = JSON.parse(saved);
+          setUser(parsedUser);
+          onLoginSuccess(parsedUser); // ← add this
         }
       } catch (err) {
         console.error("Restore auth error:", err);
@@ -233,6 +256,7 @@ export default function AuthScreen() {
       if (response.success && response.user) {
         setUser(response.user);
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(response.user));
+        onLoginSuccess(response.user);
       } else {
         setError(response.message || "Login failed. Please try again.");
       }
@@ -244,6 +268,7 @@ export default function AuthScreen() {
   };
 
   const handleLogout = async (): Promise<void> => {
+    await logout();
     setUser(null);
     setUsername("");
     setPassword("");
@@ -251,6 +276,7 @@ export default function AuthScreen() {
 
     try {
       await AsyncStorage.removeItem(STORAGE_KEY);
+      onLogout(); // ← notify App.tsx to clear its state too
     } catch (err) {
       console.error("Logout storage clear error:", err);
     }
@@ -263,15 +289,18 @@ export default function AuthScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <View className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-7">
-
         {/* Logo */}
         <View className="flex-row items-center gap-3 mb-7">
           <View className="w-10 h-10 bg-blue-700 rounded-xl items-center justify-center">
             <Text className="text-xl">🎫</Text>
           </View>
           <View>
-            <Text className="text-slate-200 text-base font-bold">Silverdab</Text>
-            <Text className="text-slate-500 text-xs">Unified Ticketing System</Text>
+            <Text className="text-slate-200 text-base font-bold">
+              Silverdab
+            </Text>
+            <Text className="text-slate-500 text-xs">
+              Unified Ticketing System
+            </Text>
           </View>
         </View>
 
@@ -286,8 +315,12 @@ export default function AuthScreen() {
 
             {/* Role Badge */}
             <View className="flex-row mb-4">
-              <View className={`px-3 py-1 rounded-full ${getRoleStyle(user.role).bg}`}>
-                <Text className={`text-xs font-semibold uppercase tracking-wider ${getRoleStyle(user.role).text}`}>
+              <View
+                className={`px-3 py-1 rounded-full ${getRoleStyle(user.role).bg}`}
+              >
+                <Text
+                  className={`text-xs font-semibold uppercase tracking-wider ${getRoleStyle(user.role).text}`}
+                >
                   {getRoleStyle(user.role).label}
                 </Text>
               </View>
@@ -295,17 +328,20 @@ export default function AuthScreen() {
 
             {/* User Info Card */}
             <View className="bg-slate-800 border border-slate-700 rounded-2xl p-4 mb-4 gap-3">
-
               <View className="flex-row justify-between items-center">
                 <Text className="text-slate-500 text-xs">Full Name</Text>
-                <Text className="text-slate-200 text-xs font-semibold">{user.displayName}</Text>
+                <Text className="text-slate-200 text-xs font-semibold">
+                  {user.displayName}
+                </Text>
               </View>
 
               <View className="h-px bg-slate-700" />
 
               <View className="flex-row justify-between items-center">
                 <Text className="text-slate-500 text-xs">Username</Text>
-                <Text className="text-slate-200 text-xs font-medium">{user.username}</Text>
+                <Text className="text-slate-200 text-xs font-medium">
+                  {user.username}
+                </Text>
               </View>
 
               <View className="h-px bg-slate-700" />
@@ -321,7 +357,9 @@ export default function AuthScreen() {
 
               <View className="flex-row justify-between items-center">
                 <Text className="text-slate-500 text-xs">Department</Text>
-                <Text className="text-slate-200 text-xs font-medium">{user.department || "—"}</Text>
+                <Text className="text-slate-200 text-xs font-medium">
+                  {user.department || "—"}
+                </Text>
               </View>
 
               {user.title ? (
@@ -329,7 +367,9 @@ export default function AuthScreen() {
                   <View className="h-px bg-slate-700" />
                   <View className="flex-row justify-between items-center">
                     <Text className="text-slate-500 text-xs">Title</Text>
-                    <Text className="text-slate-200 text-xs font-medium">{user.title}</Text>
+                    <Text className="text-slate-200 text-xs font-medium">
+                      {user.title}
+                    </Text>
                   </View>
                 </>
               ) : null}
@@ -339,7 +379,9 @@ export default function AuthScreen() {
                   <View className="h-px bg-slate-700" />
                   <View className="flex-row justify-between items-center">
                     <Text className="text-slate-500 text-xs">Phone</Text>
-                    <Text className="text-slate-200 text-xs font-medium">{user.phone}</Text>
+                    <Text className="text-slate-200 text-xs font-medium">
+                      {user.phone}
+                    </Text>
                   </View>
                 </>
               ) : null}
@@ -357,19 +399,23 @@ export default function AuthScreen() {
               className="bg-slate-700 rounded-xl py-3 items-center"
               onPress={handleLogout}
             >
-              <Text className="text-slate-200 text-sm font-semibold">Log out</Text>
+              <Text className="text-slate-200 text-sm font-semibold">
+                Log out
+              </Text>
             </TouchableOpacity>
           </>
         ) : (
           <>
-            <Text className="text-slate-100 text-2xl font-bold mb-1">Sign in</Text>
+            <Text className="text-slate-100 text-2xl font-bold mb-1">
+              Sign in
+            </Text>
             <Text className="text-slate-500 text-sm mb-5">
               Use your company Windows account
             </Text>
 
             <View className="bg-blue-950 border border-blue-900 rounded-xl p-3 mb-5 flex-row items-center gap-2">
               <Text className="text-blue-400 text-xs">
-                🏢  Login with your AD username · ocgbim.com
+                🏢 Login with your AD username · ocgbim.com
               </Text>
             </View>
 
