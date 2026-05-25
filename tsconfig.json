@@ -2,11 +2,13 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
-    "jsxImportSource": "nativewind"
+    "jsxImportSource": "nativewind",
+    "moduleResolution": "bundler"
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
+    "src/**/*",
     "nativewind-env.d.ts"
   ]
 }

@@ -6,6 +6,9 @@
     },
     "ios": {
       "jsEngine": "hermes"
-    }
+    },
+    "plugins": [
+      "expo-font"
+    ]
   }
 }

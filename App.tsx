@@ -2,33 +2,62 @@
 import "./global.css";
 import { useState } from "react";
 import { View } from "react-native";
-import AuthScreen         from "./app/auth/AuthScreen";
+import { useFonts } from "expo-font";
+import * as SplashScreen from "expo-splash-screen";
+import { useEffect } from "react";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import AuthScreen from "./app/auth/AuthScreen";
 import SuperAdminDashboard from "./app/SuperAdmin/SuperAdminDashboard";
-import AdminDashboard      from "./app/Admin/AdminDashboard";
-import EmployeeDashboard   from "./app/Employee/EmployeeDashboard";
-import { ADUser }          from "./types";
+import AdminDashboard from "./app/Admin/AdminDashboard";
+import EmployeeDashboard from "./app/Employee/EmployeeDashboard";
+import { ADUser } from "./types";
+
+SplashScreen.preventAutoHideAsync();
 
 export default function App() {
   const [user, setUser] = useState<ADUser | null>(null);
 
-  if (user?.role === "superadmin") {
-    return <SuperAdminDashboard user={user} onLogout={() => setUser(null)} />;
-  }
+  const [fontsLoaded] = useFonts({
+    DMSans_400Regular: require("./components/fonts/DMSans-Regular.ttf"),
+    DMSans_600SemiBold: require("./components/fonts/DMSans-SemiBold.ttf"),
+    DMSans_700Bold: require("./components/fonts/DMSans-Bold.ttf"),
+    Raleway_400Regular: require("./components/fonts/Raleway-Regular.ttf"),
+    Raleway_600SemiBold: require("./components/fonts/Raleway-SemiBold.ttf"),
+    Raleway_700Bold: require("./components/fonts/Raleway-Bold.ttf"),
+    Outfit_400Regular: require("./components/fonts/Outfit-Regular.ttf"),
+    Outfit_600SemiBold: require("./components/fonts/Outfit-SemiBold.ttf"),
+    Outfit_700Bold: require("./components/fonts/Outfit-Bold.ttf"),
+  });
 
-  if (user?.role === "admin") {
-    return <AdminDashboard user={user} onLogout={() => setUser(null)} />;
-  }
+  useEffect(() => {
+    if (fontsLoaded) SplashScreen.hideAsync();
+  }, [fontsLoaded]);
 
-  if (user?.role === "employee") {
-    return <EmployeeDashboard user={user} onLogout={() => setUser(null)} />;
-  }
+  if (!fontsLoaded) return null;
+
+  const renderContent = () => {
+    if (user?.role === "superadmin") {
+      return <SuperAdminDashboard user={user} onLogout={() => setUser(null)} />;
+    }
+    if (user?.role === "admin") {
+      return <AdminDashboard user={user} onLogout={() => setUser(null)} />;
+    }
+    if (user?.role === "employee") {
+      return <EmployeeDashboard user={user} onLogout={() => setUser(null)} />;
+    }
+    return (
+      <View style={{ flex: 1, minHeight: "100vh" } as any}>
+        <AuthScreen
+          onLoginSuccess={(u) => setUser(u)}
+          onLogout={() => setUser(null)}
+        />
+      </View>
+    );
+  };
 
   return (
-    <View style={{ flex: 1, minHeight: "100vh" } as any}>
-      <AuthScreen
-        onLoginSuccess={(u) => setUser(u)}
-        onLogout={() => setUser(null)}
-      />
-    </View>
+    <SafeAreaProvider>
+      {renderContent()}
+    </SafeAreaProvider>
   );
 }
