@@ -1,5 +1,4 @@
-// types.ts
-export type UserRole = "employee" | "it" | "admin" | "hr" | "accounting";
+export type UserRole = "employee" | "admin" | "superadmin";
 
 export type ADUser = {
   username: string;

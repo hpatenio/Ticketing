@@ -9,7 +9,7 @@ import {
   Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { db } from "../../firebase"; // adjust path as needed
+import { db } from "../../firebase";
 import {
   collection,
   doc,
@@ -19,45 +19,42 @@ import {
   where,
 } from "firebase/firestore";
 import { logout } from "./Logout";
+import { ADUser, UserRole } from "../../types";
 
-// ─── Config ────────────────────────────────────────────────────────────────────
 const BACKEND_URL = "http://10.10.10.98:3000";
+const STORAGE_KEY = "AD_USER_DATA";
 
-// ─── Types ─────────────────────────────────────────────────────────────────────
-type UserRole = "employee" | "it" | "admin";
+// ─── Derive role from AD department ───────────────────────────────────────────
+function getRoleFromDepartment(department: string): UserRole {
+  const dept = department.toLowerCase().trim();
+  console.log("Department from AD:", dept);
+  if (dept.includes("information technology") || dept.includes(" it") || dept === "it") return "superadmin";
+  if (dept.includes("admin")) return "admin";
+  return "employee";
+}
 
-type ADUser = {
-  username: string;
-  displayName: string;
-  email: string;
-  department: string;
-  title: string;
-  phone: string;
-  role: UserRole;
-};
+// ─── Get Firestore collection based on role ────────────────────────────────────
+function getCollectionForRole(role: UserRole): string {
+  const map: Record<UserRole, string> = {
+    superadmin: "superadmin_users",
+    admin:      "admin_users",
+    employee:   "employee_users",
+  };
+  return map[role];
+}
 
-type ADLoginResponse = {
-  success: boolean;
-  token?: string;
-  message?: string;
-  user?: ADUser;
-  displayName?: string;
-};
-
-// ─── Firestore structure written after AD login ────────────────────────────────
-//
-//  IT_Users                          <- collection
-//  └── "Henrick Patenio"             <- document ID = Full Name (displayName)
-//       username:   "hpatenio"
-//       email:      "hpatenio@ocgbim.com"
-//       Department: "Information Technology"
-//       role:       "it"
+// ─── Role badge styles ─────────────────────────────────────────────────────────
+function getRoleStyle(role: UserRole): { bg: string; text: string; label: string } {
+  const map: Record<UserRole, { bg: string; text: string; label: string }> = {
+    superadmin: { bg: "bg-blue-900",   text: "text-blue-300",   label: "Super Admin" },
+    admin:      { bg: "bg-purple-900", text: "text-purple-300", label: "Admin"       },
+    employee:   { bg: "bg-slate-700",  text: "text-slate-300",  label: "Employee"    },
+  };
+  return map[role];
+}
 
 // ─── Step 1: Validate credentials against AD backend ──────────────────────────
-async function validateWithAD(
-  username: string,
-  password: string,
-): Promise<ADLoginResponse> {
+async function validateWithAD(username: string, password: string) {
   const res = await fetch(`${BACKEND_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -66,58 +63,45 @@ async function validateWithAD(
   return res.json();
 }
 
-// ─── Step 2: Save/update AD user data into Firestore IT_Users ─────────────────
-// Uses the Full Name (displayName) as the document ID.
-// setDoc with merge:true updates existing docs without overwriting other fields.
+// ─── Step 2: Save user to role-based Firestore collection ─────────────────────
 async function saveUserToFirestore(user: ADUser): Promise<void> {
   try {
-    const usersRef = collection(db, "IT_Users");
+    const collectionName = getCollectionForRole(user.role);
+    const usersRef = collection(db, collectionName);
 
-    // Find the existing doc by matching the username field
-    // This handles the case where the doc was manually created with the Full Name as ID
-    const q = query(
-      usersRef,
-      where("username", "==", user.username.toLowerCase().trim()),
-    );
+    const q = query(usersRef, where("username", "==", user.username.toLowerCase().trim()));
     const snapshot = await getDocs(q);
 
     if (!snapshot.empty) {
-      // Doc already exists — do nothing, just let them log in
       console.log("Firestore: doc already exists for:", snapshot.docs[0].id);
       return;
     }
 
-    // First time login — create new doc using Full Name (displayName) as doc ID
     const resolvedEmail = user.email || `${user.username}@ocgbim.com`;
-    const newDocRef = doc(db, "IT_Users", user.displayName);
+    const newDocRef = doc(db, collectionName, user.displayName);
     await setDoc(newDocRef, {
-      username: user.username,
-      email: resolvedEmail,
+      username:   user.username,
+      email:      resolvedEmail,
       Department: user.department,
-      role: user.role,
+      role:       user.role,
     });
-    console.log("Firestore created:", user.displayName);
+    console.log(`Firestore created in ${collectionName}:`, user.displayName);
   } catch (err) {
-    // Non-fatal — user is still logged in even if Firestore write fails
     console.error("Firestore save error:", err);
   }
 }
 
-// ─── Step 3: Fetch existing profile from Firestore (optional enrichment) ───────
-async function fetchProfileFromFirestore(
-  username: string,
-): Promise<ADUser | null> {
+// ─── Step 3: Fetch profile from correct role collection ───────────────────────
+async function fetchProfileFromFirestore(username: string, role: UserRole): Promise<ADUser | null> {
   try {
-    const usersRef = collection(db, "IT_Users");
+    const collectionName = getCollectionForRole(role);
+    const usersRef = collection(db, collectionName);
 
     let q = query(usersRef, where("username", "==", username.trim()));
     let snapshot = await getDocs(q);
 
     if (snapshot.empty) {
-      q = query(
-        usersRef,
-        where("username", "==", username.toLowerCase().trim()),
-      );
+      q = query(usersRef, where("username", "==", username.toLowerCase().trim()));
       snapshot = await getDocs(q);
     }
 
@@ -127,13 +111,13 @@ async function fetchProfileFromFirestore(
     const data = docSnap.data();
 
     return {
-      username: data.username ?? username,
-      displayName: docSnap.id, // doc ID = Full Name
-      email: data.email ?? `${username}@ocgbim.com`,
-      department: data.Department ?? data.department ?? "",
-      title: data.title ?? "",
-      phone: data.phone ?? "",
-      role: (data.role as UserRole) ?? "it",
+      username:    data.username    ?? username,
+      displayName: docSnap.id,
+      email:       data.email       ?? `${username}@ocgbim.com`,
+      department:  data.Department  ?? data.department ?? "",
+      title:       data.title       ?? "",
+      phone:       data.phone       ?? "",
+      role:        (data.role as UserRole) ?? "employee",
     };
   } catch (err) {
     console.error("Firestore fetch error:", err);
@@ -142,71 +126,41 @@ async function fetchProfileFromFirestore(
 }
 
 // ─── Combined login flow ───────────────────────────────────────────────────────
-//
-//  1. POST /auth/login  ->  AD validates password
-//  2. Build ADUser from AD response
-//  3. saveUserToFirestore()  ->  writes/updates IT_Users/{Full Name}
-//  4. Return user to the app
-//
-const STORAGE_KEY = "AD_USER_DATA";
-
 async function handleSignIn(
   username: string,
   password: string,
 ): Promise<{ success: boolean; user?: ADUser; message?: string }> {
-  // 1. Authenticate against AD
   const adResult = await validateWithAD(username, password);
   console.log("AD raw response:", JSON.stringify(adResult));
+
   if (!adResult.success) {
-    return {
-      success: false,
-      message: adResult.message || "Login failed. Please try again.",
-    };
+    return { success: false, message: adResult.message || "Login failed. Please try again." };
   }
 
-  // 2. Build the user object from the AD backend response
   const adUser = adResult.user;
   const user: ADUser = {
-    username: adUser?.username ?? username,
+    username:    adUser?.username    ?? username,
     displayName: adUser?.displayName ?? username,
-    email: adUser?.email ?? `${username}@ocgbim.com`,
-    department: adUser?.department ?? "",
-    title: adUser?.title ?? "",
-    phone: adUser?.phone ?? "",
-    role: (adUser?.role as UserRole) ?? "it",
+    email:       adUser?.email       ?? `${username}@ocgbim.com`,
+    department:  adUser?.department  ?? "",
+    title:       adUser?.title       ?? "",
+    phone:       adUser?.phone       ?? "",
+    role:        getRoleFromDepartment(adUser?.department ?? ""),
   };
 
-  // 3. Fetch Firestore profile — role in Firestore overrides AD role
-  const firestoreProfile = await fetchProfileFromFirestore(username);
-  console.log("Firestore profile found:", firestoreProfile); // ← add this
+  const firestoreProfile = await fetchProfileFromFirestore(username, user.role);
+  console.log("Firestore profile found:", firestoreProfile);
+
   if (firestoreProfile) {
-    // Doc exists — use Firestore role (so you can manually change it for testing)
     user.role = firestoreProfile.role;
     console.log("Firestore role used:", user.role);
   } else {
-    // No doc yet — create it in the background with AD data
     saveUserToFirestore(user);
   }
 
-  // 4. Return the fully populated user
   return { success: true, user };
 }
 
-// ─── Role styles ───────────────────────────────────────────────────────────────
-function getRoleStyle(role: UserRole): {
-  bg: string;
-  text: string;
-  label: string;
-} {
-  const map: Record<UserRole, { bg: string; text: string; label: string }> = {
-    it: { bg: "bg-blue-900", text: "text-blue-300", label: "IT" },
-    admin: { bg: "bg-purple-900", text: "text-purple-300", label: "Admin" },
-    employee: { bg: "bg-slate-700", text: "text-slate-300", label: "Employee" },
-  };
-  return map[role];
-}
-
-// ─── Component ─────────────────────────────────────────────────────────────────
 // ─── Component ─────────────────────────────────────────────────────────────────
 type Props = {
   onLoginSuccess: (user: ADUser) => void;
@@ -214,45 +168,36 @@ type Props = {
 };
 
 export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
-  const [username, setUsername] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>("");
-  const [user, setUser] = useState<ADUser | null>(null);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState("");
+  const [user,     setUser]     = useState<ADUser | null>(null);
 
   useEffect(() => {
-    const restoreUser = async (): Promise<void> => {
+    const restoreUser = async () => {
       try {
         const saved = await AsyncStorage.getItem(STORAGE_KEY);
         if (saved) {
           const parsedUser = JSON.parse(saved);
           setUser(parsedUser);
-          onLoginSuccess(parsedUser); // ← add this
+          onLoginSuccess(parsedUser);
         }
       } catch (err) {
         console.error("Restore auth error:", err);
       }
     };
-
     restoreUser();
   }, []);
 
-  const handleLogin = async (): Promise<void> => {
+  const handleLogin = async () => {
     setError("");
-
-    if (!username.trim()) {
-      setError("Please enter your username.");
-      return;
-    }
-    if (!password) {
-      setError("Please enter your password.");
-      return;
-    }
+    if (!username.trim()) { setError("Please enter your username."); return; }
+    if (!password)        { setError("Please enter your password.");  return; }
 
     setLoading(true);
     try {
       const response = await handleSignIn(username.trim(), password);
-
       if (response.success && response.user) {
         setUser(response.user);
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(response.user));
@@ -267,16 +212,15 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
     }
   };
 
-  const handleLogout = async (): Promise<void> => {
+  const handleLogout = async () => {
     await logout();
     setUser(null);
     setUsername("");
     setPassword("");
     setError("");
-
     try {
       await AsyncStorage.removeItem(STORAGE_KEY);
-      onLogout(); // ← notify App.tsx to clear its state too
+      onLogout();
     } catch (err) {
       console.error("Logout storage clear error:", err);
     }
@@ -289,18 +233,15 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
       keyboardShouldPersistTaps="handled"
     >
       <View className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-7">
+
         {/* Logo */}
         <View className="flex-row items-center gap-3 mb-7">
           <View className="w-10 h-10 bg-blue-700 rounded-xl items-center justify-center">
             <Text className="text-xl">🎫</Text>
           </View>
           <View>
-            <Text className="text-slate-200 text-base font-bold">
-              Silverdab
-            </Text>
-            <Text className="text-slate-500 text-xs">
-              Unified Ticketing System
-            </Text>
+            <Text className="text-slate-200 text-base font-bold">Silverdab</Text>
+            <Text className="text-slate-500 text-xs">Unified Ticketing System</Text>
           </View>
         </View>
 
@@ -315,12 +256,8 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
 
             {/* Role Badge */}
             <View className="flex-row mb-4">
-              <View
-                className={`px-3 py-1 rounded-full ${getRoleStyle(user.role).bg}`}
-              >
-                <Text
-                  className={`text-xs font-semibold uppercase tracking-wider ${getRoleStyle(user.role).text}`}
-                >
+              <View className={`px-3 py-1 rounded-full ${getRoleStyle(user.role).bg}`}>
+                <Text className={`text-xs font-semibold uppercase tracking-wider ${getRoleStyle(user.role).text}`}>
                   {getRoleStyle(user.role).label}
                 </Text>
               </View>
@@ -330,58 +267,38 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
             <View className="bg-slate-800 border border-slate-700 rounded-2xl p-4 mb-4 gap-3">
               <View className="flex-row justify-between items-center">
                 <Text className="text-slate-500 text-xs">Full Name</Text>
-                <Text className="text-slate-200 text-xs font-semibold">
-                  {user.displayName}
-                </Text>
+                <Text className="text-slate-200 text-xs font-semibold">{user.displayName}</Text>
               </View>
-
               <View className="h-px bg-slate-700" />
-
               <View className="flex-row justify-between items-center">
                 <Text className="text-slate-500 text-xs">Username</Text>
-                <Text className="text-slate-200 text-xs font-medium">
-                  {user.username}
-                </Text>
+                <Text className="text-slate-200 text-xs font-medium">{user.username}</Text>
               </View>
-
               <View className="h-px bg-slate-700" />
-
               <View className="flex-row justify-between items-center">
                 <Text className="text-slate-500 text-xs">Email</Text>
-                <Text className="text-slate-200 text-xs font-medium">
-                  {user.email || `${user.username}@ocgbim.com`}
-                </Text>
+                <Text className="text-slate-200 text-xs font-medium">{user.email || `${user.username}@ocgbim.com`}</Text>
               </View>
-
               <View className="h-px bg-slate-700" />
-
               <View className="flex-row justify-between items-center">
                 <Text className="text-slate-500 text-xs">Department</Text>
-                <Text className="text-slate-200 text-xs font-medium">
-                  {user.department || "—"}
-                </Text>
+                <Text className="text-slate-200 text-xs font-medium">{user.department || "—"}</Text>
               </View>
-
               {user.title ? (
                 <>
                   <View className="h-px bg-slate-700" />
                   <View className="flex-row justify-between items-center">
                     <Text className="text-slate-500 text-xs">Title</Text>
-                    <Text className="text-slate-200 text-xs font-medium">
-                      {user.title}
-                    </Text>
+                    <Text className="text-slate-200 text-xs font-medium">{user.title}</Text>
                   </View>
                 </>
               ) : null}
-
               {user.phone ? (
                 <>
                   <View className="h-px bg-slate-700" />
                   <View className="flex-row justify-between items-center">
                     <Text className="text-slate-500 text-xs">Phone</Text>
-                    <Text className="text-slate-200 text-xs font-medium">
-                      {user.phone}
-                    </Text>
+                    <Text className="text-slate-200 text-xs font-medium">{user.phone}</Text>
                   </View>
                 </>
               ) : null}
@@ -399,19 +316,13 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
               className="bg-slate-700 rounded-xl py-3 items-center"
               onPress={handleLogout}
             >
-              <Text className="text-slate-200 text-sm font-semibold">
-                Log out
-              </Text>
+              <Text className="text-slate-200 text-sm font-semibold">Log out</Text>
             </TouchableOpacity>
           </>
         ) : (
           <>
-            <Text className="text-slate-100 text-2xl font-bold mb-1">
-              Sign in
-            </Text>
-            <Text className="text-slate-500 text-sm mb-5">
-              Use your company Windows account
-            </Text>
+            <Text className="text-slate-100 text-2xl font-bold mb-1">Sign in</Text>
+            <Text className="text-slate-500 text-sm mb-5">Use your company Windows account</Text>
 
             <View className="bg-blue-950 border border-blue-900 rounded-xl p-3 mb-5 flex-row items-center gap-2">
               <Text className="text-blue-400 text-xs">
@@ -434,7 +345,7 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
               placeholder="e.g. hpatenio"
               placeholderTextColor="#4B5563"
               value={username}
-              onChangeText={(text: string) => setUsername(text)}
+              onChangeText={setUsername}
               autoCapitalize="none"
               autoCorrect={false}
             />
@@ -451,7 +362,7 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
               placeholder="Your Windows password"
               placeholderTextColor="#4B5563"
               value={password}
-              onChangeText={(text: string) => setPassword(text)}
+              onChangeText={setPassword}
               secureTextEntry
               autoCapitalize="none"
               onSubmitEditing={handleLogin}
@@ -461,18 +372,14 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
             </Text>
 
             <TouchableOpacity
-              className={`rounded-xl py-3 items-center ${
-                loading ? "bg-blue-950" : "bg-blue-600"
-              }`}
+              className={`rounded-xl py-3 items-center ${loading ? "bg-blue-950" : "bg-blue-600"}`}
               onPress={handleLogin}
               disabled={loading}
             >
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text className="text-white text-sm font-semibold">
-                  Sign in with AD
-                </Text>
+                <Text className="text-white text-sm font-semibold">Sign in with AD</Text>
               )}
             </TouchableOpacity>
 
