@@ -2,9 +2,8 @@ import { useState } from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
-  ScrollView,
   Platform,
+  ScrollView,
   useWindowDimensions,
 } from "react-native";
 import { ADUser } from "../../types";
@@ -12,6 +11,7 @@ import Sidebar from "../../components/Navigations/Sidebar";
 import BottomNavBar from "../../components/Navigations/BottmNavBar";
 import TopBar from "../../components/TopBar";
 import ITInventoryPage from "./Modules/ITInventory/ITInventoryPage";
+import ITInventorySummary from "./Modules/ITInventory/ITInventorySummary";
 
 type Props = {
   user: ADUser;
@@ -25,9 +25,9 @@ export default function AdminDashboard({ user, onLogout }: Props) {
 
   const renderContent = () => {
     switch (activeKey) {
-      case "inventory":   return <ITInventoryPage />;
+      case "inventory": return <ITInventoryPage />;
       case "dashboard":
-      default:            return <DashboardHome user={user} />;
+      default:          return <DashboardHome user={user} />;
     }
   };
 
@@ -47,7 +47,7 @@ export default function AdminDashboard({ user, onLogout }: Props) {
           user={user}
           activeKey={activeKey}
           onNavigate={(key) => setActiveKey(key)}
-          onLogout={onLogout}   // ← passed directly; Sidebar owns the modal
+          onLogout={onLogout}
         />
       )}
 
@@ -76,28 +76,15 @@ export default function AdminDashboard({ user, onLogout }: Props) {
 
 function DashboardHome({ user }: { user: ADUser }) {
   return (
-    <View className="p-6">
-      <Text className="text-xl font-bold text-gray-800 mb-2">
+    <View className="flex-1 p-6">
+      <Text className="text-xl font-bold text-gray-800 mb-1">
         Welcome, {user.username}!
       </Text>
       <Text className="text-sm text-gray-500 mb-6">
         Here's your admin overview.
       </Text>
 
-      <View className="flex-row flex-wrap gap-4 mb-6">
-        <View className="bg-white rounded-xl p-4 flex-1 min-w-[140px] shadow-sm">
-          <Text className="text-xs text-gray-500">Total Assets</Text>
-          <Text className="text-2xl font-bold text-blue-600 mt-1">--</Text>
-        </View>
-        <View className="bg-white rounded-xl p-4 flex-1 min-w-[140px] shadow-sm">
-          <Text className="text-xs text-gray-500">Open Tickets</Text>
-          <Text className="text-2xl font-bold text-orange-500 mt-1">--</Text>
-        </View>
-        <View className="bg-white rounded-xl p-4 flex-1 min-w-[140px] shadow-sm">
-          <Text className="text-xs text-gray-500">Printers</Text>
-          <Text className="text-2xl font-bold text-green-600 mt-1">--</Text>
-        </View>
-      </View>
+      <ITInventorySummary />
     </View>
   );
 }

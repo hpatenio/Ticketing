@@ -29,39 +29,57 @@ const EMPTY_SINGLE = {
 interface BulkRow {
   id: number;
   assetTag: string;
-  brand: string;
-  model: string;
-  category: ITInventory["category"];
   company: string;
+  serialNumber: string;
+  model: string;
+  brand: string;
+  category: ITInventory["category"];
+  status: ITInventory["status"];
+  assigneeId: string;
+  assigneeName: string;
+  location: ITInventory["location"];
+  datePurchased: string;
+  notes: string;
 }
 
 const EMPTY_ROW = (id: number): BulkRow => ({
   id,
   assetTag: "",
-  brand: "",
-  model: "",
-  category: "Laptop",
   company: "",
-});
-
-const EMPTY_BULK_SHARED = {
-  status: "Spare" as ITInventory["status"],
-  location: "Unit 1 & 2" as ITInventory["location"],
+  serialNumber: "",
+  model: "",
+  brand: "",
+  category: "Laptop",
+  status: "Spare",
+  assigneeId: "",
+  assigneeName: "",
+  location: "Unit 1 & 2",
   datePurchased: "",
   notes: "",
-};
+});
 
 // Maps flexible column header names from Excel → our field keys
 const HEADER_MAP: Record<string, keyof BulkRow> = {
-  "asset tag":  "assetTag",
-  "assettag":   "assetTag",
-  "tag":        "assetTag",
-  "asset":      "assetTag",
-  "brand":      "brand",
-  "model":      "model",
-  "category":   "category",
-  "type":       "category",
-  "company":    "company",
+  "asset tag":      "assetTag",
+  "assettag":       "assetTag",
+  "tag":            "assetTag",
+  "asset":          "assetTag",
+  "company":        "company",
+  "serial number":  "serialNumber",
+  "serialnumber":   "serialNumber",
+  "serial":         "serialNumber",
+  "model":          "model",
+  "brand":          "brand",
+  "category":       "category",
+  "type":           "category",
+  "status":         "status",
+  "assignee":       "assigneeName",
+  "assigneename":   "assigneeName",
+  "location":       "location",
+  "date purchased": "datePurchased",
+  "datepurchased":  "datePurchased",
+  "purchased":      "datePurchased",
+  "notes":          "notes",
 };
 
 const VALID_CATEGORIES = ["Laptop", "Monitor", "Desktop"];
@@ -93,7 +111,6 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
 
   // bulk
   const [rows, setRows]               = useState<BulkRow[]>([EMPTY_ROW(1)]);
-  const [shared, setShared]           = useState(EMPTY_BULK_SHARED);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkError, setBulkError]     = useState("");
   const [bulkSuccess, setBulkSuccess] = useState(0);
@@ -145,9 +162,7 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
   const removeRow = (id: number) =>
     setRows((prev) => prev.filter((r) => r.id !== id));
 
-  const handleSharedChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) => setShared({ ...shared, [e.target.name]: e.target.value });
+
 
   // Parse uploaded .xlsx / .xls / .csv file
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -179,7 +194,10 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
           const normalized: Record<string, string> = {};
           for (const key of Object.keys(raw)) {
             const mapped = HEADER_MAP[key.toLowerCase().trim()];
-            if (mapped) normalized[mapped] = String(raw[key]);
+            if (mapped) {
+              const val = String(raw[key]).trim();
+              if (val) normalized[mapped] = val; // only add if not empty
+            }
           }
 
           if (!normalized.assetTag) {
@@ -188,14 +206,24 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
           if (!normalized.brand) {
             warnings.push(`Row ${i + 2}: Missing Brand`);
           }
+          if (!normalized.company) {
+            warnings.push(`Row ${i + 2}: Missing Company`);
+          }
 
           return {
-            id:       Date.now() + i,
-            assetTag: normalized.assetTag ?? "",
-            brand:    normalized.brand    ?? "",
-            model:    normalized.model    ?? "",
-            category: normalizeCategory(normalized.category ?? ""),
-            company:  normalizeCompany(normalized.company   ?? ""),
+            id:            Date.now() + i,
+            assetTag:      normalized.assetTag ?? "",
+            brand:         normalized.brand ?? "",
+            model:         normalized.model ?? "",
+            serialNumber:  normalized.serialNumber ?? "",
+            category:      normalizeCategory(normalized.category ?? ""),
+            company:       normalizeCompany(normalized.company ?? ""),
+            status:        (normalized.status as ITInventory["status"]) ?? "Spare",
+            assigneeName:  normalized.assigneeName ?? "",
+            assigneeId:    normalized.assigneeId ?? "",
+            location:      (normalized.location as ITInventory["location"]) ?? "Unit 1 & 2",
+            datePurchased: normalized.datePurchased ?? "",
+            notes:         normalized.notes ?? "",
           };
         });
 
@@ -222,28 +250,31 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
     setBulkSuccess(0);
     try {
       await Promise.all(
-        rows.map((r) =>
-          addAsset({
-            assetTag:     r.assetTag,
-            brand:        r.brand,
-            model:        r.model,
-            category:     r.category,
-            company:      r.company,
-            serialNumber: "",
-            assigneeId:   "",
-            assigneeName: "",
-            status:       shared.status,
-            location:     shared.location,
-            notes:        shared.notes,
-            datePurchased: shared.datePurchased
-              ? Timestamp.fromDate(new Date(shared.datePurchased))
+        rows.map((r) => {
+          // Build assignee name if not provided (try to find from employees list)
+          const assignee = employees.find((e) => e.id === r.assigneeId);
+          const finalAssigneeName = r.assigneeName || assignee?.name || "";
+
+          return addAsset({
+            assetTag:      r.assetTag,
+            company:       r.company,
+            serialNumber:  r.serialNumber,
+            model:         r.model,
+            brand:         r.brand,
+            category:      r.category,
+            status:        r.status,
+            assigneeId:    r.assigneeId,
+            assigneeName:  finalAssigneeName,
+            location:      r.location,
+            notes:         r.notes,
+            datePurchased: r.datePurchased
+              ? Timestamp.fromDate(new Date(r.datePurchased))
               : Timestamp.now(),
-          })
-        )
+          });
+        })
       );
       setBulkSuccess(rows.length);
       setRows([EMPTY_ROW(1)]);
-      setShared(EMPTY_BULK_SHARED);
       onSuccess();
       setTimeout(onClose, 900);
     } catch {
@@ -259,7 +290,6 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
     setForm(EMPTY_SINGLE);
     setError("");
     setRows([EMPTY_ROW(1)]);
-    setShared(EMPTY_BULK_SHARED);
     setBulkError("");
     setBulkSuccess(0);
     setParseWarnings([]);
@@ -348,43 +378,8 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
         {/* ── BULK TAB ── */}
         {tab === "bulk" && (
           <>
-            {/* Shared fields */}
-            <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-4">
-              <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-3">
-                Shared values — applied to all rows
-              </p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div>
-                  <label className={labelClass}>Status</label>
-                  <select name="status" value={shared.status} onChange={handleSharedChange} className={inputClass}>
-                    <option value="Spare">Spare</option>
-                    <option value="Deployed">Deployed</option>
-                    <option value="Defective">Defective</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={labelClass}>Location</label>
-                  <select name="location" value={shared.location} onChange={handleSharedChange} className={inputClass}>
-                    <option value="Unit 1 & 2">Unit 1 & 2</option>
-                    <option value="Unit 3">Unit 3</option>
-                    <option value="BDO Makati">BDO Makati</option>
-                    <option value="Triumph">Triumph</option>
-                    <option value="WFH">WFH</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={labelClass}>Date Purchased</label>
-                  <input name="datePurchased" type="date" value={shared.datePurchased} onChange={handleSharedChange} className={inputClass} />
-                </div>
-                <div>
-                  <label className={labelClass}>Notes</label>
-                  <input name="notes" placeholder="Notes (optional)" value={shared.notes} onChange={handleSharedChange} className={inputClass} />
-                </div>
-              </div>
-            </div>
-
             {/* Upload strip */}
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-3 mb-4 flex-wrap">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -399,14 +394,14 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
                 <span>📂</span> Upload Excel / CSV
               </button>
               <a
-                href="data:text/csv;charset=utf-8,Asset Tag,Brand,Model,Category,Company%0AOCG-001,Lenovo,ThinkPad X1,Laptop,OCG%0AOCG-002,Dell,U2722D,Monitor,OCG"
+                href="data:text/csv;charset=utf-8,Asset Tag,Company,Serial Number,Model,Brand,Category,Status,Assignee,Location,Date Purchased,Notes%0AOCG-001,OCG,SN12345,ThinkPad X1,Lenovo,Laptop,Deployed,John Doe,Unit 1 & 2,2024-01-15,In working condition"
                 download="it_inventory_template.csv"
                 className="text-xs text-blue-500 hover:text-blue-700 underline transition-colors"
               >
                 Download template
               </a>
               <span className="text-xs text-gray-400 ml-auto">
-                Columns: Asset Tag, Brand, Model, Category, Company
+                Columns: Asset Tag, Company, Serial Number, Model, Brand, Category, Status, Assignee, Location, Date Purchased, Notes
               </span>
             </div>
 
@@ -438,8 +433,8 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
               <table className="min-w-full text-sm">
                 <thead className="bg-gray-50">
                   <tr>
-                    {["#", "Asset Tag *", "Brand *", "Model", "Category", "Company *", ""].map((h) => (
-                      <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">
+                    {["#", "Asset Tag *", "Company *", "Serial #", "Model", "Brand *", "Category", "Status", "Assignee", "Location", "Date Purchased", "Notes", ""].map((h) => (
+                      <th key={h} className="px-2 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">
                         {h}
                       </th>
                     ))}
@@ -448,63 +443,19 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
                 <tbody className="divide-y divide-gray-100">
                   {rows.map((row, i) => (
                     <tr key={row.id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                      <td className="px-3 py-2 text-xs text-gray-400 w-8">{i + 1}</td>
-                      <td className="px-2 py-1.5">
-                        <input
-                          placeholder="e.g. OCG-001"
-                          value={row.assetTag}
-                          onChange={(e) => updateRow(row.id, "assetTag", e.target.value)}
-                          className={`${cellInput} ${!row.assetTag ? "border-red-200 bg-red-50" : ""}`}
-                        />
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <input
-                          placeholder="e.g. Lenovo"
-                          value={row.brand}
-                          onChange={(e) => updateRow(row.id, "brand", e.target.value)}
-                          className={`${cellInput} ${!row.brand ? "border-red-200 bg-red-50" : ""}`}
-                        />
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <input
-                          placeholder="e.g. ThinkPad"
-                          value={row.model}
-                          onChange={(e) => updateRow(row.id, "model", e.target.value)}
-                          className={cellInput}
-                        />
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <select
-                          value={row.category}
-                          onChange={(e) => updateRow(row.id, "category", e.target.value)}
-                          className={cellInput}
-                        >
-                          <option value="Laptop">Laptop</option>
-                          <option value="Monitor">Monitor</option>
-                          <option value="Desktop">Desktop</option>
-                        </select>
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <select
-                          value={row.company}
-                          onChange={(e) => updateRow(row.id, "company", e.target.value)}
-                          className={`${cellInput} ${!row.company ? "border-red-200 bg-red-50" : ""}`}
-                        >
-                          <option value="">— select —</option>
-                          <option value="OCG">OCG</option>
-                          <option value="SDB">SDB</option>
-                        </select>
-                      </td>
-                      <td className="px-2 py-1.5 text-center">
-                        {rows.length > 1 && (
-                          <button
-                            onClick={() => removeRow(row.id)}
-                            className="text-gray-300 hover:text-red-400 transition-colors text-base font-bold"
-                          >
-                            ✕
-                          </button>
-                        )}
-                      </td>
+                      <td className="px-2 py-1.5 text-xs text-gray-400 w-8">{i + 1}</td>
+                      <td className="px-1 py-1"><input placeholder="e.g. OCG-001" value={row.assetTag} onChange={(e) => updateRow(row.id, "assetTag", e.target.value)} className={`${cellInput} w-20 ${!row.assetTag ? "border-red-200 bg-red-50" : ""}`} /></td>
+                      <td className="px-1 py-1"><select value={row.company} onChange={(e) => updateRow(row.id, "company", e.target.value)} className={`${cellInput} w-16 ${!row.company ? "border-red-200 bg-red-50" : ""}`}><option value="">—</option><option value="OCG">OCG</option><option value="SDB">SDB</option></select></td>
+                      <td className="px-1 py-1"><input placeholder="SN..." value={row.serialNumber} onChange={(e) => updateRow(row.id, "serialNumber", e.target.value)} className={`${cellInput} w-24`} /></td>
+                      <td className="px-1 py-1"><input placeholder="e.g. ThinkPad" value={row.model} onChange={(e) => updateRow(row.id, "model", e.target.value)} className={`${cellInput} w-20`} /></td>
+                      <td className="px-1 py-1"><input placeholder="e.g. Lenovo" value={row.brand} onChange={(e) => updateRow(row.id, "brand", e.target.value)} className={`${cellInput} w-20 ${!row.brand ? "border-red-200 bg-red-50" : ""}`} /></td>
+                      <td className="px-1 py-1"><select value={row.category} onChange={(e) => updateRow(row.id, "category", e.target.value)} className={`${cellInput} w-20`}><option value="Laptop">Laptop</option><option value="Monitor">Monitor</option><option value="Desktop">Desktop</option></select></td>
+                      <td className="px-1 py-1"><select value={row.status} onChange={(e) => updateRow(row.id, "status", e.target.value as ITInventory["status"])} className={`${cellInput} w-20`}><option value="Spare">Spare</option><option value="Deployed">Deployed</option><option value="Defective">Defective</option></select></td>
+                      <td className="px-1 py-1"><input placeholder="Name" value={row.assigneeName} onChange={(e) => updateRow(row.id, "assigneeName", e.target.value)} className={`${cellInput} w-24`} /></td>
+                      <td className="px-1 py-1"><select value={row.location} onChange={(e) => updateRow(row.id, "location", e.target.value as ITInventory["location"])} className={`${cellInput} w-24`}><option value="Unit 1 & 2">Unit 1 & 2</option><option value="Unit 3">Unit 3</option><option value="BDO Makati">BDO Makati</option><option value="Triumph">Triumph</option><option value="WFH">WFH</option></select></td>
+                      <td className="px-1 py-1"><input type="date" value={row.datePurchased} onChange={(e) => updateRow(row.id, "datePurchased", e.target.value)} className={`${cellInput} w-32`} /></td>
+                      <td className="px-1 py-1"><input placeholder="Notes..." value={row.notes} onChange={(e) => updateRow(row.id, "notes", e.target.value)} className={`${cellInput} w-32`} /></td>
+                      <td className="px-1 py-1.5 text-center">{rows.length > 1 && (<button onClick={() => removeRow(row.id)} className="text-gray-300 hover:text-red-400 transition-colors text-base font-bold">✕</button>)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -521,7 +472,7 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
 
             <div className="flex items-center justify-between">
               <p className="text-xs text-gray-400">
-                {rows.length} row{rows.length !== 1 ? "s" : ""} · Status, Location, Date & Notes shared
+                {rows.length} row{rows.length !== 1 ? "s" : ""} · All fields per row · Blank cells will be empty
               </p>
               <div className="flex gap-3">
                 <button onClick={handleClose} className={cancelBtn}>Cancel</button>
