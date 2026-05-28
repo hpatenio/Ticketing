@@ -1,3 +1,5 @@
+import { Timestamp } from "firebase/firestore";
+
 export type UserRole = "employee" | "admin" | "superadmin";
 
 export type ADUser = {
@@ -9,3 +11,55 @@ export type ADUser = {
   phone: string;
   role: UserRole;
 };
+
+export interface ITInventory {
+  id: string;
+  assetTag: string;
+  company: string;
+  serialNumber: string;
+  model: string;
+  brand: string;
+  status: "Deployed" | "Spare" | "Defective";
+  assigneeId: string;
+  assigneeName: string;
+  category: "Laptop" | "Monitor" | "Desktop";
+  location: "Unit 1 & 2" | "Unit 3" | "BDO Makati" | "Triumph" | "WFH";
+  datePurchased: Timestamp;
+  notes: string;
+  createdAt: Timestamp;
+}
+
+export interface ITConsumable {
+  id: string;
+  printerName: string;
+  serialNumber: string;
+  location: string;
+  blackInk: number;
+  cyanInk: number;
+  magentaInk: number;
+  yellowInk: number;
+  photoBlack: number;
+  maintenanceBox: string;
+}
+
+export interface ConcernTicket {
+  id: string;
+  ticketNumber: string;
+  summary: string;
+  requesterId: string;
+  requesterName: string;
+  assigneeId: string;
+  assigneeName: string;
+  category: "CCTV" | "Licenses Accounts" | "Hardware" | "Email" | "Network" | "Maintenance" | "Medicine" | "Office Supplies" | "Software" | "Other";
+  priority: "Low" | "Medium" | "High";
+  status: "Pending" | "In Progress" | "Resolved";
+  dateCreated: Timestamp;
+  dueDate: Timestamp;
+}
+
+// For the reusable table
+export interface Column<T> {
+  key: keyof T;
+  label: string;
+  render?: (row: T) => React.ReactNode;
+}

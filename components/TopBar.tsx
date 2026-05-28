@@ -55,8 +55,6 @@ export default function TopBar({
       <View
         style={{
           backgroundColor: "#EEF7FB",
-          borderBottomWidth: 0.5,
-          borderBottomColor: "#E8F4F8",
           marginTop: 12,
         }}
       >
@@ -133,8 +131,7 @@ export default function TopBar({
         paddingHorizontal: 24,
         paddingVertical: 16,
         backgroundColor: "#EEF7FB",
-        borderBottomWidth: 0.5,
-        borderBottomColor: "#E8F4F8",
+       
         gap: 16,
         marginTop: 12,
       }}
@@ -169,7 +166,7 @@ export default function TopBar({
             fontSize: 15,
             color: "#1D4B5C",
             flex: 1,
-            padding: 0,
+            padding: 3,
           }}
         />
       </View>

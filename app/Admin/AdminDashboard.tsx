@@ -2,16 +2,16 @@ import { useState } from "react";
 import {
   View,
   Text,
-  ScrollView,
   TouchableOpacity,
+  ScrollView,
   Platform,
-  useWindowDimensions, // ← make sure this is here
+  useWindowDimensions,
 } from "react-native";
 import { ADUser } from "../../types";
-import { logout } from "../auth/Logout";
 import Sidebar from "../../components/Navigations/Sidebar";
 import BottomNavBar from "../../components/Navigations/BottmNavBar";
 import TopBar from "../../components/TopBar";
+import ITInventoryPage from "./Modules/ITInventory/ITInventoryPage";
 
 type Props = {
   user: ADUser;
@@ -21,16 +21,25 @@ type Props = {
 export default function AdminDashboard({ user, onLogout }: Props) {
   const [activeKey, setActiveKey] = useState("dashboard");
   const { width } = useWindowDimensions();
-  const isMobile =
-    Platform.OS === "android" || Platform.OS === "ios" || width < 768;
-  console.log("isMobile:", isMobile, "width:", width, "platform:", Platform.OS);
+  const isMobile = Platform.OS === "android" || Platform.OS === "ios" || width < 768;
 
-  const handleLogout = async () => {
-    console.log("Logging out...");
-    await logout();
-    onLogout();
+  const renderContent = () => {
+    switch (activeKey) {
+      case "inventory":   return <ITInventoryPage />;
+      case "dashboard":
+      default:            return <DashboardHome user={user} />;
+    }
   };
-  console.log("rendering dashboard, isMobile:", isMobile);
+
+  const getTitle = () => {
+    switch (activeKey) {
+      case "inventory":   return "IT Inventory";
+      case "consumables": return "IT Consumables";
+      case "tickets":     return "Concern Tickets";
+      default:            return "Dashboard";
+    }
+  };
+
   return (
     <View style={{ flex: 1, flexDirection: "row" }}>
       {!isMobile && (
@@ -38,33 +47,21 @@ export default function AdminDashboard({ user, onLogout }: Props) {
           user={user}
           activeKey={activeKey}
           onNavigate={(key) => setActiveKey(key)}
+          onLogout={onLogout}   // ← passed directly; Sidebar owns the modal
         />
       )}
 
-      <View
-        style={{ flex: 1, flexDirection: "column", backgroundColor: "#EEF7FB" }}
-      >
+      <View style={{ flex: 1, flexDirection: "column", backgroundColor: "#EEF7FB" }}>
         <TopBar
-          title="Dashboard"
+          title={getTitle()}
           onBellPress={() => console.log("bell pressed")}
           onProfilePress={() => console.log("profile pressed")}
         />
 
-        {/* Give ScrollView a flex but NOT flex:1 so it doesn't take all space */}
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
-          <View style={{ padding: 24 }}>
-            <TouchableOpacity
-              className="bg-slate-700 rounded-xl py-3 items-center"
-              onPress={handleLogout}
-            >
-              <Text className="text-slate-200 text-sm font-semibold">
-                Log out
-              </Text>
-            </TouchableOpacity>
-          </View>
+          {renderContent()}
         </ScrollView>
 
-        {/* Force visible for testing */}
         {isMobile && (
           <BottomNavBar
             user={user}
@@ -72,6 +69,34 @@ export default function AdminDashboard({ user, onLogout }: Props) {
             onNavigate={(key) => setActiveKey(key)}
           />
         )}
+      </View>
+    </View>
+  );
+}
+
+function DashboardHome({ user }: { user: ADUser }) {
+  return (
+    <View className="p-6">
+      <Text className="text-xl font-bold text-gray-800 mb-2">
+        Welcome, {user.username}!
+      </Text>
+      <Text className="text-sm text-gray-500 mb-6">
+        Here's your admin overview.
+      </Text>
+
+      <View className="flex-row flex-wrap gap-4 mb-6">
+        <View className="bg-white rounded-xl p-4 flex-1 min-w-[140px] shadow-sm">
+          <Text className="text-xs text-gray-500">Total Assets</Text>
+          <Text className="text-2xl font-bold text-blue-600 mt-1">--</Text>
+        </View>
+        <View className="bg-white rounded-xl p-4 flex-1 min-w-[140px] shadow-sm">
+          <Text className="text-xs text-gray-500">Open Tickets</Text>
+          <Text className="text-2xl font-bold text-orange-500 mt-1">--</Text>
+        </View>
+        <View className="bg-white rounded-xl p-4 flex-1 min-w-[140px] shadow-sm">
+          <Text className="text-xs text-gray-500">Printers</Text>
+          <Text className="text-2xl font-bold text-green-600 mt-1">--</Text>
+        </View>
       </View>
     </View>
   );
