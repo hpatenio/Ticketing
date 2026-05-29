@@ -12,6 +12,7 @@ import BottomNavBar from "../../components/Navigations/BottmNavBar";
 import TopBar from "../../components/TopBar";
 import ITInventoryPage from "./Modules/ITInventory/ITInventoryPage";
 import ITInventorySummary from "./Modules/ITInventory/ITInventorySummary";
+import ConsumablesPage from "./Modules/Consumables/ConsumablesPage";
 
 type Props = {
   user: ADUser;
@@ -25,9 +26,10 @@ export default function AdminDashboard({ user, onLogout }: Props) {
 
   const renderContent = () => {
     switch (activeKey) {
-      case "inventory": return <ITInventoryPage />;
+      case "inventory":   return <ITInventoryPage />;
+      case "consumables": return <ConsumablesPage />;
       case "dashboard":
-      default:          return <DashboardHome user={user} />;
+      default:            return <DashboardHome user={user} />;
     }
   };
 
@@ -83,7 +85,6 @@ function DashboardHome({ user }: { user: ADUser }) {
       <Text className="text-sm text-gray-500 mb-6">
         Here's your admin overview.
       </Text>
-
       <ITInventorySummary />
     </View>
   );
