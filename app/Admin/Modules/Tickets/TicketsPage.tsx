@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -6,45 +6,59 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Platform,
 } from "react-native";
 import { useEmployees, EmployeeOption } from "../../../../hooks/useEmployees";
-import { ConcernTicket, Column } from "../../../../types";
+import { ConcernTicket } from "../../../../types";
 import {
   getAllTickets,
   updateTicketField,
 } from "../../../../Services/ticketService";
 import InlineDropdown from "../../../../components/common/InlineDropdown";
 import InlineDatePicker from "../../../../components/common/InlineDatePicker";
-import DataTable from "../../../../components/common/DataTable";
 import EditAssetModal from "./EditAssetModal";
 import AddAssetModal from "./AddAssetModal";
+import { useTheme } from "../../../../theme/ThemeContext";
+
+// ─── Options ──────────────────────────────────────────────────────────────────
 
 const CATEGORY_OPTIONS = [
-  { label: "CCTV", value: "CCTV", color: "bg-blue-600" },
+  { label: "CCTV",              value: "CCTV",              color: "bg-blue-600"   },
   { label: "Licenses Accounts", value: "Licenses Accounts", color: "bg-violet-600" },
-  { label: "Hardware", value: "Hardware", color: "bg-slate-600" },
-  { label: "Email", value: "Email", color: "bg-cyan-600" },
-  { label: "Network", value: "Network", color: "bg-emerald-600" },
-  { label: "Maintenance", value: "Maintenance", color: "bg-amber-600" },
-  { label: "Medicine", value: "Medicine", color: "bg-rose-600" },
-  { label: "Office Supplies", value: "Office Supplies", color: "bg-slate-500" },
-  { label: "Software", value: "Software", color: "bg-indigo-600" },
-  { label: "Other", value: "Other", color: "bg-gray-600" },
+  { label: "Hardware",          value: "Hardware",          color: "bg-slate-600"  },
+  { label: "Email",             value: "Email",             color: "bg-cyan-600"   },
+  { label: "Network",           value: "Network",           color: "bg-emerald-600"},
+  { label: "Maintenance",       value: "Maintenance",       color: "bg-amber-600"  },
+  { label: "Medicine",          value: "Medicine",          color: "bg-rose-600"   },
+  { label: "Office Supplies",   value: "Office Supplies",   color: "bg-slate-500"  },
+  { label: "Software",          value: "Software",          color: "bg-indigo-600" },
+  { label: "Other",             value: "Other",             color: "bg-gray-600"   },
 ] as const;
 
 const PRIORITY_OPTIONS = [
-  { label: "Low", value: "Low" },
+  { label: "Low",    value: "Low"    },
   { label: "Medium", value: "Medium" },
-  { label: "High", value: "High" },
+  { label: "High",   value: "High"   },
 ] as const;
 
 const STATUS_OPTIONS = [
-  { label: "Pending", value: "Pending" },
+  { label: "Pending",     value: "Pending"     },
   { label: "In Progress", value: "In Progress" },
-  { label: "Resolved", value: "Resolved" },
+  { label: "Resolved",    value: "Resolved"    },
 ] as const;
 
+// ─── Column config (mirrors inventory/consumables pattern) ────────────────────
+
+const COLUMNS = [
+  { key: "summary",       label: "Summary",     flex: 2,   minWidth: 180 },
+  { key: "requesterName", label: "Requester",   flex: 1.5, minWidth: 120 },
+  { key: "assigneeName",  label: "Assignee",    flex: 1.5, minWidth: 120 },
+  { key: "category",      label: "Category",    flex: 1.5, minWidth: 130 },
+  { key: "priority",      label: "Priority",    flex: 1,   minWidth: 90  },
+  { key: "status",        label: "Status",      flex: 1.2, minWidth: 110 },
+  { key: "dueDate",       label: "Due Date",    flex: 1.2, minWidth: 110 },
+] as const;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatTimestamp(value: any) {
   if (value && typeof value.toDate === "function") {
@@ -56,59 +70,82 @@ function formatTimestamp(value: any) {
   return String(value || "-");
 }
 
-function formatDateForInput(value: any) {
-  if (value && typeof value.toDate === "function") {
-    return value.toDate().toISOString().split("T")[0];
-  }
-  if (value instanceof Date) {
-    return value.toISOString().split("T")[0];
-  }
-  const date = new Date(value as any);
-  return !Number.isNaN(date.getTime()) ? date.toISOString().split("T")[0] : "";
-}
+const renderStatusBadge = (value: string) => {
+  const bg =
+    value === "Resolved"    ? "#d1fae5" :
+    value === "In Progress" ? "#dbeafe" : "#fef9c3";
+  const color =
+    value === "Resolved"    ? "#065f46" :
+    value === "In Progress" ? "#1d4ed8" : "#92400e";
+  return (
+    <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: bg }}>
+      <Text style={{ fontSize: 11, fontWeight: "700", color }}>{value || "—"}</Text>
+    </View>
+  );
+};
+
+const renderPriorityBadge = (value: string) => {
+  const bg =
+    value === "High"   ? "#fee2e2" :
+    value === "Medium" ? "#fef9c3" : "#f0fdf4";
+  const color =
+    value === "High"   ? "#b91c1c" :
+    value === "Medium" ? "#92400e" : "#166534";
+  return (
+    <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: bg }}>
+      <Text style={{ fontSize: 11, fontWeight: "700", color }}>{value || "—"}</Text>
+    </View>
+  );
+};
+
+// ─── Row component ────────────────────────────────────────────────────────────
 
 type TicketRowProps = {
   ticket: ConcernTicket;
+  index: number;
   assigneeOptions: readonly { label: string; value: string }[];
   employeeOptions: readonly { label: string; value: string }[];
   onUpdateField: (ticketNumber: string, field: string, value: any) => Promise<void>;
   onOpenDetails: (ticket: ConcernTicket) => void;
 };
 
-const TicketRow = ({ ticket, assigneeOptions, employeeOptions, onUpdateField, onOpenDetails }: TicketRowProps) => {
-  const [lastSummaryTap, setLastSummaryTap] = useState(0);
-
-  const handleSummaryPress = () => {
-    const now = Date.now();
-    if (now - lastSummaryTap < 300) {
-      onOpenDetails(ticket);
-    }
-    setLastSummaryTap(now);
-  };
-  const getDateValue = () => {
-    try {
-      if (ticket.dueDate instanceof Date) {
-        return ticket.dueDate;
-      }
-      if (typeof ticket.dueDate === "object" && ticket.dueDate?.toDate) {
-        return ticket.dueDate.toDate();
-      }
-      const date = new Date(ticket.dueDate as any);
-      return !Number.isNaN(date.getTime()) ? date : new Date();
-    } catch {
-      return new Date();
-    }
-  };
-
+const TicketRow = ({
+  ticket,
+  index,
+  assigneeOptions,
+  employeeOptions,
+  onUpdateField,
+  onOpenDetails,
+}: TicketRowProps) => {
+  const { theme } = useTheme();
+  const [lastTap, setLastTap] = useState(0);
   const [dueDate, setDueDate] = useState(formatTimestamp(ticket.dueDate));
 
   useEffect(() => {
     setDueDate(formatTimestamp(ticket.dueDate));
   }, [ticket.dueDate]);
 
+  const handleSummaryPress = () => {
+    const now = Date.now();
+    if (now - lastTap < 300) onOpenDetails(ticket);
+    setLastTap(now);
+  };
+
+  const getDateValue = () => {
+    try {
+      if (ticket.dueDate instanceof Date) return ticket.dueDate;
+      if (typeof ticket.dueDate === "object" && (ticket.dueDate as any)?.toDate) {
+        return (ticket.dueDate as any).toDate();
+      }
+      const d = new Date(ticket.dueDate as any);
+      return !Number.isNaN(d.getTime()) ? d : new Date();
+    } catch {
+      return new Date();
+    }
+  };
+
   const handleDateConfirm = async (newDate: Date) => {
-    const formattedDate = newDate.toLocaleDateString();
-    setDueDate(formattedDate);
+    setDueDate(newDate.toLocaleDateString());
     try {
       await onUpdateField(ticket.ticketNumber, "dueDate", newDate.toISOString().split("T")[0]);
     } catch (err) {
@@ -117,43 +154,55 @@ const TicketRow = ({ ticket, assigneeOptions, employeeOptions, onUpdateField, on
   };
 
   return (
-    <View className="flex-row items-center border-b border-slate-200 px-4 py-3">
-      <View className="flex-1 min-w-[150px] pr-2">
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        borderBottomWidth: 1,
+        borderBottomColor: theme.border,
+        backgroundColor: index % 2 === 0 ? theme.background : theme.surface,
+      }}
+    >
+      {/* Summary */}
+      <View style={{ flex: 2, minWidth: 180, paddingHorizontal: 12, paddingVertical: 10 }}>
         <TouchableOpacity onPress={handleSummaryPress} activeOpacity={0.7}>
-          <Text className="text-slate-900 font-semibold text-xs" numberOfLines={2}>{ticket.summary}</Text>
-          <Text className="text-slate-500 text-[10px] mt-0.5">Double tap to edit</Text>
+          <Text style={{ fontSize: 12, fontWeight: "600", color: theme.text }} numberOfLines={2}>
+            {ticket.summary}
+          </Text>
+          <Text style={{ fontSize: 10, color: theme.subtext, marginTop: 2 }}>
+            {ticket.ticketNumber}
+          </Text>
         </TouchableOpacity>
-        <Text className="text-slate-500 text-xs mt-0.5">{ticket.ticketNumber}</Text>
       </View>
 
-      <View className="flex-1 min-w-[100px] pr-2">
-        <Text className="text-slate-600 text-xs mb-1">Requester</Text>
+      {/* Requester */}
+      <View style={{ flex: 1.5, minWidth: 120, paddingHorizontal: 12, paddingVertical: 10 }}>
         <InlineDropdown
           value={ticket.requesterName || "Unknown"}
           options={employeeOptions}
           onSelect={async (val: string) => {
-            const selected = employeeOptions.find((item) => item.value === val);
+            const selected = employeeOptions.find((e) => e.value === val);
             await onUpdateField(ticket.ticketNumber, "requesterId", val);
             await onUpdateField(ticket.ticketNumber, "requesterName", selected?.label ?? "");
           }}
         />
       </View>
 
-      <View className="flex-1 min-w-[100px] pr-2">
-        <Text className="text-slate-600 text-xs mb-1">Assignee</Text>
+      {/* Assignee */}
+      <View style={{ flex: 1.5, minWidth: 120, paddingHorizontal: 12, paddingVertical: 10 }}>
         <InlineDropdown
           value={ticket.assigneeName || "Unassigned"}
           options={[{ label: "Unassigned", value: "" }, ...assigneeOptions]}
           onSelect={async (val: string) => {
-            const selected = assigneeOptions.find((item) => item.value === val);
+            const selected = assigneeOptions.find((e) => e.value === val);
             await onUpdateField(ticket.ticketNumber, "assigneeId", val);
             await onUpdateField(ticket.ticketNumber, "assigneeName", selected?.label ?? "");
           }}
         />
       </View>
 
-      <View className="flex-1 min-w-[80px] pr-2">
-        <Text className="text-slate-600 text-xs mb-1">Category</Text>
+      {/* Category */}
+      <View style={{ flex: 1.5, minWidth: 130, paddingHorizontal: 12, paddingVertical: 10 }}>
         <InlineDropdown
           value={ticket.category}
           options={CATEGORY_OPTIONS}
@@ -161,31 +210,28 @@ const TicketRow = ({ ticket, assigneeOptions, employeeOptions, onUpdateField, on
         />
       </View>
 
-      <View className="flex-1 min-w-[70px] pr-2">
-        <Text className="text-slate-600 text-xs mb-1">Priority</Text>
+      {/* Priority */}
+      <View style={{ flex: 1, minWidth: 90, paddingHorizontal: 12, paddingVertical: 10 }}>
         <InlineDropdown
           value={ticket.priority}
           options={PRIORITY_OPTIONS}
           onSelect={async (val: string) => onUpdateField(ticket.ticketNumber, "priority", val)}
+          renderBadge={renderPriorityBadge}
         />
       </View>
 
-      <View className="flex-1 min-w-[80px] pr-2">
-        <Text className="text-slate-600 text-xs mb-1">Status</Text>
+      {/* Status */}
+      <View style={{ flex: 1.2, minWidth: 110, paddingHorizontal: 12, paddingVertical: 10 }}>
         <InlineDropdown
           value={ticket.status}
           options={STATUS_OPTIONS}
           onSelect={async (val: string) => onUpdateField(ticket.ticketNumber, "status", val)}
-          renderBadge={(value: string) => (
-            <View className={`px-2 py-1 rounded-full ${value === "Resolved" ? "bg-emerald-100" : value === "In Progress" ? "bg-blue-100" : "bg-yellow-100"}`}>
-              <Text className={`text-xs ${value === "Resolved" ? "text-emerald-700" : value === "In Progress" ? "text-blue-700" : "text-yellow-800"}`}>{value}</Text>
-            </View>
-          )}
+          renderBadge={renderStatusBadge}
         />
       </View>
 
-      <View className="flex-1 min-w-[90px]">
-        <Text className="text-slate-600 text-xs mb-1">Due</Text>
+      {/* Due Date */}
+      <View style={{ flex: 1.2, minWidth: 110, paddingHorizontal: 12, paddingVertical: 10 }}>
         <InlineDatePicker
           value={dueDate}
           initialDate={getDateValue()}
@@ -196,17 +242,17 @@ const TicketRow = ({ ticket, assigneeOptions, employeeOptions, onUpdateField, on
   );
 };
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function TicketsPage() {
+  const { theme } = useTheme();
   const [tickets, setTickets] = useState<ConcernTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingTicket, setEditingTicket] = useState<ConcernTicket | null>(null);
-  type CategoryValue = (typeof CATEGORY_OPTIONS)[number]["value"];
-  type PriorityValue = (typeof PRIORITY_OPTIONS)[number]["value"];
-  type StatusValue = (typeof STATUS_OPTIONS)[number]["value"];
-  const { employees, loading: employeesLoading } = useEmployees();
+  const { employees } = useEmployees();
 
   const loadTickets = async () => {
     setLoading(true);
@@ -232,7 +278,6 @@ export default function TicketsPage() {
           .includes(search.trim().toLowerCase())
       )
     : tickets;
-
 
   const handleUpdateField = async (ticketNumber: string, field: string, value: any) => {
     try {
@@ -277,221 +322,114 @@ export default function TicketsPage() {
     }
   };
 
-  const assigneeOptions = employees.map((employee: EmployeeOption) => ({
-    label: employee.name,
-    value: employee.id,
-  }));
-
-  const employeeOptions = employees.map((employee: EmployeeOption) => ({
-    label: employee.name,
-    value: employee.id,
-  }));
-
-  const handleDeleteTicket = (_id: string) => {
-    // DataTable currently includes an actions column by default.
-    // Ticket deletion is not supported from this page today.
-  };
-
-  const ticketTableColumns: Column<ConcernTicket>[] = [
-    {
-      key: "summary",
-      label: "Summary",
-      render: (row) => (
-        <div className="flex flex-col gap-1">
-          <button
-            type="button"
-            onClick={() => openEditModal(row)}
-            className="text-slate-900 font-semibold text-xs text-left"
-          >
-            {row.summary}
-          </button>
-          <span className="text-slate-500 text-[10px]">{row.ticketNumber}</span>
-        </div>
-      ),
-    },
-    {
-      key: "requesterName",
-      label: "Requester",
-      render: (row) => (
-        <InlineDropdown
-          value={row.requesterName || "Unknown"}
-          options={employeeOptions}
-          onSelect={async (val: string) => {
-            const selected = employeeOptions.find((item) => item.value === val);
-            await handleUpdateField(row.ticketNumber, "requesterId", val);
-            await handleUpdateField(row.ticketNumber, "requesterName", selected?.label ?? "");
-          }}
-        />
-      ),
-    },
-    {
-      key: "assigneeName",
-      label: "Assignee",
-      render: (row) => (
-        <InlineDropdown
-          value={row.assigneeName || "Unassigned"}
-          options={[{ label: "Unassigned", value: "" }, ...assigneeOptions]}
-          onSelect={async (val: string) => {
-            const selected = assigneeOptions.find((item) => item.value === val);
-            await handleUpdateField(row.ticketNumber, "assigneeId", val);
-            await handleUpdateField(row.ticketNumber, "assigneeName", selected?.label ?? "");
-          }}
-        />
-      ),
-    },
-    {
-      key: "category",
-      label: "Category",
-      render: (row) => (
-        <InlineDropdown
-          value={row.category}
-          options={CATEGORY_OPTIONS}
-          onSelect={async (val: string) => handleUpdateField(row.ticketNumber, "category", val)}
-        />
-      ),
-    },
-    {
-      key: "priority",
-      label: "Priority",
-      render: (row) => (
-        <InlineDropdown
-          value={row.priority}
-          options={PRIORITY_OPTIONS}
-          onSelect={async (val: string) => handleUpdateField(row.ticketNumber, "priority", val)}
-        />
-      ),
-    },
-    {
-      key: "status",
-      label: "Status",
-      render: (row) => (
-        <InlineDropdown
-          value={row.status}
-          options={STATUS_OPTIONS}
-          onSelect={async (val: string) => handleUpdateField(row.ticketNumber, "status", val)}
-          renderBadge={(value: string) => (
-            <div className={`px-2 py-1 rounded-full ${
-              value === "Resolved"
-                ? "bg-emerald-100"
-                : value === "In Progress"
-                ? "bg-blue-100"
-                : "bg-yellow-100"
-            }`}
-            >
-              <span className={`text-xs ${
-                value === "Resolved"
-                  ? "text-emerald-700"
-                  : value === "In Progress"
-                  ? "text-blue-700"
-                  : "text-yellow-800"
-              }`}
-              >
-                {value}
-              </span>
-            </div>
-          )}
-        />
-      ),
-    },
-    {
-      key: "dueDate",
-      label: "Due",
-      render: (row) => {
-        const initialDue = row.dueDate && typeof (row.dueDate as any).toDate === "function"
-          ? (row.dueDate as any).toDate()
-          : (row.dueDate as any);
-
-        return (
-          <InlineDatePicker
-            value={formatTimestamp(row.dueDate)}
-            initialDate={new Date(initialDue)}
-            onConfirm={async (newDate: Date) => {
-              await handleUpdateField(row.ticketNumber, "dueDate", newDate.toISOString().split("T")[0]);
-            }}
-          />
-        );
-      },
-    },
-  ];
+  const assigneeOptions = employees.map((e: EmployeeOption) => ({ label: e.name, value: e.id }));
+  const employeeOptions = employees.map((e: EmployeeOption) => ({ label: e.name, value: e.id }));
 
   return (
-    <View className="flex-1 p-4 bg-slate-100" style={{ minHeight: "100%" }}>
-      <View className="flex-row items-center justify-between mb-4">
+    <View style={{ flex: 1, padding: 16, backgroundColor: theme.background }}>
+
+      {/* Header */}
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <View>
-          <Text className="text-xl font-bold text-slate-900">Concern Tickets</Text>
-          <Text className="text-sm text-slate-500">Monitor employee-submitted tickets and create new concerns.</Text>
+          <Text style={{ fontSize: 20, fontWeight: "700", color: theme.text }}>Concern Tickets</Text>
+          <Text style={{ fontSize: 12, color: theme.subtext, marginTop: 2 }}>
+            {filteredTickets.length} of {tickets.length} tickets
+          </Text>
         </View>
         <TouchableOpacity
-          className="bg-blue-600 px-4 py-2 rounded-2xl"
           onPress={() => setModalVisible(true)}
+          style={{ backgroundColor: theme.iconActive, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}
         >
-          <Text className="text-white font-semibold">+ Add Ticket</Text>
+          <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}>+ Add Ticket</Text>
         </TouchableOpacity>
       </View>
 
+      {/* Search */}
       <TextInput
-        className="bg-white rounded-3xl px-4 py-3 mb-4 border border-slate-200"
         placeholder="Search tickets..."
-        placeholderTextColor="#94a3b8"
+        placeholderTextColor={theme.subtext}
         value={search}
         onChangeText={setSearch}
+        style={{
+          width: "100%",
+          paddingHorizontal: 16,
+          paddingVertical: 10,
+          marginBottom: 16,
+          fontSize: 13,
+          borderWidth: 1,
+          borderColor: theme.border,
+          borderRadius: 8,
+          backgroundColor: theme.surface,
+          color: theme.text,
+        }}
       />
 
+      {/* Table */}
       {loading ? (
-        <View className="flex-1 items-center justify-center mt-16">
-          <ActivityIndicator size="large" color="#3b82f6" />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator size="large" color={theme.iconActive} />
         </View>
       ) : filteredTickets.length === 0 ? (
-        <View className="rounded-3xl bg-white p-6 items-center mt-8">
-          <Text className="text-slate-600">No tickets found.</Text>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 80 }}>
+          <Text style={{ color: theme.subtext, fontSize: 13 }}>No tickets found.</Text>
         </View>
-      ) : Platform.OS === "web" ? (
-        <DataTable
-          columns={ticketTableColumns}
-          data={filteredTickets}
-          loading={loading}
-          onEdit={openEditModal}
-          onDelete={handleDeleteTicket}
-          showActions={false}
-        />
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <View className="bg-white rounded-3xl overflow-hidden">
-            <View className="flex-row items-center bg-slate-200 px-4 py-3 border-b border-slate-300">
-              <Text className="flex-1 min-w-[150px] text-slate-600 text-xs font-semibold">Summary</Text>
-              <Text className="flex-1 min-w-[100px] text-slate-600 text-xs font-semibold">Requester</Text>
-              <Text className="flex-1 min-w-[100px] text-slate-600 text-xs font-semibold">Assignee</Text>
-              <Text className="flex-1 min-w-[80px] text-slate-600 text-xs font-semibold">Category</Text>
-              <Text className="flex-1 min-w-[70px] text-slate-600 text-xs font-semibold">Priority</Text>
-              <Text className="flex-1 min-w-[80px] text-slate-600 text-xs font-semibold">Status</Text>
-              <Text className="flex-1 min-w-[90px] text-slate-600 text-xs font-semibold">Due</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1, minWidth: "100%" }}
+        >
+          <View style={{ flex: 1, minWidth: "100%", borderRadius: 10, borderWidth: 1, borderColor: theme.border, overflow: "hidden" }}>
+
+            {/* Header row */}
+            <View style={{ flexDirection: "row", backgroundColor: theme.surface, borderBottomWidth: 1, borderBottomColor: theme.border }}>
+              {COLUMNS.map((col) => (
+                <View
+                  key={col.key}
+                  style={{
+                    flex: col.flex,
+                    minWidth: col.minWidth,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: "600", color: theme.subtext, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    {col.label}
+                  </Text>
+                </View>
+              ))}
             </View>
 
-            {filteredTickets.map((ticket) => {
-              try {
-                return (
-                  <TicketRow
-                    key={ticket.ticketNumber}
-                    ticket={ticket}
-                    assigneeOptions={assigneeOptions}
-                    employeeOptions={employeeOptions}
-                    onUpdateField={handleUpdateField}
-                    onOpenDetails={openEditModal}
-                  />
-                );
-              } catch (err) {
-                console.error("Error rendering ticket row:", err, ticket);
-                return (
-                  <View key={ticket.ticketNumber} className="px-4 py-3 border-b border-slate-200">
-                    <Text className="text-red-600 text-xs">Error rendering ticket</Text>
-                  </View>
-                );
-              }
-            })}
+            {/* Rows */}
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {filteredTickets.map((ticket, index) => {
+                try {
+                  return (
+                    <TicketRow
+                      key={ticket.ticketNumber}
+                      ticket={ticket}
+                      index={index}
+                      assigneeOptions={assigneeOptions}
+                      employeeOptions={employeeOptions}
+                      onUpdateField={handleUpdateField}
+                      onOpenDetails={openEditModal}
+                    />
+                  );
+                } catch (err) {
+                  console.error("Error rendering ticket row:", err, ticket);
+                  return (
+                    <View key={ticket.ticketNumber} style={{ paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.border }}>
+                      <Text style={{ color: "#dc2626", fontSize: 12 }}>Error rendering ticket</Text>
+                    </View>
+                  );
+                }
+              })}
+            </ScrollView>
+
           </View>
         </ScrollView>
       )}
-
 
       <AddAssetModal
         visible={modalVisible}

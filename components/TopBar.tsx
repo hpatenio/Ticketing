@@ -9,15 +9,16 @@ import {
 import Svg, { Path, Circle } from "react-native-svg";
 import { Bell } from "lucide-react-native";
 import { UserRound } from "lucide-react-native";
+import { useTheme } from "../theme/ThemeContext";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
-const SearchIcon = () => (
+const SearchIcon = ({ color }: { color: string }) => (
   <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-    <Circle cx="11" cy="11" r="8" stroke="#669BAE" strokeWidth="2" />
+    <Circle cx="11" cy="11" r="8" stroke={color} strokeWidth="2" />
     <Path
       d="M21 21l-4.35-4.35"
-      stroke="#669BAE"
+      stroke={color}
       strokeWidth="2"
       strokeLinecap="round"
     />
@@ -48,13 +49,14 @@ export default function TopBar({
   onProfilePress,
 }: TopBarProps) {
   const { width } = useWindowDimensions();
+  const { theme } = useTheme();
   const isMobile = width < 768;
 
   if (isMobile) {
     return (
       <View
         style={{
-          backgroundColor: "#EEF7FB",
+          backgroundColor: theme.background,
           marginTop: 12,
         }}
       >
@@ -70,50 +72,71 @@ export default function TopBar({
           }}
         >
           <Text
-            className="text-[#1D4B5C] text-2xl"
-            style={{ fontFamily: "Outfit_600SemiBold" }}
+            style={{
+              fontFamily: "Outfit_600SemiBold",
+              fontSize: 24,
+              color: theme.text,
+            }}
           >
             {title}
           </Text>
           <View style={{ flexDirection: "row", gap: 8 }}>
             <TouchableOpacity
               onPress={onBellPress}
-              className="w-10 h-10 items-center justify-center rounded-xl border border-[#E8F4F8]"
+              style={{
+                width: 40,
+                height: 40,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: theme.border,
+                backgroundColor: theme.surface,
+              }}
             >
-              <BellIcon color="#669BAE" size={22} />
+              <BellIcon color={theme.subtext} size={22} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={onProfilePress}
-              className="w-10 h-10 items-center justify-center rounded-xl border border-[#E8F4F8]"
+              style={{
+                width: 40,
+                height: 40,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: theme.border,
+                backgroundColor: theme.surface,
+              }}
             >
-              <ProfileIcon color="#669BAE" size={22} />
+              <ProfileIcon color={theme.subtext} size={22} />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Row 2 */}
+        {/* Row 2 — Search */}
         <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
           <View
             style={{
               flexDirection: "row",
               alignItems: "center",
-              backgroundColor: "white",
+              backgroundColor: theme.surface,
               borderRadius: 8,
               paddingHorizontal: 12,
               paddingVertical: 10,
               gap: 8,
               borderWidth: 0.5,
-              borderColor: "#E8F4F8",
+              borderColor: theme.border,
             }}
           >
-            <SearchIcon />
+            <SearchIcon color={theme.subtext} />
             <TextInput
               placeholder="Search tickets, items, user..."
-              placeholderTextColor="#93D3EA"
+              placeholderTextColor={theme.iconInactive}
               style={{
                 fontFamily: "DMSans_400Regular",
                 fontSize: 14,
-                color: "#1D4B5C",
+                color: theme.text,
                 flex: 1,
                 padding: 0,
               }}
@@ -123,6 +146,7 @@ export default function TopBar({
       </View>
     );
   }
+
   return (
     <View
       style={{
@@ -130,15 +154,18 @@ export default function TopBar({
         alignItems: "center",
         paddingHorizontal: 24,
         paddingVertical: 16,
-        backgroundColor: "#EEF7FB",
-       
+        backgroundColor: theme.background,
         gap: 16,
         marginTop: 12,
       }}
     >
       <Text
-        className="text-[#1D4B5C] text-4xl flex-1"
-        style={{ fontFamily: "Outfit_600SemiBold" }}
+        style={{
+          fontFamily: "Outfit_600SemiBold",
+          fontSize: 36,
+          color: theme.text,
+          flex: 1,
+        }}
       >
         {title}
       </Text>
@@ -147,24 +174,24 @@ export default function TopBar({
         style={{
           flexDirection: "row",
           alignItems: "center",
-          backgroundColor: "white",
+          backgroundColor: theme.surface,
           borderRadius: 8,
           paddingHorizontal: 12,
           paddingVertical: 14,
           gap: 8,
           borderWidth: 0.5,
-          borderColor: "#E8F4F8",
+          borderColor: theme.border,
           width: 500,
         }}
       >
-        <SearchIcon />
+        <SearchIcon color={theme.subtext} />
         <TextInput
           placeholder="Search tickets, items, user..."
-          placeholderTextColor="#93D3EA"
+          placeholderTextColor={theme.iconInactive}
           style={{
             fontFamily: "DMSans_400Regular",
             fontSize: 15,
-            color: "#1D4B5C",
+            color: theme.text,
             flex: 1,
             padding: 3,
           }}
@@ -180,11 +207,12 @@ export default function TopBar({
           justifyContent: "center",
           borderRadius: 12,
           borderWidth: 0.5,
-          borderColor: "#E8F4F8",
+          borderColor: theme.border,
+          backgroundColor: theme.surface,
         }}
         activeOpacity={0.7}
       >
-        <BellIcon color="#669BAE" />
+        <BellIcon color={theme.subtext} />
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -196,11 +224,12 @@ export default function TopBar({
           justifyContent: "center",
           borderRadius: 12,
           borderWidth: 0.5,
-          borderColor: "#E8F4F8",
+          borderColor: theme.border,
+          backgroundColor: theme.surface,
         }}
         activeOpacity={0.7}
       >
-        <ProfileIcon color="#669BAE" />
+        <ProfileIcon color={theme.subtext} />
       </TouchableOpacity>
     </View>
   );

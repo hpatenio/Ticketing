@@ -20,6 +20,7 @@ import {
 } from "firebase/firestore";
 import { logout } from "./Logout";
 import { ADUser, UserRole } from "../../types";
+import { useTheme } from "../../theme/ThemeContext";
 
 const BACKEND_URL = "http://10.10.10.98:3000";
 const STORAGE_KEY = "AD_USER_DATA";
@@ -43,12 +44,12 @@ function getCollectionForRole(role: UserRole): string {
   return map[role];
 }
 
-// ─── Role badge styles ─────────────────────────────────────────────────────────
+// ─── Role badge colors (semantic, not theme-dependent) ────────────────────────
 function getRoleStyle(role: UserRole): { bg: string; text: string; label: string } {
   const map: Record<UserRole, { bg: string; text: string; label: string }> = {
-    superadmin: { bg: "bg-blue-900",   text: "text-blue-300",   label: "Super Admin" },
-    admin:      { bg: "bg-purple-900", text: "text-purple-300", label: "Admin"       },
-    employee:   { bg: "bg-slate-700",  text: "text-slate-300",  label: "Employee"    },
+    superadmin: { bg: "#1e3a5f", text: "#93c5fd", label: "Super Admin" },
+    admin:      { bg: "#3b1f5e", text: "#d8b4fe", label: "Admin"       },
+    employee:   { bg: "#2d3748", text: "#cbd5e0", label: "Employee"    },
   };
   return map[role];
 }
@@ -168,6 +169,8 @@ type Props = {
 };
 
 export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
+  const { theme } = useTheme();
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading,  setLoading]  = useState(false);
@@ -228,164 +231,279 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
 
   return (
     <ScrollView
-      className="flex-1 bg-slate-950"
-      contentContainerClassName="flex-grow items-center justify-center p-4"
+      style={{ flex: 1, backgroundColor: theme.background }}
+      contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center", padding: 16 }}
       keyboardShouldPersistTaps="handled"
     >
-      <View className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-7">
-
+      <View
+        style={{
+          width: "100%",
+          maxWidth: 384,
+          backgroundColor: theme.surface,
+          borderWidth: 1,
+          borderColor: theme.border,
+          borderRadius: 24,
+          padding: 28,
+        }}
+      >
         {/* Logo */}
-        <View className="flex-row items-center gap-3 mb-7">
-          <View className="w-10 h-10 bg-blue-700 rounded-xl items-center justify-center">
-            <Text className="text-xl">🎫</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 28 }}>
+          <View
+            style={{
+              width: 40,
+              height: 40,
+              backgroundColor: theme.iconActive,
+              borderRadius: 12,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text style={{ fontSize: 20 }}>🎫</Text>
           </View>
           <View>
-            <Text className="text-slate-200 text-base font-bold">Silverdab</Text>
-            <Text className="text-slate-500 text-xs">Unified Ticketing System</Text>
+            <Text style={{ color: theme.text, fontSize: 15, fontWeight: "700" }}>Silverdab</Text>
+            <Text style={{ color: theme.subtext, fontSize: 11 }}>Unified Ticketing System</Text>
           </View>
         </View>
 
         {user ? (
           <>
-            <Text className="text-slate-100 text-xl font-bold mb-1">
+            <Text style={{ color: theme.text, fontSize: 20, fontWeight: "700", marginBottom: 4 }}>
               Welcome, {user.displayName.split(" ")[0]}! 👋
             </Text>
-            <Text className="text-slate-500 text-xs mb-5">
+            <Text style={{ color: theme.subtext, fontSize: 11, marginBottom: 20 }}>
               Authenticated via Active Directory · ocgbim.com
             </Text>
 
             {/* Role Badge */}
-            <View className="flex-row mb-4">
-              <View className={`px-3 py-1 rounded-full ${getRoleStyle(user.role).bg}`}>
-                <Text className={`text-xs font-semibold uppercase tracking-wider ${getRoleStyle(user.role).text}`}>
+            <View style={{ flexDirection: "row", marginBottom: 16 }}>
+              <View
+                style={{
+                  backgroundColor: getRoleStyle(user.role).bg,
+                  paddingHorizontal: 12,
+                  paddingVertical: 4,
+                  borderRadius: 99,
+                }}
+              >
+                <Text
+                  style={{
+                    color: getRoleStyle(user.role).text,
+                    fontSize: 10,
+                    fontWeight: "600",
+                    textTransform: "uppercase",
+                    letterSpacing: 0.8,
+                  }}
+                >
                   {getRoleStyle(user.role).label}
                 </Text>
               </View>
             </View>
 
             {/* User Info Card */}
-            <View className="bg-slate-800 border border-slate-700 rounded-2xl p-4 mb-4 gap-3">
-              <View className="flex-row justify-between items-center">
-                <Text className="text-slate-500 text-xs">Full Name</Text>
-                <Text className="text-slate-200 text-xs font-semibold">{user.displayName}</Text>
-              </View>
-              <View className="h-px bg-slate-700" />
-              <View className="flex-row justify-between items-center">
-                <Text className="text-slate-500 text-xs">Username</Text>
-                <Text className="text-slate-200 text-xs font-medium">{user.username}</Text>
-              </View>
-              <View className="h-px bg-slate-700" />
-              <View className="flex-row justify-between items-center">
-                <Text className="text-slate-500 text-xs">Email</Text>
-                <Text className="text-slate-200 text-xs font-medium">{user.email || `${user.username}@ocgbim.com`}</Text>
-              </View>
-              <View className="h-px bg-slate-700" />
-              <View className="flex-row justify-between items-center">
-                <Text className="text-slate-500 text-xs">Department</Text>
-                <Text className="text-slate-200 text-xs font-medium">{user.department || "—"}</Text>
-              </View>
-              {user.title ? (
-                <>
-                  <View className="h-px bg-slate-700" />
-                  <View className="flex-row justify-between items-center">
-                    <Text className="text-slate-500 text-xs">Title</Text>
-                    <Text className="text-slate-200 text-xs font-medium">{user.title}</Text>
+            <View
+              style={{
+                backgroundColor: theme.bgActive,
+                borderWidth: 1,
+                borderColor: theme.border,
+                borderRadius: 16,
+                padding: 16,
+                marginBottom: 16,
+                gap: 12,
+              }}
+            >
+              {[
+                { label: "Full Name",   value: user.displayName },
+                { label: "Username",    value: user.username },
+                { label: "Email",       value: user.email || `${user.username}@ocgbim.com` },
+                { label: "Department",  value: user.department || "—" },
+                ...(user.title ? [{ label: "Title", value: user.title }] : []),
+                ...(user.phone ? [{ label: "Phone", value: user.phone }] : []),
+              ].map((row, i, arr) => (
+                <View key={row.label}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                    <Text style={{ color: theme.subtext, fontSize: 11 }}>{row.label}</Text>
+                    <Text style={{ color: theme.text, fontSize: 11, fontWeight: "600" }}>{row.value}</Text>
                   </View>
-                </>
-              ) : null}
-              {user.phone ? (
-                <>
-                  <View className="h-px bg-slate-700" />
-                  <View className="flex-row justify-between items-center">
-                    <Text className="text-slate-500 text-xs">Phone</Text>
-                    <Text className="text-slate-200 text-xs font-medium">{user.phone}</Text>
-                  </View>
-                </>
-              ) : null}
+                  {i < arr.length - 1 && (
+                    <View style={{ height: 1, backgroundColor: theme.border, marginTop: 12 }} />
+                  )}
+                </View>
+              ))}
             </View>
 
             {/* AD + Firestore indicator */}
-            <View className="bg-blue-950 border border-blue-900 rounded-xl p-3 mb-4 flex-row items-center gap-2">
-              <View className="w-2 h-2 rounded-full bg-green-400" />
-              <Text className="text-blue-300 text-xs">
+            <View
+              style={{
+                backgroundColor: theme.bgActive,
+                borderWidth: 1,
+                borderColor: theme.border,
+                borderRadius: 12,
+                padding: 12,
+                marginBottom: 16,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <View style={{ width: 8, height: 8, borderRadius: 99, backgroundColor: "#4ade80" }} />
+              <Text style={{ color: theme.iconActive, fontSize: 11 }}>
                 Connected to AD + Firestore · ocgbim.com
               </Text>
             </View>
 
             <TouchableOpacity
-              className="bg-slate-700 rounded-xl py-3 items-center"
+              style={{
+                backgroundColor: theme.bgHover,
+                borderRadius: 12,
+                paddingVertical: 12,
+                alignItems: "center",
+              }}
               onPress={handleLogout}
             >
-              <Text className="text-slate-200 text-sm font-semibold">Log out</Text>
+              <Text style={{ color: theme.text, fontSize: 13, fontWeight: "600" }}>Log out</Text>
             </TouchableOpacity>
           </>
         ) : (
           <>
-            <Text className="text-slate-100 text-2xl font-bold mb-1">Sign in</Text>
-            <Text className="text-slate-500 text-sm mb-5">Use your company Windows account</Text>
+            <Text style={{ color: theme.text, fontSize: 22, fontWeight: "700", marginBottom: 4 }}>Sign in</Text>
+            <Text style={{ color: theme.subtext, fontSize: 13, marginBottom: 20 }}>
+              Use your company Windows account
+            </Text>
 
-            <View className="bg-blue-950 border border-blue-900 rounded-xl p-3 mb-5 flex-row items-center gap-2">
-              <Text className="text-blue-400 text-xs">
+            {/* AD info banner */}
+            <View
+              style={{
+                backgroundColor: theme.bgActive,
+                borderWidth: 1,
+                borderColor: theme.border,
+                borderRadius: 12,
+                padding: 12,
+                marginBottom: 20,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Text style={{ color: theme.iconActive, fontSize: 11 }}>
                 🏢 Login with your AD username · ocgbim.com
               </Text>
             </View>
 
+            {/* Error */}
             {error ? (
-              <View className="bg-red-950 border border-red-900 rounded-xl p-3 mb-4">
-                <Text className="text-red-300 text-sm">⚠ {error}</Text>
+              <View
+                style={{
+                  backgroundColor: theme.mode === "dark" ? "#2e0f0f" : "#fef2f2",
+                  borderWidth: 1,
+                  borderColor: theme.mode === "dark" ? "#7f1d1d" : "#fecaca",
+                  borderRadius: 12,
+                  padding: 12,
+                  marginBottom: 16,
+                }}
+              >
+                <Text style={{ color: theme.mode === "dark" ? "#f87171" : "#b91c1c", fontSize: 13 }}>
+                  ⚠ {error}
+                </Text>
               </View>
             ) : null}
 
-            <Text className="text-slate-400 text-xs font-medium mb-1.5 tracking-wide uppercase">
+            {/* Username */}
+            <Text
+              style={{
+                color: theme.subtext,
+                fontSize: 10,
+                fontWeight: "500",
+                marginBottom: 6,
+                textTransform: "uppercase",
+                letterSpacing: 0.8,
+              }}
+            >
               Username
             </Text>
             <TextInput
-              className="bg-slate-950 border border-slate-800 rounded-xl px-4 text-slate-200 text-sm mb-1"
-              style={{ paddingVertical: Platform.OS === "ios" ? 12 : 10 }}
+              style={{
+                backgroundColor: theme.background,
+                borderWidth: 1,
+                borderColor: theme.border,
+                borderRadius: 12,
+                paddingHorizontal: 16,
+                paddingVertical: Platform.OS === "ios" ? 12 : 10,
+                color: theme.text,
+                fontSize: 13,
+                marginBottom: 4,
+              }}
               placeholder="e.g. hpatenio"
-              placeholderTextColor="#4B5563"
+              placeholderTextColor={theme.subtext}
               value={username}
               onChangeText={setUsername}
               autoCapitalize="none"
               autoCorrect={false}
             />
-            <Text className="text-slate-600 text-xs mb-4">
+            <Text style={{ color: theme.subtext, fontSize: 11, marginBottom: 16 }}>
               Your Windows login username (e.g. hpatenio for Henrick Patenio)
             </Text>
 
-            <Text className="text-slate-400 text-xs font-medium mb-1.5 tracking-wide uppercase">
+            {/* Password */}
+            <Text
+              style={{
+                color: theme.subtext,
+                fontSize: 10,
+                fontWeight: "500",
+                marginBottom: 6,
+                textTransform: "uppercase",
+                letterSpacing: 0.8,
+              }}
+            >
               Password
             </Text>
             <TextInput
-              className="bg-slate-950 border border-slate-800 rounded-xl px-4 text-slate-200 text-sm mb-1"
-              style={{ paddingVertical: Platform.OS === "ios" ? 12 : 10 }}
+              style={{
+                backgroundColor: theme.background,
+                borderWidth: 1,
+                borderColor: theme.border,
+                borderRadius: 12,
+                paddingHorizontal: 16,
+                paddingVertical: Platform.OS === "ios" ? 12 : 10,
+                color: theme.text,
+                fontSize: 13,
+                marginBottom: 4,
+              }}
               placeholder="Your Windows password"
-              placeholderTextColor="#4B5563"
+              placeholderTextColor={theme.subtext}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
               autoCapitalize="none"
               onSubmitEditing={handleLogin}
             />
-            <Text className="text-slate-600 text-xs mb-5">
+            <Text style={{ color: theme.subtext, fontSize: 11, marginBottom: 20 }}>
               Same password you use to log in to your work PC
             </Text>
 
+            {/* Sign in button */}
             <TouchableOpacity
-              className={`rounded-xl py-3 items-center ${loading ? "bg-blue-950" : "bg-blue-600"}`}
+              style={{
+                backgroundColor: loading ? theme.bgActive : theme.iconActive,
+                borderRadius: 12,
+                paddingVertical: 12,
+                alignItems: "center",
+              }}
               onPress={handleLogin}
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={theme.iconActive} />
               ) : (
-                <Text className="text-white text-sm font-semibold">Sign in with AD</Text>
+                <Text style={{ color: "#ffffff", fontSize: 13, fontWeight: "600" }}>
+                  Sign in with AD
+                </Text>
               )}
             </TouchableOpacity>
 
-            <View className="flex-row items-center justify-center mt-5 gap-2">
-              <View className="w-2 h-2 rounded-full bg-blue-500" />
-              <Text className="text-slate-600 text-xs">
+            {/* Footer */}
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 20, gap: 8 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 99, backgroundColor: theme.iconActive }} />
+              <Text style={{ color: theme.subtext, fontSize: 11 }}>
                 Authenticating via Active Directory · ocgbim.com
               </Text>
             </View>

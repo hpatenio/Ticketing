@@ -16,6 +16,7 @@ import { ITConsumable } from "../../../../types";
 import AddConsumableModal from "./AddAssetModal";
 import EditConsumableModal from "./EditAssetModal";
 import InlineDropdown from "../../../../components/common/InlineDropdown";
+import { useTheme } from "../../../../theme/ThemeContext";
 
 // ─── options ──────────────────────────────────────────────────────────────────
 
@@ -74,8 +75,6 @@ const PlainBadge = (value: string) => (
 );
 
 // ─── column config ────────────────────────────────────────────────────────────
-// flex: how much of the remaining space each col takes
-// minWidth: minimum before horizontal scroll kicks in
 
 const COLUMNS = [
   { key: "name",           label: "Printer Name", flex: 2,   minWidth: 130, align: "left"   },
@@ -117,6 +116,7 @@ const renderStatusBadge = (value: string) => {
 // ─── component ────────────────────────────────────────────────────────────────
 
 const ConsumablesPage: React.FC = () => {
+  const { theme } = useTheme();
   const [data, setData]             = useState<ITConsumable[]>([]);
   const [loading, setLoading]       = useState(true);
   const [search, setSearch]         = useState("");
@@ -173,14 +173,14 @@ const ConsumablesPage: React.FC = () => {
             activeOpacity={0.7}
             style={{ width: "100%" }}
           >
-            <Text style={{ fontSize: 12, fontWeight: "600", color: "#111827" }} numberOfLines={1}>
+            <Text style={{ fontSize: 12, fontWeight: "600", color: theme.text }} numberOfLines={1}>
               {item.name}
             </Text>
           </TouchableOpacity>
         );
       case "model":
         return (
-          <Text style={{ fontSize: 12, color: "#6b7280", fontFamily: "monospace" }} numberOfLines={1}>
+          <Text style={{ fontSize: 12, color: theme.subtext, fontFamily: "monospace" }} numberOfLines={1}>
             {item.model || "—"}
           </Text>
         );
@@ -204,13 +204,13 @@ const ConsumablesPage: React.FC = () => {
         );
       case "ipAddress":
         return (
-          <Text style={{ fontSize: 12, color: "#374151", fontFamily: "monospace" }} numberOfLines={1}>
+          <Text style={{ fontSize: 12, color: theme.text, fontFamily: "monospace" }} numberOfLines={1}>
             {item.ipAddress || "—"}
           </Text>
         );
       case "macAddress":
         return (
-          <Text style={{ fontSize: 11, color: "#6b7280", fontFamily: "monospace" }} numberOfLines={1}>
+          <Text style={{ fontSize: 11, color: theme.subtext, fontFamily: "monospace" }} numberOfLines={1}>
             {item.macAddress || "—"}
           </Text>
         );
@@ -236,9 +236,10 @@ const ConsumablesPage: React.FC = () => {
                 paddingHorizontal: 6,
                 paddingVertical: 4,
                 borderWidth: 1,
-                borderColor: "#93c5fd",
+                borderColor: theme.iconActive,
                 borderRadius: 6,
-                backgroundColor: "#eff6ff",
+                backgroundColor: theme.bgActive,
+                color: theme.text,
               }}
             />
           ) : (
@@ -312,19 +313,19 @@ const ConsumablesPage: React.FC = () => {
   };
 
   return (
-    <View style={{ flex: 1, padding: 16 }}>
+    <View style={{ flex: 1, padding: 16, backgroundColor: theme.background }}>
 
       {/* Header */}
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <View>
-          <Text style={{ fontSize: 20, fontWeight: "700", color: "#1f2937" }}>IT Consumables</Text>
-          <Text style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>
+          <Text style={{ fontSize: 20, fontWeight: "700", color: theme.text }}>IT Consumables</Text>
+          <Text style={{ fontSize: 12, color: theme.subtext, marginTop: 2 }}>
             {filtered.length} of {data.length} printers
           </Text>
         </View>
         <TouchableOpacity
           onPress={() => setAddVisible(true)}
-          style={{ backgroundColor: "#2563eb", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}
+          style={{ backgroundColor: theme.iconActive, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}
         >
           <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}>+ Add Printer</Text>
         </TouchableOpacity>
@@ -333,6 +334,7 @@ const ConsumablesPage: React.FC = () => {
       {/* Search */}
       <TextInput
         placeholder="Search printer name, model, IP, location..."
+        placeholderTextColor={theme.subtext}
         value={search}
         onChangeText={setSearch}
         style={{
@@ -342,25 +344,26 @@ const ConsumablesPage: React.FC = () => {
           marginBottom: 16,
           fontSize: 13,
           borderWidth: 1,
-          borderColor: "#d1d5db",
+          borderColor: theme.border,
           borderRadius: 8,
-          backgroundColor: "#fff",
+          backgroundColor: theme.surface,
+          color: theme.text,
         }}
       />
 
       {/* Table */}
       {loading ? (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator size="large" color="#3b82f6" />
+          <ActivityIndicator size="large" color={theme.iconActive} />
         </View>
       ) : filtered.length === 0 ? (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 80 }}>
-          <Text style={{ color: "#9ca3af", fontSize: 13 }}>No printers found.</Text>
+          <Text style={{ color: theme.subtext, fontSize: 13 }}>No printers found.</Text>
         </View>
       ) : (
-        <View style={{ flex: 1, borderRadius: 10, borderWidth: 1, borderColor: "#e5e7eb", overflow: "hidden" }}>
+        <View style={{ flex: 1, borderRadius: 10, borderWidth: 1, borderColor: theme.border, overflow: "hidden" }}>
           {/* Header row */}
-          <View style={{ flexDirection: "row", backgroundColor: "#f9fafb", borderBottomWidth: 1, borderBottomColor: "#e5e7eb" }}>
+          <View style={{ flexDirection: "row", backgroundColor: theme.surface, borderBottomWidth: 1, borderBottomColor: theme.border }}>
             {COLUMNS.map((col) => {
               const isSorted = sortKey === col.key;
               const icon = isSorted ? (sortDirection === "asc" ? "▲" : "▼") : "⇅";
@@ -378,17 +381,17 @@ const ConsumablesPage: React.FC = () => {
                     flexDirection: "row",
                   }}
                 >
-                  <Text style={{ fontSize: 11, fontWeight: "600", color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5, marginRight: 4 }}>
+                  <Text style={{ fontSize: 11, fontWeight: "600", color: theme.subtext, textTransform: "uppercase", letterSpacing: 0.5, marginRight: 4 }}>
                     {col.label}
                   </Text>
-                  <Text style={{ fontSize: 11, color: "#9ca3af" }}>{icon}</Text>
+                  <Text style={{ fontSize: 11, color: theme.subtext }}>{icon}</Text>
                 </TouchableOpacity>
               );
             })}
           </View>
 
           {/* Rows */}
-          <ScrollView showsVerticalScrollIndicator={false} style={{ backgroundColor: "#fff" }}>
+          <ScrollView showsVerticalScrollIndicator={false} style={{ backgroundColor: theme.background }}>
             {sortedFiltered.map((item, index) => (
               <View
                 key={item.id}
@@ -396,8 +399,8 @@ const ConsumablesPage: React.FC = () => {
                   flexDirection: "row",
                   alignItems: "center",
                   borderBottomWidth: 1,
-                  borderBottomColor: "#f3f4f6",
-                  backgroundColor: index % 2 === 0 ? "#fff" : "#fafafa",
+                  borderBottomColor: theme.border,
+                  backgroundColor: index % 2 === 0 ? theme.background : theme.surface,
                 }}
               >
                 {COLUMNS.map((col) => (

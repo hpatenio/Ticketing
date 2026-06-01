@@ -17,24 +17,25 @@ import { ITInventory } from "../../../../types";
 import AddAssetModal from "./AddAssetModal";
 import EditAssetModal from "./EditAssetModal";
 import InlineDropdown from "../../../../components/common/InlineDropdown";
+import { useTheme } from "../../../../theme/ThemeContext";
 
 // --- dropdown options ---
 const LOCATION_OPTIONS = [
   { label: "Unit 1 & 2", value: "Unit 1 & 2", color: "bg-pink-500" },
-  { label: "Unit 3",     value: "Unit 3",     color: "bg-purple-600" },
+  { label: "Unit 3", value: "Unit 3", color: "bg-purple-600" },
   { label: "BDO Makati", value: "BDO Makati", color: "bg-teal-500" },
-  { label: "Triumph",    value: "Triumph",    color: "bg-green-500" },
-  { label: "WFH",        value: "WFH",        color: "bg-cyan-500" },
+  { label: "Triumph", value: "Triumph", color: "bg-green-500" },
+  { label: "WFH", value: "WFH", color: "bg-cyan-500" },
 ];
 
 const STATUS_OPTIONS = [
-  { label: "Deployed",  value: "Deployed",  color: "bg-green-500" },
-  { label: "Spare",     value: "Spare",     color: "bg-blue-500" },
+  { label: "Deployed", value: "Deployed", color: "bg-green-500" },
+  { label: "Spare", value: "Spare", color: "bg-blue-500" },
   { label: "Defective", value: "Defective", color: "bg-red-500" },
 ];
 
 const CATEGORY_OPTIONS = [
-  { label: "Laptop",  value: "Laptop",  color: "bg-orange-500" },
+  { label: "Laptop", value: "Laptop", color: "bg-orange-500" },
   { label: "Monitor", value: "Monitor", color: "bg-yellow-500" },
   { label: "Desktop", value: "Desktop", color: "bg-indigo-500" },
 ];
@@ -57,42 +58,41 @@ type InventorySortKey =
   | "datePurchased"
   | "notes";
 
-const TABLE_HEADERS: { label: string; key: InventorySortKey; width: number }[] = [
-  { label: "Asset Tag", key: "assetTag", width: 130 },
-  { label: "Company", key: "company", width: 110 },
-  { label: "Serial Number", key: "serialNumber", width: 140 },
-  { label: "Model", key: "model", width: 110 },
-  { label: "Brand", key: "brand", width: 110 },
-  { label: "Category", key: "category", width: 110 },
-  { label: "Status", key: "status", width: 110 },
-  { label: "Assignee", key: "assigneeName", width: 110 },
-  { label: "Location", key: "location", width: 110 },
-  { label: "Date Purchased", key: "datePurchased", width: 130 },
-  { label: "Notes", key: "notes", width: 200 },
-];
+const TABLE_HEADERS: { label: string; key: InventorySortKey; width: number }[] =
+  [
+    { label: "Asset Tag", key: "assetTag", width: 130 },
+    { label: "Company", key: "company", width: 110 },
+    { label: "Serial Number", key: "serialNumber", width: 140 },
+    { label: "Model", key: "model", width: 110 },
+    { label: "Brand", key: "brand", width: 110 },
+    { label: "Category", key: "category", width: 110 },
+    { label: "Status", key: "status", width: 110 },
+    { label: "Assignee", key: "assigneeName", width: 110 },
+    { label: "Location", key: "location", width: 110 },
+    { label: "Date Purchased", key: "datePurchased", width: 130 },
+    { label: "Notes", key: "notes", width: 200 },
+  ];
 
 // --- status badge colors ---
 const StatusBadge = (value: string) => {
-  const styles =
-    value === "Deployed"
-      ? "bg-green-100 text-green-700"
-      : value === "Defective"
-      ? "bg-red-100 text-red-700"
-      : "bg-gray-100 text-gray-600";
+  const bgColor =
+    value === "Deployed" ? "#dcfce7" : value === "Defective" ? "#fee2e2" : "#f3f4f6";
+  const textColor =
+    value === "Deployed" ? "#15803d" : value === "Defective" ? "#b91c1c" : "#4b5563";
 
   return (
-    <View className={`flex-row items-center gap-1 px-2 py-1 rounded-full ${styles}`}>
-      <Text className={`text-xs font-semibold ${styles}`}>{value}</Text>
-      <Text className="text-xs opacity-50">▾</Text>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: bgColor }}>
+      <Text style={{ fontSize: 11, fontWeight: "600", color: textColor }}>{value}</Text>
+      <Text style={{ fontSize: 11, color: textColor, opacity: 0.5 }}>▾</Text>
     </View>
   );
 };
 
 // --- plain dropdown badge ---
 const PlainBadge = (value: string) => (
-  <View className="flex-row items-center gap-1 px-2 py-1 bg-gray-100 rounded-lg">
-    <Text className="text-xs text-gray-700">{value || "—"}</Text>
-    <Text className="text-xs text-gray-400">▾</Text>
+  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: "#f3f4f6", borderRadius: 8 }}>
+    <Text style={{ fontSize: 11, color: "#374151" }}>{value || "—"}</Text>
+    <Text style={{ fontSize: 11, color: "#9ca3af" }}>▾</Text>
   </View>
 );
 
@@ -102,15 +102,15 @@ const getSurname = (fullName: string) => {
 };
 
 const ITInventoryPage: React.FC = () => {
-  const [data, setData]                   = useState<ITInventory[]>([]);
-  const [loading, setLoading]             = useState(true);
-  const [search, setSearch]               = useState("");
-  const [sortKey, setSortKey]             = useState<InventorySortKey | null>(null);
+  const [data, setData] = useState<ITInventory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState<InventorySortKey | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [addVisible, setAddVisible]       = useState(false);
-  const [editVisible, setEditVisible]     = useState(false);
+  const [addVisible, setAddVisible] = useState(false);
+  const [editVisible, setEditVisible] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<ITInventory | null>(null);
-
+  const { theme } = useTheme();
   const { employees } = useEmployees();
 
   const assigneeOptions = employees.map((e) => ({
@@ -125,21 +125,23 @@ const ITInventoryPage: React.FC = () => {
     setLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   // update a single field in local state immediately (optimistic update)
   const updateLocalField = (assetTag: string, field: string, value: string) => {
     setData((prev) =>
       prev.map((item) =>
-        item.assetTag === assetTag ? { ...item, [field]: value } : item
-      )
+        item.assetTag === assetTag ? { ...item, [field]: value } : item,
+      ),
     );
   };
 
   const handleFieldUpdate = async (
     assetTag: string,
     field: string,
-    value: string
+    value: string,
   ) => {
     updateLocalField(assetTag, field, value); // update UI instantly
     await updateAssetField(assetTag, field, value); // then save to Firestore
@@ -191,7 +193,9 @@ const ITInventoryPage: React.FC = () => {
   };
 
   const getAssigneeName = (item: ITInventory) =>
-    employees.find((e) => e.id === item.assigneeId)?.name ?? item.assigneeName ?? "";
+    employees.find((e) => e.id === item.assigneeId)?.name ??
+    item.assigneeName ??
+    "";
 
   const sortedFiltered = useMemo(() => {
     if (!sortKey) return filtered;
@@ -231,62 +235,87 @@ const ITInventoryPage: React.FC = () => {
   };
 
   return (
-    <View className="flex-1 p-4" style={{ width: "100%" }}>
-
+    <View style={{ flex: 1, padding: 16, width: "100%", backgroundColor: theme.background }}>
       {/* Header */}
-      <View className="flex-row items-center justify-between mb-4">
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <View>
-          <Text className="text-xl font-bold text-gray-800">IT Inventory</Text>
-          <Text className="text-xs text-gray-400 mt-0.5">
+          <Text style={{ fontSize: 20, fontWeight: "700", color: theme.text }}>IT Inventory</Text>
+          <Text style={{ fontSize: 12, color: theme.subtext, marginTop: 2 }}>
             {filtered.length} of {data.length} records
           </Text>
         </View>
         <TouchableOpacity
           onPress={() => setAddVisible(true)}
-          className="bg-blue-600 px-4 py-2 rounded-lg"
+          style={{ backgroundColor: theme.iconActive, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}
         >
-          <Text className="text-white text-sm font-semibold">+ Add Asset</Text>
+          <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}>+ Add Asset</Text>
         </TouchableOpacity>
       </View>
 
       {/* Search */}
       <TextInput
         placeholder="Search asset tag, brand, model..."
+        placeholderTextColor={theme.subtext}
         value={search}
         onChangeText={setSearch}
-        className="w-full px-4 py-2.5 mb-4 text-sm border border-gray-300 rounded-lg bg-white"
+        style={{
+          width: "100%",
+          paddingHorizontal: 16,
+          paddingVertical: 10,
+          marginBottom: 16,
+          fontSize: 13,
+          borderWidth: 1,
+          borderColor: theme.border,
+          borderRadius: 8,
+          backgroundColor: theme.surface,
+          color: theme.text,
+        }}
       />
 
       {/* Table */}
       {loading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#3b82f6" />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator size="large" color={theme.iconActive} />
         </View>
       ) : (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, minWidth: "100%" }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1, minWidth: "100%" }}
+        >
           <View style={{ flex: 1, minWidth: "100%" }}>
             {/* Table Header */}
-            <View className="flex-row bg-gray-100 rounded-t-lg" style={{ minWidth: "100%" }}>
+            <View
+              style={{ flexDirection: "row", backgroundColor: theme.surface, borderRadius: 8, minWidth: "100%", borderBottomWidth: 1, borderBottomColor: theme.border }}
+            >
               {TABLE_HEADERS.map((header) => {
                 const isSorted = sortKey === header.key;
-                const icon = isSorted ? (sortDirection === "asc" ? "▲" : "▼") : "⇅";
+                const icon = isSorted
+                  ? sortDirection === "asc"
+                    ? "▲"
+                    : "▼"
+                  : "⇅";
                 return (
                   <TouchableOpacity
                     key={header.key}
                     onPress={() => toggleSort(header.key)}
-                    className="px-3 py-3"
                     activeOpacity={0.7}
                     style={{
                       flex: 1,
                       minWidth: header.width,
                       flexDirection: "row",
                       alignItems: "center",
+                      paddingHorizontal: 12,
+                      paddingVertical: 12,
                     }}
                   >
-                    <Text className="text-xs font-semibold text-gray-600 uppercase" style={{ marginRight: 4 }}>
+                    <Text
+                      style={{ fontSize: 11, fontWeight: "600", color: theme.subtext, textTransform: "uppercase", letterSpacing: 0.5, marginRight: 4 }}
+                    >
                       {header.label}
                     </Text>
-                    <Text className="text-gray-400 text-xs">{icon}</Text>
+                    <Text style={{ color: theme.subtext, fontSize: 11 }}>{icon}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -297,13 +326,18 @@ const ITInventoryPage: React.FC = () => {
               {sortedFiltered.map((item, index) => (
                 <View
                   key={item.id}
-                  className={`flex-row items-center border-b border-gray-100`}
-                  style={{ backgroundColor: index % 2 === 0 ? "#fff" : "#f9fafb", minWidth: "100%" }}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    borderBottomWidth: 1,
+                    borderBottomColor: theme.border,
+                    backgroundColor: index % 2 === 0 ? theme.background : theme.surface,
+                    minWidth: "100%",
+                  }}
                 >
                   {/* Asset Tag — double-tap to edit (removed separate edit icon) */}
                   <View
-                    className="flex-row items-center gap-1.5 px-3 py-3"
-                    style={{ flex: 1, minWidth: 130 }}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 12, flex: 1, minWidth: 130 }}
                   >
                     <TouchableOpacity
                       onPress={() => {
@@ -317,14 +351,19 @@ const ITInventoryPage: React.FC = () => {
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       style={{ flex: 1 }}
                     >
-                      <Text className="text-xs text-gray-700 flex-shrink flex-1" numberOfLines={1}>
+                      <Text
+                        style={{ fontSize: 12, color: theme.text, flexShrink: 1 }}
+                        numberOfLines={1}
+                      >
                         {item.assetTag}
                       </Text>
                     </TouchableOpacity>
                   </View>
 
                   {/* Company — inline dropdown */}
-                  <View className="px-2 py-2" style={{ flex: 1, minWidth: 110 }}>
+                  <View
+                    style={{ paddingHorizontal: 8, paddingVertical: 8, flex: 1, minWidth: 110 }}
+                  >
                     <InlineDropdown
                       value={item.company}
                       options={COMPANY_OPTIONS}
@@ -337,30 +376,29 @@ const ITInventoryPage: React.FC = () => {
 
                   {/* Serial Number */}
                   <Text
-                    className="text-xs text-gray-700 px-3 py-3"
-                    style={{ flex: 1, minWidth: 140 }}
+                    style={{ fontSize: 12, color: theme.text, paddingHorizontal: 12, paddingVertical: 12, flex: 1, minWidth: 140 }}
                   >
                     {item.serialNumber || "—"}
                   </Text>
 
                   {/* Model — read only */}
                   <Text
-                    className="text-xs text-gray-700 px-3 py-3"
-                    style={{ flex: 1, minWidth: 110 }}
+                    style={{ fontSize: 12, color: theme.text, paddingHorizontal: 12, paddingVertical: 12, flex: 1, minWidth: 110 }}
                   >
                     {item.model}
                   </Text>
 
                   {/* Brand — read only */}
                   <Text
-                    className="text-xs text-gray-700 px-3 py-3"
-                    style={{ flex: 1, minWidth: 110 }}
+                    style={{ fontSize: 12, color: theme.text, paddingHorizontal: 12, paddingVertical: 12, flex: 1, minWidth: 110 }}
                   >
                     {item.brand}
                   </Text>
 
                   {/* Category — inline dropdown */}
-                  <View className="px-2 py-2" style={{ flex: 1, minWidth: 110 }}>
+                  <View
+                    style={{ paddingHorizontal: 8, paddingVertical: 8, flex: 1, minWidth: 110 }}
+                  >
                     <InlineDropdown
                       value={item.category}
                       options={CATEGORY_OPTIONS}
@@ -372,7 +410,9 @@ const ITInventoryPage: React.FC = () => {
                   </View>
 
                   {/* Status — inline dropdown with badge */}
-                  <View className="px-2 py-2" style={{ flex: 1, minWidth: 110 }}>
+                  <View
+                    style={{ paddingHorizontal: 8, paddingVertical: 8, flex: 1, minWidth: 110 }}
+                  >
                     <InlineDropdown
                       value={item.status}
                       options={STATUS_OPTIONS}
@@ -384,7 +424,9 @@ const ITInventoryPage: React.FC = () => {
                   </View>
 
                   {/* Assignee — inline dropdown from Firebase users */}
-                  <View className="px-2 py-2" style={{ flex: 1, minWidth: 110 }}>
+                  <View
+                    style={{ paddingHorizontal: 8, paddingVertical: 8, flex: 1, minWidth: 110 }}
+                  >
                     <InlineDropdown
                       value={item.assigneeId}
                       options={assigneeOptions}
@@ -393,19 +435,36 @@ const ITInventoryPage: React.FC = () => {
                       onSelect={async (val) => {
                         const selected = employees.find((e) => e.id === val);
                         updateLocalField(item.assetTag, "assigneeId", val);
-                        updateLocalField(item.assetTag, "assigneeName", selected?.name ?? "");
-                        await updateAssetField(item.assetTag, "assigneeId", val);
-                        await updateAssetField(item.assetTag, "assigneeName", selected?.name ?? "");
+                        updateLocalField(
+                          item.assetTag,
+                          "assigneeName",
+                          selected?.name ?? "",
+                        );
+                        await updateAssetField(
+                          item.assetTag,
+                          "assigneeId",
+                          val,
+                        );
+                        await updateAssetField(
+                          item.assetTag,
+                          "assigneeName",
+                          selected?.name ?? "",
+                        );
                       }}
                       renderBadge={(val) => {
-                        const name = employees.find((e) => e.id === val)?.name ?? item.assigneeName ?? "—";
+                        const name =
+                          employees.find((e) => e.id === val)?.name ??
+                          item.assigneeName ??
+                          "—";
                         return PlainBadge(getSurname(name));
                       }}
                     />
                   </View>
 
                   {/* Location — inline dropdown */}
-                  <View className="px-2 py-2" style={{ flex: 1, minWidth: 110 }}>
+                  <View
+                    style={{ paddingHorizontal: 8, paddingVertical: 8, flex: 1, minWidth: 110 }}
+                  >
                     <InlineDropdown
                       value={item.location}
                       options={LOCATION_OPTIONS}
@@ -418,16 +477,16 @@ const ITInventoryPage: React.FC = () => {
 
                   {/* Date Purchased */}
                   <Text
-                    className="text-xs text-gray-700 px-3 py-3"
-                    style={{ flex: 1, minWidth: 130 }}
+                    style={{ fontSize: 12, color: theme.text, paddingHorizontal: 12, paddingVertical: 12, flex: 1, minWidth: 130 }}
                   >
-                    {item.datePurchased ? item.datePurchased.toDate().toLocaleDateString() : "—"}
+                    {item.datePurchased
+                      ? item.datePurchased.toDate().toLocaleDateString()
+                      : "—"}
                   </Text>
 
                   {/* Notes */}
                   <Text
-                    className="text-xs text-gray-700 px-3 py-3"
-                    style={{ flex: 1, minWidth: 200 }}
+                    style={{ fontSize: 12, color: theme.text, paddingHorizontal: 12, paddingVertical: 12, flex: 1, minWidth: 200 }}
                     numberOfLines={2}
                   >
                     {item.notes || "—"}

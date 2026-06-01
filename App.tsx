@@ -11,7 +11,7 @@ import SuperAdminDashboard from "./app/SuperAdmin/SuperAdminDashboard";
 import AdminDashboard from "./app/Admin/AdminDashboard";
 import EmployeeDashboard from "./app/Employee/EmployeeDashboard";
 import { ADUser } from "./types";
-
+import { ThemeProvider } from "./theme/ThemeContext";
 SplashScreen.preventAutoHideAsync();
 
 export default function App() {
@@ -57,7 +57,9 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      {renderContent()}
+      <ThemeProvider>
+        {renderContent()}
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

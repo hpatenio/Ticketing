@@ -14,7 +14,7 @@ import ITInventoryPage from "./Modules/ITInventory/ITInventoryPage";
 import ITInventorySummary from "./Modules/ITInventory/ITInventorySummary";
 import ConsumablesPage from "./Modules/Consumables/ConsumablesPage";
 import TicketsPage from "./Modules/Tickets/TicketsPage";
-
+import { useTheme } from "../../theme/ThemeContext";
 
 type Props = {
   user: ADUser;
@@ -24,6 +24,7 @@ type Props = {
 export default function AdminDashboard({ user, onLogout }: Props) {
   const [activeKey, setActiveKey] = useState("dashboard");
   const { width } = useWindowDimensions();
+  const { theme } = useTheme();
   const isMobile = Platform.OS === "android" || Platform.OS === "ios" || width < 768;
 
   const renderContent = () => {
@@ -46,7 +47,7 @@ export default function AdminDashboard({ user, onLogout }: Props) {
   };
 
   return (
-    <View style={{ flex: 1, flexDirection: "row" }}>
+    <View style={{ flex: 1, flexDirection: "row", backgroundColor: theme.background }}>
       {!isMobile && (
         <Sidebar
           user={user}
@@ -56,14 +57,17 @@ export default function AdminDashboard({ user, onLogout }: Props) {
         />
       )}
 
-      <View style={{ flex: 1, flexDirection: "column", backgroundColor: "#EEF7FB" }}>
+      <View style={{ flex: 1, flexDirection: "column", backgroundColor: theme.background }}>
         <TopBar
           title={getTitle()}
           onBellPress={() => console.log("bell pressed")}
           onProfilePress={() => console.log("profile pressed")}
         />
 
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+        >
           {renderContent()}
         </ScrollView>
 
@@ -80,12 +84,28 @@ export default function AdminDashboard({ user, onLogout }: Props) {
 }
 
 function DashboardHome({ user }: { user: ADUser }) {
+  const { theme } = useTheme();
+
   return (
-    <View className="flex-1 p-6">
-      <Text className="text-xl font-bold text-gray-800 mb-1">
+    <View style={{ flex: 1, padding: 24, backgroundColor: theme.background }}>
+      <Text
+        style={{
+          fontFamily: "DMSans_700Bold",
+          fontSize: 20,
+          color: theme.text,
+          marginBottom: 4,
+        }}
+      >
         Welcome, {user.username}!
       </Text>
-      <Text className="text-sm text-gray-500 mb-6">
+      <Text
+        style={{
+          fontFamily: "DMSans_400Regular",
+          fontSize: 14,
+          color: theme.subtext,
+          marginBottom: 24,
+        }}
+      >
         Here's your admin overview.
       </Text>
       <ITInventorySummary />

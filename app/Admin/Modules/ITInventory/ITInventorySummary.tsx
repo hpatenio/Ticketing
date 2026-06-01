@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { getAllAssets } from "../../../../Services/itInventory";
 import { ITInventory } from "../../../../types";
+import { useTheme } from "../../../../theme/ThemeContext";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -24,25 +25,47 @@ const MetricCard = ({
   label,
   value,
   sub,
-  valueColor = "#1f2937",
+  valueColor,
 }: {
   label: string;
   value: number | string;
   sub?: string;
   valueColor?: string;
-}) => (
-  <View className="flex-1 bg-white rounded-xl p-4 mx-1.5 shadow-sm border border-gray-100">
-    <Text className="text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wide">
-      {label}
-    </Text>
-    <Text style={{ color: valueColor }} className="text-2xl font-bold">
-      {value}
-    </Text>
-    {sub ? (
-      <Text className="text-xs text-gray-400 mt-1">{sub}</Text>
-    ) : null}
-  </View>
-);
+}) => {
+  const { theme } = useTheme();
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: theme.surface,
+        borderRadius: 12,
+        padding: 16,
+        marginHorizontal: 6,
+        borderWidth: 1,
+        borderColor: theme.border,
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 10,
+          color: theme.subtext,
+          marginBottom: 6,
+          fontWeight: "500",
+          textTransform: "uppercase",
+          letterSpacing: 0.5,
+        }}
+      >
+        {label}
+      </Text>
+      <Text style={{ color: valueColor ?? theme.text, fontSize: 24, fontWeight: "700" }}>
+        {value}
+      </Text>
+      {sub ? (
+        <Text style={{ fontSize: 10, color: theme.subtext, marginTop: 4 }}>{sub}</Text>
+      ) : null}
+    </View>
+  );
+};
 
 const HorizontalBar = ({
   label,
@@ -56,26 +79,29 @@ const HorizontalBar = ({
   max: number;
   color: string;
   animatedWidth?: Animated.AnimatedInterpolation<string | number> | string;
-}) => (
-  <View className="mb-3">
-    <View className="flex-row items-center justify-between mb-1">
-      <Text className="text-xs text-gray-600 font-medium">{label}</Text>
-      <Text className="text-xs text-gray-400">{count}</Text>
+}) => {
+  const { theme } = useTheme();
+  return (
+    <View style={{ marginBottom: 12 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+        <Text style={{ fontSize: 10, color: theme.text, fontWeight: "500" }}>{label}</Text>
+        <Text style={{ fontSize: 10, color: theme.subtext }}>{count}</Text>
+      </View>
+      <View style={{ height: 8, backgroundColor: theme.border, borderRadius: 99, overflow: "hidden" }}>
+        <Animated.View
+          style={{
+            width:
+              (animatedWidth as any) ??
+              (max > 0 ? `${Math.round((count / max) * 100)}%` : "0%"),
+            backgroundColor: color,
+            height: "100%",
+            borderRadius: 99,
+          }}
+        />
+      </View>
     </View>
-    <View className="h-2 bg-gray-100 rounded-full overflow-hidden">
-      <Animated.View
-        style={{
-          width:
-            (animatedWidth as any) ??
-            (max > 0 ? `${Math.round((count / max) * 100)}%` : "0%"),
-          backgroundColor: color,
-          height: "100%",
-          borderRadius: 99,
-        }}
-      />
-    </View>
-  </View>
-);
+  );
+};
 
 const StatusBadge = ({
   status,
@@ -86,29 +112,35 @@ const StatusBadge = ({
   count: number;
   total: number;
 }) => {
+  const { theme } = useTheme();
+
+  // Keep semantic status colors but adjust opacity/tint for dark mode
   const configs: Record<string, { bg: string; text: string; dot: string }> = {
-    Deployed: { bg: "#f0fdf4", text: "#15803d", dot: "#22c55e" },
-    Spare:    { bg: "#eff6ff", text: "#1d4ed8", dot: "#3b82f6" },
-    Defective:{ bg: "#fef2f2", text: "#b91c1c", dot: "#ef4444" },
+    Deployed:  { bg: theme.mode === "dark" ? "#0f2e1a" : "#f0fdf4", text: theme.mode === "dark" ? "#4ade80" : "#15803d", dot: "#22c55e" },
+    Spare:     { bg: theme.mode === "dark" ? "#0f1e3a" : "#eff6ff", text: theme.mode === "dark" ? "#60a5fa" : "#1d4ed8", dot: "#3b82f6" },
+    Defective: { bg: theme.mode === "dark" ? "#2e0f0f" : "#fef2f2", text: theme.mode === "dark" ? "#f87171" : "#b91c1c", dot: "#ef4444" },
   };
-  const cfg = configs[status] ?? { bg: "#f9fafb", text: "#374151", dot: "#9ca3af" };
+  const cfg = configs[status] ?? {
+    bg: theme.surface,
+    text: theme.text,
+    dot: theme.subtext,
+  };
 
   return (
     <View
-      style={{ backgroundColor: cfg.bg }}
-      className="flex-1 rounded-xl p-3 mx-1 items-center"
+      style={{
+        flex: 1,
+        backgroundColor: cfg.bg,
+        borderRadius: 12,
+        padding: 12,
+        marginHorizontal: 4,
+        alignItems: "center",
+      }}
     >
-      <View
-        style={{ backgroundColor: cfg.dot }}
-        className="w-2 h-2 rounded-full mb-2"
-      />
-      <Text style={{ color: cfg.text }} className="text-lg font-bold">
-        {count}
-      </Text>
-      <Text style={{ color: cfg.text }} className="text-xs font-medium mt-0.5">
-        {status}
-      </Text>
-      <Text className="text-xs text-gray-400 mt-0.5">{pct(count, total)}%</Text>
+      <View style={{ width: 8, height: 8, borderRadius: 99, backgroundColor: cfg.dot, marginBottom: 8 }} />
+      <Text style={{ color: cfg.text, fontSize: 18, fontWeight: "700" }}>{count}</Text>
+      <Text style={{ color: cfg.text, fontSize: 10, fontWeight: "500", marginTop: 2 }}>{status}</Text>
+      <Text style={{ fontSize: 10, color: theme.subtext, marginTop: 2 }}>{pct(count, total)}%</Text>
     </View>
   );
 };
@@ -119,16 +151,32 @@ const SectionCard = ({
 }: {
   title: string;
   children: React.ReactNode;
-}) => (
-  <View className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-gray-100">
-    <Text className="text-sm font-semibold text-gray-700 mb-4">{title}</Text>
-    {children}
-  </View>
-);
+}) => {
+  const { theme } = useTheme();
+  return (
+    <View
+      style={{
+        backgroundColor: theme.surface,
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: theme.border,
+      }}
+    >
+      <Text style={{ fontSize: 13, fontWeight: "600", color: theme.text, marginBottom: 16 }}>
+        {title}
+      </Text>
+      {children}
+    </View>
+  );
+};
 
 // ─── main component ──────────────────────────────────────────────────────────
 
 const ITInventorySummary: React.FC = () => {
+  const { theme } = useTheme();
+
   const [data, setData]         = useState<ITInventory[]>([]);
   const [loading, setLoading]   = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -272,22 +320,22 @@ const ITInventorySummary: React.FC = () => {
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center py-16">
-        <ActivityIndicator size="large" color="#3b82f6" />
-        <Text className="text-xs text-gray-400 mt-3">Loading summary...</Text>
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 64 }}>
+        <ActivityIndicator size="large" color={theme.iconActive} />
+        <Text style={{ fontSize: 10, color: theme.subtext, marginTop: 12 }}>Loading summary...</Text>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View className="flex-1 items-center justify-center py-16">
-        <Text className="text-sm text-red-500 mb-3">Failed to load data.</Text>
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 64 }}>
+        <Text style={{ fontSize: 13, color: "#ef4444", marginBottom: 12 }}>Failed to load data.</Text>
         <TouchableOpacity
           onPress={() => fetchData(false)}
-          className="bg-blue-600 px-4 py-2 rounded-lg"
+          style={{ backgroundColor: theme.iconActive, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}
         >
-          <Text className="text-white text-xs font-semibold">Retry</Text>
+          <Text style={{ color: "#ffffff", fontSize: 10, fontWeight: "600" }}>Retry</Text>
         </TouchableOpacity>
       </View>
     );
@@ -328,211 +376,265 @@ const ITInventorySummary: React.FC = () => {
   const spareW     = pct(spare, total);
   const defectiveW = pct(defective, total);
 
+  // company pill colors (semantic, kept intentional)
+  const companyColors: Record<string, { bg: string; text: string; bar: string }> = {
+    OCG: {
+      bg:   theme.mode === "dark" ? "#0f1e3a" : "#eff6ff",
+      text: theme.mode === "dark" ? "#60a5fa" : "#1d4ed8",
+      bar:  "#3b82f6",
+    },
+    SDB: {
+      bg:   theme.mode === "dark" ? "#1e0f3a" : "#f5f3ff",
+      text: theme.mode === "dark" ? "#a78bfa" : "#7c3aed",
+      bar:  "#8b5cf6",
+    },
+  };
+
   return (
     <ScrollView
-      className="flex-1"
+      style={{ flex: 1, backgroundColor: theme.background }}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
     >
       {/* Header */}
-      <View className="flex-row items-center justify-between mb-4">
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <View>
-          <Text className="text-base font-bold text-gray-800">
+          <Text style={{ fontSize: 15, fontWeight: "700", color: theme.text }}>
             Inventory Summary
           </Text>
-          <Text className="text-xs text-gray-400 mt-0.5">
+          <Text style={{ fontSize: 10, color: theme.subtext, marginTop: 2 }}>
             {total} total assets
           </Text>
         </View>
         <TouchableOpacity
           onPress={() => fetchData(true)}
-          className="bg-gray-100 px-3 py-1.5 rounded-lg"
+          style={{
+            backgroundColor: theme.bgActive,
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: 8,
+          }}
           disabled={refreshing}
         >
-          <Text className="text-xs text-gray-500 font-medium">↻ Refresh</Text>
+          <Text style={{ fontSize: 10, color: theme.subtext, fontWeight: "500" }}>↻ Refresh</Text>
         </TouchableOpacity>
       </View>
 
       <Animated.View style={{ opacity: fadeAnim }}>
         {/* Top metric cards */}
-      <View className="flex-row mb-3 -mx-1.5">
-        <MetricCard
-          label="Total"
-          value={total}
-          sub="all assets"
-          valueColor="#1f2937"
-        />
-        <MetricCard
-          label="Deployed"
-          value={`${pct(deployed, total)}%`}
-          sub={`${deployed} units`}
-          valueColor="#16a34a"
-        />
-        <MetricCard
-          label="Defective"
-          value={defective}
-          sub={defective === 0 ? "none — great!" : "needs attention"}
-          valueColor={defective > 0 ? "#dc2626" : "#16a34a"}
-        />
-      </View>
-
-      {/* Status breakdown */}
-      <SectionCard title="Status breakdown">
-        <View className="flex-row -mx-1">
-          <StatusBadge status="Deployed"  count={deployed}  total={total} />
-          <StatusBadge status="Spare"     count={spare}     total={total} />
-          <StatusBadge status="Defective" count={defective} total={total} />
+        <View style={{ flexDirection: "row", marginBottom: 12, marginHorizontal: -6 }}>
+          <MetricCard
+            label="Total"
+            value={total}
+            sub="all assets"
+            valueColor={theme.text}
+          />
+          <MetricCard
+            label="Deployed"
+            value={`${pct(deployed, total)}%`}
+            sub={`${deployed} units`}
+            valueColor="#16a34a"
+          />
+          <MetricCard
+            label="Defective"
+            value={defective}
+            sub={defective === 0 ? "none — great!" : "needs attention"}
+            valueColor={defective > 0 ? "#dc2626" : "#16a34a"}
+          />
         </View>
 
-{/* Utilization stacked bar */}
-        <View className="mt-4">
-          <Text className="text-xs text-gray-400 mb-2">Utilization rate</Text>
-          <View
-            className="flex-row overflow-hidden rounded-full"
-            style={{ height: 10, backgroundColor: "#f3f4f6" }}
-          >
-            <Animated.View
-              style={{
-                width: progressAnims.deployed.interpolate({
-                  inputRange: [0, 100],
-                  outputRange: ["0%", "100%"],
-                }),
-                backgroundColor: "#22c55e",
-              }}
-            />
-            <Animated.View
-              style={{
-                width: progressAnims.spare.interpolate({
-                  inputRange: [0, 100],
-                  outputRange: ["0%", "100%"],
-                }),
-                backgroundColor: "#3b82f6",
-              }}
-            />
-            <Animated.View
-              style={{
-                width: progressAnims.defective.interpolate({
-                  inputRange: [0, 100],
-                  outputRange: ["0%", "100%"],
-                }),
-                backgroundColor: "#ef4444",
-              }}
-            />
+        {/* Status breakdown */}
+        <SectionCard title="Status breakdown">
+          <View style={{ flexDirection: "row", marginHorizontal: -4 }}>
+            <StatusBadge status="Deployed"  count={deployed}  total={total} />
+            <StatusBadge status="Spare"     count={spare}     total={total} />
+            <StatusBadge status="Defective" count={defective} total={total} />
           </View>
-          <View className="flex-row justify-between mt-1.5">
-            <Text className="text-xs text-gray-400">
-              <Text style={{ color: "#22c55e" }}>●</Text> Deployed {deployedW}%
-            </Text>
-            <Text className="text-xs text-gray-400">
-              <Text style={{ color: "#3b82f6" }}>●</Text> Spare {spareW}%
-            </Text>
-            <Text className="text-xs text-gray-400">
-              <Text style={{ color: "#ef4444" }}>●</Text> Defective {defectiveW}%
-            </Text>
-          </View>
-        </View>
-      </SectionCard>
 
-      {/* Category + Location side by side */}
-      <View className="flex-row gap-3 mb-3">
-        {/* Category */}
-        <View className="flex-1 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-          <Text className="text-sm font-semibold text-gray-700 mb-4">
-            By category
-          </Text>
-          {categories.map((c, index) => (
-            <HorizontalBar
-              key={c.label}
-              label={c.label}
-              count={c.count}
-              max={catMax}
-              color={c.color}
-              animatedWidth={progressAnims.categories[index].interpolate({
-                inputRange: [0, 100],
-                outputRange: ["0%", "100%"],
-              })}
-            />
-          ))}
-        </View>
-
-        {/* Location */}
-        <View className="flex-1 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-          <Text className="text-sm font-semibold text-gray-700 mb-4">
-            By location
-          </Text>
-          {locations.map((l, index) => (
-            <HorizontalBar
-              key={l.label}
-              label={l.label}
-              count={l.count}
-              max={locMax}
-              color={l.color}
-              animatedWidth={progressAnims.locations[index].interpolate({
-                inputRange: [0, 100],
-                outputRange: ["0%", "100%"],
-              })}
-            />
-          ))}
-        </View>
-      </View>
-
-      {/* Company split */}
-      <SectionCard title="Company split">
-        {companies.map((co, i) => (
-          <View
-            key={co.name}
-            className={`flex-row items-center py-3 ${
-              i < companies.length - 1 ? "border-b border-gray-100" : ""
-            }`}
-          >
-            {/* Company pill */}
+          {/* Utilization stacked bar */}
+          <View style={{ marginTop: 16 }}>
+            <Text style={{ fontSize: 10, color: theme.subtext, marginBottom: 8 }}>Utilization rate</Text>
             <View
               style={{
-                backgroundColor: co.name === "OCG" ? "#eff6ff" : "#f5f3ff",
+                flexDirection: "row",
+                overflow: "hidden",
+                borderRadius: 99,
+                height: 10,
+                backgroundColor: theme.border,
               }}
-              className="px-3 py-1 rounded-md mr-3"
             >
-              <Text
-                style={{ color: co.name === "OCG" ? "#1d4ed8" : "#7c3aed" }}
-                className="text-xs font-bold"
-              >
-                {co.name}
+              <Animated.View
+                style={{
+                  width: progressAnims.deployed.interpolate({
+                    inputRange: [0, 100],
+                    outputRange: ["0%", "100%"],
+                  }),
+                  backgroundColor: "#22c55e",
+                }}
+              />
+              <Animated.View
+                style={{
+                  width: progressAnims.spare.interpolate({
+                    inputRange: [0, 100],
+                    outputRange: ["0%", "100%"],
+                  }),
+                  backgroundColor: "#3b82f6",
+                }}
+              />
+              <Animated.View
+                style={{
+                  width: progressAnims.defective.interpolate({
+                    inputRange: [0, 100],
+                    outputRange: ["0%", "100%"],
+                  }),
+                  backgroundColor: "#ef4444",
+                }}
+              />
+            </View>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
+              <Text style={{ fontSize: 10, color: theme.subtext }}>
+                <Text style={{ color: "#22c55e" }}>●</Text> Deployed {deployedW}%
+              </Text>
+              <Text style={{ fontSize: 10, color: theme.subtext }}>
+                <Text style={{ color: "#3b82f6" }}>●</Text> Spare {spareW}%
+              </Text>
+              <Text style={{ fontSize: 10, color: theme.subtext }}>
+                <Text style={{ color: "#ef4444" }}>●</Text> Defective {defectiveW}%
               </Text>
             </View>
-
-            <View className="flex-1">
-              <Text className="text-xs text-gray-400">
-                {co.total} assets · {co.deployed} deployed
-              </Text>
-              {/* mini bar */}
-              <View
-                className="mt-1.5 h-1.5 rounded-full overflow-hidden"
-                style={{ backgroundColor: "#f3f4f6" }}
-              >
-                <Animated.View
-                  style={{
-                    width: progressAnims.companies[i].interpolate({
-                      inputRange: [0, 100],
-                      outputRange: ["0%", "100%"],
-                    }),
-                    backgroundColor:
-                      co.name === "OCG" ? "#3b82f6" : "#8b5cf6",
-                    height: "100%",
-                    borderRadius: 99,
-                  }}
-                />
-              </View>
-            </View>
-
-            <Text
-              style={{ color: co.name === "OCG" ? "#1d4ed8" : "#7c3aed" }}
-              className="text-sm font-bold ml-3"
-            >
-              {pct(co.deployed, co.total)}%
-            </Text>
           </View>
-        ))}
-      </SectionCard>
+        </SectionCard>
+
+        {/* Category + Location side by side */}
+        <View style={{ flexDirection: "row", gap: 12, marginBottom: 12 }}>
+          {/* Category */}
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: theme.surface,
+              borderRadius: 12,
+              padding: 16,
+              borderWidth: 1,
+              borderColor: theme.border,
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: "600", color: theme.text, marginBottom: 16 }}>
+              By category
+            </Text>
+            {categories.map((c, index) => (
+              <HorizontalBar
+                key={c.label}
+                label={c.label}
+                count={c.count}
+                max={catMax}
+                color={c.color}
+                animatedWidth={progressAnims.categories[index].interpolate({
+                  inputRange: [0, 100],
+                  outputRange: ["0%", "100%"],
+                })}
+              />
+            ))}
+          </View>
+
+          {/* Location */}
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: theme.surface,
+              borderRadius: 12,
+              padding: 16,
+              borderWidth: 1,
+              borderColor: theme.border,
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: "600", color: theme.text, marginBottom: 16 }}>
+              By location
+            </Text>
+            {locations.map((l, index) => (
+              <HorizontalBar
+                key={l.label}
+                label={l.label}
+                count={l.count}
+                max={locMax}
+                color={l.color}
+                animatedWidth={progressAnims.locations[index].interpolate({
+                  inputRange: [0, 100],
+                  outputRange: ["0%", "100%"],
+                })}
+              />
+            ))}
+          </View>
+        </View>
+
+        {/* Company split */}
+        <SectionCard title="Company split">
+          {companies.map((co, i) => {
+            const colors = companyColors[co.name] ?? {
+              bg: theme.bgActive,
+              text: theme.text,
+              bar: theme.iconActive,
+            };
+            return (
+              <View
+                key={co.name}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingVertical: 12,
+                  borderBottomWidth: i < companies.length - 1 ? 1 : 0,
+                  borderBottomColor: theme.border,
+                }}
+              >
+                {/* Company pill */}
+                <View
+                  style={{
+                    backgroundColor: colors.bg,
+                    paddingHorizontal: 12,
+                    paddingVertical: 4,
+                    borderRadius: 6,
+                    marginRight: 12,
+                  }}
+                >
+                  <Text style={{ color: colors.text, fontSize: 10, fontWeight: "700" }}>
+                    {co.name}
+                  </Text>
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 10, color: theme.subtext }}>
+                    {co.total} assets · {co.deployed} deployed
+                  </Text>
+                  {/* mini bar */}
+                  <View
+                    style={{
+                      marginTop: 6,
+                      height: 6,
+                      borderRadius: 99,
+                      overflow: "hidden",
+                      backgroundColor: theme.border,
+                    }}
+                  >
+                    <Animated.View
+                      style={{
+                        width: progressAnims.companies[i].interpolate({
+                          inputRange: [0, 100],
+                          outputRange: ["0%", "100%"],
+                        }),
+                        backgroundColor: colors.bar,
+                        height: "100%",
+                        borderRadius: 99,
+                      }}
+                    />
+                  </View>
+                </View>
+
+                <Text style={{ color: colors.text, fontSize: 13, fontWeight: "700", marginLeft: 12 }}>
+                  {pct(co.deployed, co.total)}%
+                </Text>
+              </View>
+            );
+          })}
+        </SectionCard>
       </Animated.View>
     </ScrollView>
   );
