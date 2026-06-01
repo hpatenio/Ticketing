@@ -13,6 +13,8 @@ import TopBar from "../../components/TopBar";
 import ITInventoryPage from "./Modules/ITInventory/ITInventoryPage";
 import ITInventorySummary from "./Modules/ITInventory/ITInventorySummary";
 import ConsumablesPage from "./Modules/Consumables/ConsumablesPage";
+import TicketsPage from "./Modules/Tickets/TicketsPage";
+
 
 type Props = {
   user: ADUser;
@@ -28,6 +30,7 @@ export default function AdminDashboard({ user, onLogout }: Props) {
     switch (activeKey) {
       case "inventory":   return <ITInventoryPage />;
       case "consumables": return <ConsumablesPage />;
+      case "tickets":     return <TicketsPage />;
       case "dashboard":
       default:            return <DashboardHome user={user} />;
     }

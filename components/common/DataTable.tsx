@@ -5,8 +5,9 @@ interface DataTableProps<T> {
   columns: Column<T>[];
   data: T[];
   loading: boolean;
-  onEdit: (row: T) => void;
-  onDelete: (id: string) => void;
+  onEdit?: (row: T) => void;
+  onDelete?: (id: string) => void;
+  showActions?: boolean;
 }
 
 const DataTable = <T extends { id: string }>({
@@ -15,6 +16,7 @@ const DataTable = <T extends { id: string }>({
   loading,
   onEdit,
   onDelete,
+  showActions,
 }: DataTableProps<T>) => {
   if (loading) {
     return (
@@ -45,9 +47,11 @@ const DataTable = <T extends { id: string }>({
                 {col.label}
               </th>
             ))}
+            {showActions !== false ? (
             <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Actions
             </th>
+          ) : null}
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-100">
@@ -66,20 +70,26 @@ const DataTable = <T extends { id: string }>({
                     : String(row[col.key] ?? "-")}
                 </td>
               ))}
-              <td className="px-4 py-3 text-center whitespace-nowrap">
+              {showActions !== false ? (
+            <td className="px-4 py-3 text-center whitespace-nowrap">
+              {onEdit ? (
                 <button
                   onClick={() => onEdit(row)}
                   className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors mr-2"
                 >
                   Edit
                 </button>
+              ) : null}
+              {onDelete ? (
                 <button
                   onClick={() => onDelete(row.id)}
                   className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors"
                 >
                   Delete
                 </button>
-              </td>
+              ) : null}
+            </td>
+          ) : null}
             </tr>
           ))}
         </tbody>

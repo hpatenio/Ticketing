@@ -1,6 +1,10 @@
 {
   "expo": {
-    "name": "your-app",
+    "name": "Silverdab",
+    "slug": "your-app",
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
     "android": {
       "jsEngine": "hermes"
     },
@@ -8,7 +12,14 @@
       "jsEngine": "hermes"
     },
     "plugins": [
-      "expo-font"
-    ]
+      "expo-font",
+      "@react-native-community/datetimepicker"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "432690ad-9c9e-40f1-8c81-d6d1e492ec99"
+      }
+    },
+    "owner": "hpatenio"
   }
 }

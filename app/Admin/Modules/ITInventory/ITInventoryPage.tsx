@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -44,6 +44,33 @@ const COMPANY_OPTIONS = [
   { label: "SDB", value: "SDB", color: "bg-violet-600" },
 ];
 
+type InventorySortKey =
+  | "assetTag"
+  | "company"
+  | "serialNumber"
+  | "model"
+  | "brand"
+  | "category"
+  | "status"
+  | "assigneeName"
+  | "location"
+  | "datePurchased"
+  | "notes";
+
+const TABLE_HEADERS: { label: string; key: InventorySortKey; width: number }[] = [
+  { label: "Asset Tag", key: "assetTag", width: 130 },
+  { label: "Company", key: "company", width: 110 },
+  { label: "Serial Number", key: "serialNumber", width: 140 },
+  { label: "Model", key: "model", width: 110 },
+  { label: "Brand", key: "brand", width: 110 },
+  { label: "Category", key: "category", width: 110 },
+  { label: "Status", key: "status", width: 110 },
+  { label: "Assignee", key: "assigneeName", width: 110 },
+  { label: "Location", key: "location", width: 110 },
+  { label: "Date Purchased", key: "datePurchased", width: 130 },
+  { label: "Notes", key: "notes", width: 200 },
+];
+
 // --- status badge colors ---
 const StatusBadge = (value: string) => {
   const styles =
@@ -78,6 +105,8 @@ const ITInventoryPage: React.FC = () => {
   const [data, setData]                   = useState<ITInventory[]>([]);
   const [loading, setLoading]             = useState(true);
   const [search, setSearch]               = useState("");
+  const [sortKey, setSortKey]             = useState<InventorySortKey | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [addVisible, setAddVisible]       = useState(false);
   const [editVisible, setEditVisible]     = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<ITInventory | null>(null);
@@ -153,6 +182,54 @@ const ITInventoryPage: React.FC = () => {
       })
     : data;
 
+  const normalizeValue = (value: any) => {
+    if (value == null) return "";
+    if (typeof value === "number") return value;
+    if (value instanceof Date) return value.getTime();
+    if (typeof value.toDate === "function") return value.toDate().getTime();
+    return String(value).toLowerCase();
+  };
+
+  const getAssigneeName = (item: ITInventory) =>
+    employees.find((e) => e.id === item.assigneeId)?.name ?? item.assigneeName ?? "";
+
+  const sortedFiltered = useMemo(() => {
+    if (!sortKey) return filtered;
+
+    return [...filtered].sort((a, b) => {
+      const aValue =
+        sortKey === "assigneeName"
+          ? normalizeValue(getAssigneeName(a))
+          : normalizeValue(a[sortKey]);
+      const bValue =
+        sortKey === "assigneeName"
+          ? normalizeValue(getAssigneeName(b))
+          : normalizeValue(b[sortKey]);
+
+      if (typeof aValue === "number" && typeof bValue === "number") {
+        return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
+      }
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [filtered, sortKey, sortDirection, employees]);
+
+  const toggleSort = (key: InventorySortKey) => {
+    if (sortKey !== key) {
+      setSortKey(key);
+      setSortDirection("asc");
+      return;
+    }
+
+    if (sortDirection === "asc") {
+      setSortDirection("desc");
+      return;
+    }
+
+    setSortKey(null);
+  };
+
   return (
     <View className="flex-1 p-4" style={{ width: "100%" }}>
 
@@ -190,34 +267,34 @@ const ITInventoryPage: React.FC = () => {
           <View style={{ flex: 1, minWidth: "100%" }}>
             {/* Table Header */}
             <View className="flex-row bg-gray-100 rounded-t-lg" style={{ minWidth: "100%" }}>
-              {["Asset Tag", "Company", "Serial Number", "Model", "Brand", "Category", "Status", "Assignee", "Location", "Date Purchased", "Notes"].map(
-                (header) => (
-                  <Text
-                    key={header}
-                    className="text-xs font-semibold text-gray-600 uppercase px-3 py-3"
+              {TABLE_HEADERS.map((header) => {
+                const isSorted = sortKey === header.key;
+                const icon = isSorted ? (sortDirection === "asc" ? "▲" : "▼") : "⇅";
+                return (
+                  <TouchableOpacity
+                    key={header.key}
+                    onPress={() => toggleSort(header.key)}
+                    className="px-3 py-3"
+                    activeOpacity={0.7}
                     style={{
                       flex: 1,
-                      minWidth:
-                        header === "Asset Tag"
-                          ? 130
-                          : header === "Notes"
-                          ? 200
-                          : header === "Serial Number"
-                          ? 140
-                          : header === "Date Purchased"
-                          ? 130
-                          : 110,
+                      minWidth: header.width,
+                      flexDirection: "row",
+                      alignItems: "center",
                     }}
                   >
-                    {header}
-                  </Text>
-                )
-              )}
+                    <Text className="text-xs font-semibold text-gray-600 uppercase" style={{ marginRight: 4 }}>
+                      {header.label}
+                    </Text>
+                    <Text className="text-gray-400 text-xs">{icon}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             {/* Table Rows */}
             <ScrollView showsVerticalScrollIndicator={false}>
-              {filtered.map((item, index) => (
+              {sortedFiltered.map((item, index) => (
                 <View
                   key={item.id}
                   className={`flex-row items-center border-b border-gray-100`}

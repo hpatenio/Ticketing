@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -92,6 +92,8 @@ const COLUMNS = [
   { key: "photoBlack",     label: "Photo Black",  flex: 1,   minWidth: 70,  align: "center" },
 ] as const;
 
+type ConsumablesSortKey = typeof COLUMNS[number]["key"];
+
 const INK_KEYS = ["black", "cyan", "magenta", "yellow", "maintenanceBox", "photoBlack"] as const;
 
 const STATUS_OPTIONS = [
@@ -118,6 +120,8 @@ const ConsumablesPage: React.FC = () => {
   const [data, setData]             = useState<ITConsumable[]>([]);
   const [loading, setLoading]       = useState(true);
   const [search, setSearch]         = useState("");
+  const [sortKey, setSortKey]       = useState<ConsumablesSortKey | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [addVisible, setAddVisible] = useState(false);
   const [editVisible, setEditVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ITConsumable | null>(null);
@@ -269,6 +273,44 @@ const ConsumablesPage: React.FC = () => {
       )
     : data;
 
+  const normalizeValue = (value: any) => {
+    if (value == null) return "";
+    if (typeof value === "number") return value;
+    if (typeof value === "boolean") return value ? 1 : 0;
+    return String(value).toLowerCase();
+  };
+
+  const sortedFiltered = useMemo(() => {
+    if (!sortKey) return filtered;
+
+    return [...filtered].sort((a, b) => {
+      const aValue = normalizeValue(a[sortKey]);
+      const bValue = normalizeValue(b[sortKey]);
+
+      if (typeof aValue === "number" && typeof bValue === "number") {
+        return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
+      }
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [filtered, sortKey, sortDirection]);
+
+  const toggleSort = (key: ConsumablesSortKey) => {
+    if (sortKey !== key) {
+      setSortKey(key);
+      setSortDirection("asc");
+      return;
+    }
+
+    if (sortDirection === "asc") {
+      setSortDirection("desc");
+      return;
+    }
+
+    setSortKey(null);
+  };
+
   return (
     <View style={{ flex: 1, padding: 16 }}>
 
@@ -319,27 +361,35 @@ const ConsumablesPage: React.FC = () => {
         <View style={{ flex: 1, borderRadius: 10, borderWidth: 1, borderColor: "#e5e7eb", overflow: "hidden" }}>
           {/* Header row */}
           <View style={{ flexDirection: "row", backgroundColor: "#f9fafb", borderBottomWidth: 1, borderBottomColor: "#e5e7eb" }}>
-            {COLUMNS.map((col) => (
-              <View
-                key={col.key}
-                style={{
-                  flex: col.flex,
-                  minWidth: col.minWidth,
-                  paddingHorizontal: 12,
-                  paddingVertical: 10,
-                  alignItems: col.align === "center" ? "center" : "flex-start",
-                }}
-              >
-                <Text style={{ fontSize: 11, fontWeight: "600", color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5 }}>
-                  {col.label}
-                </Text>
-              </View>
-            ))}
+            {COLUMNS.map((col) => {
+              const isSorted = sortKey === col.key;
+              const icon = isSorted ? (sortDirection === "asc" ? "▲" : "▼") : "⇅";
+              return (
+                <TouchableOpacity
+                  key={col.key}
+                  onPress={() => toggleSort(col.key)}
+                  activeOpacity={0.7}
+                  style={{
+                    flex: col.flex,
+                    minWidth: col.minWidth,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    alignItems: col.align === "center" ? "center" : "flex-start",
+                    flexDirection: "row",
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: "600", color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5, marginRight: 4 }}>
+                    {col.label}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: "#9ca3af" }}>{icon}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           {/* Rows */}
           <ScrollView showsVerticalScrollIndicator={false} style={{ backgroundColor: "#fff" }}>
-            {filtered.map((item, index) => (
+            {sortedFiltered.map((item, index) => (
               <View
                 key={item.id}
                 style={{

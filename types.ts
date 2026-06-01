@@ -58,6 +58,7 @@ export interface ConcernTicket {
   category:      "CCTV" | "Licenses Accounts" | "Hardware" | "Email" | "Network" | "Maintenance" | "Medicine" | "Office Supplies" | "Software" | "Other";
   priority:      "Low" | "Medium" | "High";
   status:        "Pending" | "In Progress" | "Resolved";
+  details?:      string;
   dateCreated:   Timestamp;
   dueDate:       Timestamp;
 }

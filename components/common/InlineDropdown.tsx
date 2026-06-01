@@ -18,7 +18,7 @@ interface Option {
 
 interface Props {
   value: string;
-  options: Option[];
+  options: readonly Option[];
   onSelect: (value: string) => Promise<void>;
   renderBadge?: (value: string) => React.ReactNode;
   showSearch?: boolean;
