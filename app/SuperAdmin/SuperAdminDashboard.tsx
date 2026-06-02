@@ -12,7 +12,6 @@ import { clearUserSession, logout } from "../auth/Logout";
 import LogoutModal from "../auth/LogoutModal";
 import Sidebar from "../../components/Navigations/Sidebar";
 import BottomNavBar from "../../components/Navigations/BottmNavBar";
-import TopBar from "../../components/TopBar";
 
 
 type Props = {
@@ -45,11 +44,7 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
       <View
         style={{ flex: 1, flexDirection: "column", backgroundColor: "#EEF7FB" }}
       >
-        <TopBar
-          title="Dashboard"
-          onBellPress={() => console.log("bell pressed")}
-          onProfilePress={() => console.log("profile pressed")}
-        />
+      
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
           <View style={{ padding: 24 }}>

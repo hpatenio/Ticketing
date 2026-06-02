@@ -1,7 +1,8 @@
 // src/hooks/useEmployees.ts
 import { useEffect, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
-import { db } from "../firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { db, auth } from "../firebase";
 
 export interface EmployeeOption {
   id: string;
@@ -11,6 +12,15 @@ export interface EmployeeOption {
 export const useEmployees = () => {
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [loading, setLoading]     = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Track the logged-in user so we can mark "Me" in the assignee picker
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUserId(user?.uid ?? null);
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     const fetch = async () => {
@@ -42,5 +52,5 @@ export const useEmployees = () => {
     fetch();
   }, []);
 
-  return { employees, loading };
+  return { employees, loading, currentUserId };
 };

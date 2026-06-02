@@ -12,6 +12,8 @@ import AdminDashboard from "./app/Admin/AdminDashboard";
 import EmployeeDashboard from "./app/Employee/EmployeeDashboard";
 import { ADUser } from "./types";
 import { ThemeProvider } from "./theme/ThemeContext";
+import { registerForPushNotificationsAsync } from "./notification";
+
 SplashScreen.preventAutoHideAsync();
 
 export default function App() {
@@ -31,6 +33,7 @@ export default function App() {
 
   useEffect(() => {
     if (fontsLoaded) SplashScreen.hideAsync();
+    registerForPushNotificationsAsync();
   }, [fontsLoaded]);
 
   if (!fontsLoaded) return null;
@@ -57,9 +60,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        {renderContent()}
-      </ThemeProvider>
+      <ThemeProvider>{renderContent()}</ThemeProvider>
     </SafeAreaProvider>
   );
 }

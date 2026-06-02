@@ -14,9 +14,11 @@ import {
 } from "../../../../Services/itInventory";
 import { useEmployees } from "../../../../hooks/useEmployees";
 import { ITInventory } from "../../../../types";
+import { InventoryFilter } from "./ITInventorySummary";
 import AddAssetModal from "./AddAssetModal";
 import EditAssetModal from "./EditAssetModal";
 import InlineDropdown from "../../../../components/common/InlineDropdown";
+import AssigneeDropdown from "../../../../components/common/AssigneeDropdown";
 import { useTheme } from "../../../../theme/ThemeContext";
 
 // --- dropdown options ---
@@ -38,6 +40,9 @@ const CATEGORY_OPTIONS = [
   { label: "Laptop", value: "Laptop", color: "bg-orange-500" },
   { label: "Monitor", value: "Monitor", color: "bg-yellow-500" },
   { label: "Desktop", value: "Desktop", color: "bg-indigo-500" },
+  { label: "UPS", value: "UPS", color: "bg-cyan-500" },
+  { label: "Network Device", value: "Network Device", color: "bg-emerald-500" },
+  { label: "Server", value: "Server", color: "bg-violet-500" },
 ];
 
 const COMPANY_OPTIONS = [
@@ -65,7 +70,7 @@ const TABLE_HEADERS: { label: string; key: InventorySortKey; width: number }[] =
     { label: "Serial Number", key: "serialNumber", width: 140 },
     { label: "Model", key: "model", width: 110 },
     { label: "Brand", key: "brand", width: 110 },
-    { label: "Category", key: "category", width: 110 },
+    { label: "Category", key: "category", width: 160 },
     { label: "Status", key: "status", width: 110 },
     { label: "Assignee", key: "assigneeName", width: 110 },
     { label: "Location", key: "location", width: 110 },
@@ -76,13 +81,33 @@ const TABLE_HEADERS: { label: string; key: InventorySortKey; width: number }[] =
 // --- status badge colors ---
 const StatusBadge = (value: string) => {
   const bgColor =
-    value === "Deployed" ? "#dcfce7" : value === "Defective" ? "#fee2e2" : "#f3f4f6";
+    value === "Deployed"
+      ? "#dcfce7"
+      : value === "Defective"
+        ? "#fee2e2"
+        : "#f3f4f6";
   const textColor =
-    value === "Deployed" ? "#15803d" : value === "Defective" ? "#b91c1c" : "#4b5563";
+    value === "Deployed"
+      ? "#15803d"
+      : value === "Defective"
+        ? "#b91c1c"
+        : "#4b5563";
 
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: bgColor }}>
-      <Text style={{ fontSize: 11, fontWeight: "600", color: textColor }}>{value}</Text>
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 999,
+        backgroundColor: bgColor,
+      }}
+    >
+      <Text style={{ fontSize: 11, fontWeight: "600", color: textColor }}>
+        {value}
+      </Text>
       <Text style={{ fontSize: 11, color: textColor, opacity: 0.5 }}>▾</Text>
     </View>
   );
@@ -90,7 +115,17 @@ const StatusBadge = (value: string) => {
 
 // --- plain dropdown badge ---
 const PlainBadge = (value: string) => (
-  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: "#f3f4f6", borderRadius: 8 }}>
+  <View
+    style={{
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      backgroundColor: "#f3f4f6",
+      borderRadius: 8,
+    }}
+  >
     <Text style={{ fontSize: 11, color: "#374151" }}>{value || "—"}</Text>
     <Text style={{ fontSize: 11, color: "#9ca3af" }}>▾</Text>
   </View>
@@ -101,21 +136,29 @@ const getSurname = (fullName: string) => {
   return parts.length > 0 ? parts[parts.length - 1] : fullName || "—";
 };
 
-const ITInventoryPage: React.FC = () => {
+type Props = {
+  initialFilter?: InventoryFilter | null;
+};
+
+const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
   const [data, setData] = useState<ITInventory[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [activeFilter, setActiveFilter] = useState<InventoryFilter | null>(
+    initialFilter,
+  );
   const [sortKey, setSortKey] = useState<InventorySortKey | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [addVisible, setAddVisible] = useState(false);
   const [editVisible, setEditVisible] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<ITInventory | null>(null);
   const { theme } = useTheme();
-  const { employees } = useEmployees();
+  const { employees, currentUserId } = useEmployees();
 
   const assigneeOptions = employees.map((e) => ({
-    label: getSurname(e.name),
+    label: e.name,
     value: e.id,
+    isMe: e.id === currentUserId, // marks the logged-in user as "Me" in the picker
   }));
 
   const fetchData = async () => {
@@ -161,8 +204,16 @@ const ITInventoryPage: React.FC = () => {
   const lastTapRef = useRef<Record<string, number>>({});
 
   const q = search.toLowerCase().trim();
+
+  // apply summary filter first, then search on top
+  const filterApplied = activeFilter
+    ? data.filter(
+        (item) => (item[activeFilter.field] ?? "") === activeFilter.value,
+      )
+    : data;
+
   const filtered = q
-    ? data.filter((item) => {
+    ? filterApplied.filter((item) => {
         const assigneeName =
           employees.find((e) => e.id === item.assigneeId)?.name ??
           item.assigneeName ??
@@ -178,11 +229,14 @@ const ITInventoryPage: React.FC = () => {
           item.serialNumber,
           assigneeName,
           item.notes,
+          item.datePurchased
+            ? item.datePurchased.toDate().toLocaleDateString()
+            : "",
         ]
           .map((v) => (v ?? "").toLowerCase())
           .some((v) => v.includes(q));
       })
-    : data;
+    : filterApplied;
 
   const normalizeValue = (value: any) => {
     if (value == null) return "";
@@ -235,20 +289,43 @@ const ITInventoryPage: React.FC = () => {
   };
 
   return (
-    <View style={{ flex: 1, padding: 16, width: "100%", backgroundColor: theme.background }}>
+    <View
+      style={{
+        flex: 1,
+        padding: 16,
+        width: "100%",
+        backgroundColor: theme.background,
+      }}
+    >
       {/* Header */}
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 16,
+        }}
+      >
         <View>
-          <Text style={{ fontSize: 20, fontWeight: "700", color: theme.text }}>IT Inventory</Text>
+          <Text style={{ fontSize: 20, fontWeight: "700", color: theme.text }}>
+            IT Inventory
+          </Text>
           <Text style={{ fontSize: 12, color: theme.subtext, marginTop: 2 }}>
             {filtered.length} of {data.length} records
           </Text>
         </View>
         <TouchableOpacity
           onPress={() => setAddVisible(true)}
-          style={{ backgroundColor: theme.iconActive, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}
+          style={{
+            backgroundColor: theme.iconActive,
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+            borderRadius: 8,
+          }}
         >
-          <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}>+ Add Asset</Text>
+          <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}>
+            + Add Asset
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -262,7 +339,7 @@ const ITInventoryPage: React.FC = () => {
           width: "100%",
           paddingHorizontal: 16,
           paddingVertical: 10,
-          marginBottom: 16,
+          marginBottom: activeFilter ? 8 : 16,
           fontSize: 13,
           borderWidth: 1,
           borderColor: theme.border,
@@ -272,9 +349,66 @@ const ITInventoryPage: React.FC = () => {
         }}
       />
 
+      {/* Active filter pill */}
+      {activeFilter && (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            marginBottom: 12,
+            gap: 8,
+          }}
+        >
+          <Text style={{ fontSize: 11, color: theme.subtext }}>
+            Filtered by:
+          </Text>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: theme.bgActive,
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              borderRadius: 99,
+              gap: 6,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: "600",
+                color: theme.iconActive,
+                textTransform: "capitalize",
+              }}
+            >
+              {activeFilter.field}: {activeFilter.value}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setActiveFilter(null)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: theme.iconActive,
+                  fontWeight: "700",
+                }}
+              >
+                ✕
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={{ fontSize: 11, color: theme.subtext }}>
+            {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+          </Text>
+        </View>
+      )}
+
       {/* Table */}
       {loading ? (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <View
+          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+        >
           <ActivityIndicator size="large" color={theme.iconActive} />
         </View>
       ) : (
@@ -287,7 +421,14 @@ const ITInventoryPage: React.FC = () => {
           <View style={{ flex: 1, minWidth: "100%" }}>
             {/* Table Header */}
             <View
-              style={{ flexDirection: "row", backgroundColor: theme.surface, borderRadius: 8, minWidth: "100%", borderBottomWidth: 1, borderBottomColor: theme.border }}
+              style={{
+                flexDirection: "row",
+                backgroundColor: theme.surface,
+                borderRadius: 8,
+                minWidth: "100%",
+                borderBottomWidth: 1,
+                borderBottomColor: theme.border,
+              }}
             >
               {TABLE_HEADERS.map((header) => {
                 const isSorted = sortKey === header.key;
@@ -311,11 +452,20 @@ const ITInventoryPage: React.FC = () => {
                     }}
                   >
                     <Text
-                      style={{ fontSize: 11, fontWeight: "600", color: theme.subtext, textTransform: "uppercase", letterSpacing: 0.5, marginRight: 4 }}
+                      style={{
+                        fontSize: 11,
+                        fontWeight: "600",
+                        color: theme.subtext,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.5,
+                        marginRight: 4,
+                      }}
                     >
                       {header.label}
                     </Text>
-                    <Text style={{ color: theme.subtext, fontSize: 11 }}>{icon}</Text>
+                    <Text style={{ color: theme.subtext, fontSize: 11 }}>
+                      {icon}
+                    </Text>
                   </TouchableOpacity>
                 );
               })}
@@ -331,13 +481,22 @@ const ITInventoryPage: React.FC = () => {
                     alignItems: "center",
                     borderBottomWidth: 1,
                     borderBottomColor: theme.border,
-                    backgroundColor: index % 2 === 0 ? theme.background : theme.surface,
+                    backgroundColor:
+                      index % 2 === 0 ? theme.background : theme.surface,
                     minWidth: "100%",
                   }}
                 >
                   {/* Asset Tag — double-tap to edit (removed separate edit icon) */}
                   <View
-                    style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 12, flex: 1, minWidth: 130 }}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 6,
+                      paddingHorizontal: 12,
+                      paddingVertical: 12,
+                      flex: 1,
+                      minWidth: 130,
+                    }}
                   >
                     <TouchableOpacity
                       onPress={() => {
@@ -352,7 +511,11 @@ const ITInventoryPage: React.FC = () => {
                       style={{ flex: 1 }}
                     >
                       <Text
-                        style={{ fontSize: 12, color: theme.text, flexShrink: 1 }}
+                        style={{
+                          fontSize: 12,
+                          color: theme.text,
+                          flexShrink: 1,
+                        }}
                         numberOfLines={1}
                       >
                         {item.assetTag}
@@ -362,7 +525,12 @@ const ITInventoryPage: React.FC = () => {
 
                   {/* Company — inline dropdown */}
                   <View
-                    style={{ paddingHorizontal: 8, paddingVertical: 8, flex: 1, minWidth: 110 }}
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 8,
+                      flex: 1,
+                      minWidth: 110,
+                    }}
                   >
                     <InlineDropdown
                       value={item.company}
@@ -376,28 +544,54 @@ const ITInventoryPage: React.FC = () => {
 
                   {/* Serial Number */}
                   <Text
-                    style={{ fontSize: 12, color: theme.text, paddingHorizontal: 12, paddingVertical: 12, flex: 1, minWidth: 140 }}
+                    style={{
+                      fontSize: 12,
+                      color: theme.text,
+                      paddingHorizontal: 12,
+                      paddingVertical: 12,
+                      flex: 1,
+                      minWidth: 140,
+                    }}
                   >
                     {item.serialNumber || "—"}
                   </Text>
 
                   {/* Model — read only */}
                   <Text
-                    style={{ fontSize: 12, color: theme.text, paddingHorizontal: 12, paddingVertical: 12, flex: 1, minWidth: 110 }}
+                    style={{
+                      fontSize: 12,
+                      color: theme.text,
+                      paddingHorizontal: 12,
+                      paddingVertical: 12,
+                      flex: 1,
+                      minWidth: 110,
+                    }}
                   >
                     {item.model}
                   </Text>
 
                   {/* Brand — read only */}
                   <Text
-                    style={{ fontSize: 12, color: theme.text, paddingHorizontal: 12, paddingVertical: 12, flex: 1, minWidth: 110 }}
+                    style={{
+                      fontSize: 12,
+                      color: theme.text,
+                      paddingHorizontal: 12,
+                      paddingVertical: 12,
+                      flex: 1,
+                      minWidth: 110,
+                    }}
                   >
                     {item.brand}
                   </Text>
 
                   {/* Category — inline dropdown */}
                   <View
-                    style={{ paddingHorizontal: 8, paddingVertical: 8, flex: 1, minWidth: 110 }}
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 8,
+                      flex: 1,
+                      minWidth: 160,
+                    }}
                   >
                     <InlineDropdown
                       value={item.category}
@@ -411,7 +605,12 @@ const ITInventoryPage: React.FC = () => {
 
                   {/* Status — inline dropdown with badge */}
                   <View
-                    style={{ paddingHorizontal: 8, paddingVertical: 8, flex: 1, minWidth: 110 }}
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 8,
+                      flex: 1,
+                      minWidth: 110,
+                    }}
                   >
                     <InlineDropdown
                       value={item.status}
@@ -423,15 +622,18 @@ const ITInventoryPage: React.FC = () => {
                     />
                   </View>
 
-                  {/* Assignee — inline dropdown from Firebase users */}
+                  {/* Assignee — people-picker dropdown */}
                   <View
-                    style={{ paddingHorizontal: 8, paddingVertical: 8, flex: 1, minWidth: 110 }}
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 8,
+                      flex: 1,
+                      minWidth: 110,
+                    }}
                   >
-                    <InlineDropdown
+                    <AssigneeDropdown
                       value={item.assigneeId}
                       options={assigneeOptions}
-                      showSearch
-                      searchPlaceholder="Search assignees..."
                       onSelect={async (val) => {
                         const selected = employees.find((e) => e.id === val);
                         updateLocalField(item.assetTag, "assigneeId", val);
@@ -451,19 +653,17 @@ const ITInventoryPage: React.FC = () => {
                           selected?.name ?? "",
                         );
                       }}
-                      renderBadge={(val) => {
-                        const name =
-                          employees.find((e) => e.id === val)?.name ??
-                          item.assigneeName ??
-                          "—";
-                        return PlainBadge(getSurname(name));
-                      }}
                     />
                   </View>
 
                   {/* Location — inline dropdown */}
                   <View
-                    style={{ paddingHorizontal: 8, paddingVertical: 8, flex: 1, minWidth: 110 }}
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 8,
+                      flex: 1,
+                      minWidth: 110,
+                    }}
                   >
                     <InlineDropdown
                       value={item.location}
@@ -477,7 +677,14 @@ const ITInventoryPage: React.FC = () => {
 
                   {/* Date Purchased */}
                   <Text
-                    style={{ fontSize: 12, color: theme.text, paddingHorizontal: 12, paddingVertical: 12, flex: 1, minWidth: 130 }}
+                    style={{
+                      fontSize: 12,
+                      color: theme.text,
+                      paddingHorizontal: 12,
+                      paddingVertical: 12,
+                      flex: 1,
+                      minWidth: 130,
+                    }}
                   >
                     {item.datePurchased
                       ? item.datePurchased.toDate().toLocaleDateString()
@@ -486,7 +693,14 @@ const ITInventoryPage: React.FC = () => {
 
                   {/* Notes */}
                   <Text
-                    style={{ fontSize: 12, color: theme.text, paddingHorizontal: 12, paddingVertical: 12, flex: 1, minWidth: 200 }}
+                    style={{
+                      fontSize: 12,
+                      color: theme.text,
+                      paddingHorizontal: 12,
+                      paddingVertical: 12,
+                      flex: 1,
+                      minWidth: 200,
+                    }}
                     numberOfLines={2}
                   >
                     {item.notes || "—"}

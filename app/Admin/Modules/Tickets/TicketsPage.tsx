@@ -13,6 +13,7 @@ import {
   getAllTickets,
   updateTicketField,
 } from "../../../../Services/ticketService";
+import AssigneeDropdown from "../../../../components/common/AssigneeDropdown";
 import InlineDropdown from "../../../../components/common/InlineDropdown";
 import InlineDatePicker from "../../../../components/common/InlineDatePicker";
 import EditAssetModal from "./EditAssetModal";
@@ -22,40 +23,44 @@ import { useTheme } from "../../../../theme/ThemeContext";
 // ─── Options ──────────────────────────────────────────────────────────────────
 
 const CATEGORY_OPTIONS = [
-  { label: "CCTV",              value: "CCTV",              color: "bg-blue-600"   },
-  { label: "Licenses Accounts", value: "Licenses Accounts", color: "bg-violet-600" },
-  { label: "Hardware",          value: "Hardware",          color: "bg-slate-600"  },
-  { label: "Email",             value: "Email",             color: "bg-cyan-600"   },
-  { label: "Network",           value: "Network",           color: "bg-emerald-600"},
-  { label: "Maintenance",       value: "Maintenance",       color: "bg-amber-600"  },
-  { label: "Medicine",          value: "Medicine",          color: "bg-rose-600"   },
-  { label: "Office Supplies",   value: "Office Supplies",   color: "bg-slate-500"  },
-  { label: "Software",          value: "Software",          color: "bg-indigo-600" },
-  { label: "Other",             value: "Other",             color: "bg-gray-600"   },
+  { label: "CCTV", value: "CCTV", color: "bg-blue-600" },
+  {
+    label: "Licenses Accounts",
+    value: "Licenses Accounts",
+    color: "bg-violet-600",
+  },
+  { label: "Hardware", value: "Hardware", color: "bg-slate-600" },
+  { label: "Email", value: "Email", color: "bg-cyan-600" },
+  { label: "Network", value: "Network", color: "bg-emerald-600" },
+  { label: "Maintenance", value: "Maintenance", color: "bg-amber-600" },
+  { label: "Medicine", value: "Medicine", color: "bg-rose-600" },
+  { label: "Office Supplies", value: "Office Supplies", color: "bg-slate-500" },
+  { label: "Software", value: "Software", color: "bg-indigo-600" },
+  { label: "Other", value: "Other", color: "bg-gray-600" },
 ] as const;
 
 const PRIORITY_OPTIONS = [
-  { label: "Low",    value: "Low"    },
+  { label: "Low", value: "Low" },
   { label: "Medium", value: "Medium" },
-  { label: "High",   value: "High"   },
+  { label: "High", value: "High" },
 ] as const;
 
 const STATUS_OPTIONS = [
-  { label: "Pending",     value: "Pending"     },
+  { label: "Pending", value: "Pending" },
   { label: "In Progress", value: "In Progress" },
-  { label: "Resolved",    value: "Resolved"    },
+  { label: "Resolved", value: "Resolved" },
 ] as const;
 
-// ─── Column config (mirrors inventory/consumables pattern) ────────────────────
+// ─── Column config ────────────────────────────────────────────────────────────
 
 const COLUMNS = [
-  { key: "summary",       label: "Summary",     flex: 2,   minWidth: 180 },
-  { key: "requesterName", label: "Requester",   flex: 1.5, minWidth: 120 },
-  { key: "assigneeName",  label: "Assignee",    flex: 1.5, minWidth: 120 },
-  { key: "category",      label: "Category",    flex: 1.5, minWidth: 130 },
-  { key: "priority",      label: "Priority",    flex: 1,   minWidth: 90  },
-  { key: "status",        label: "Status",      flex: 1.2, minWidth: 110 },
-  { key: "dueDate",       label: "Due Date",    flex: 1.2, minWidth: 110 },
+  { key: "summary", label: "Summary", flex: 2, minWidth: 180 },
+  { key: "requesterName", label: "Requester", flex: 1.5, minWidth: 120 },
+  { key: "assigneeName", label: "Assignee", flex: 1.5, minWidth: 120 },
+  { key: "category", label: "Category", flex: 1.5, minWidth: 130 },
+  { key: "priority", label: "Priority", flex: 1, minWidth: 90 },
+  { key: "status", label: "Status", flex: 1.2, minWidth: 110 },
+  { key: "dueDate", label: "Due Date", flex: 1.2, minWidth: 110 },
 ] as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -72,28 +77,50 @@ function formatTimestamp(value: any) {
 
 const renderStatusBadge = (value: string) => {
   const bg =
-    value === "Resolved"    ? "#d1fae5" :
-    value === "In Progress" ? "#dbeafe" : "#fef9c3";
+    value === "Resolved"
+      ? "#d1fae5"
+      : value === "In Progress"
+        ? "#dbeafe"
+        : "#fef9c3";
   const color =
-    value === "Resolved"    ? "#065f46" :
-    value === "In Progress" ? "#1d4ed8" : "#92400e";
+    value === "Resolved"
+      ? "#065f46"
+      : value === "In Progress"
+        ? "#1d4ed8"
+        : "#92400e";
   return (
-    <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: bg }}>
-      <Text style={{ fontSize: 11, fontWeight: "700", color }}>{value || "—"}</Text>
+    <View
+      style={{
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 999,
+        backgroundColor: bg,
+      }}
+    >
+      <Text style={{ fontSize: 11, fontWeight: "700", color }}>
+        {value || "—"}
+      </Text>
     </View>
   );
 };
 
 const renderPriorityBadge = (value: string) => {
   const bg =
-    value === "High"   ? "#fee2e2" :
-    value === "Medium" ? "#fef9c3" : "#f0fdf4";
+    value === "High" ? "#fee2e2" : value === "Medium" ? "#fef9c3" : "#f0fdf4";
   const color =
-    value === "High"   ? "#b91c1c" :
-    value === "Medium" ? "#92400e" : "#166534";
+    value === "High" ? "#b91c1c" : value === "Medium" ? "#92400e" : "#166534";
   return (
-    <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: bg }}>
-      <Text style={{ fontSize: 11, fontWeight: "700", color }}>{value || "—"}</Text>
+    <View
+      style={{
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 999,
+        backgroundColor: bg,
+      }}
+    >
+      <Text style={{ fontSize: 11, fontWeight: "700", color }}>
+        {value || "—"}
+      </Text>
     </View>
   );
 };
@@ -103,9 +130,12 @@ const renderPriorityBadge = (value: string) => {
 type TicketRowProps = {
   ticket: ConcernTicket;
   index: number;
-  assigneeOptions: readonly { label: string; value: string }[];
-  employeeOptions: readonly { label: string; value: string }[];
-  onUpdateField: (ticketNumber: string, field: string, value: any) => Promise<void>;
+  assigneeOptions: { label: string; value: string; isMe?: boolean }[];
+  onUpdateField: (
+    ticketNumber: string,
+    field: string,
+    value: any,
+  ) => Promise<void>;
   onOpenDetails: (ticket: ConcernTicket) => void;
 };
 
@@ -113,7 +143,6 @@ const TicketRow = ({
   ticket,
   index,
   assigneeOptions,
-  employeeOptions,
   onUpdateField,
   onOpenDetails,
 }: TicketRowProps) => {
@@ -134,7 +163,10 @@ const TicketRow = ({
   const getDateValue = () => {
     try {
       if (ticket.dueDate instanceof Date) return ticket.dueDate;
-      if (typeof ticket.dueDate === "object" && (ticket.dueDate as any)?.toDate) {
+      if (
+        typeof ticket.dueDate === "object" &&
+        (ticket.dueDate as any)?.toDate
+      ) {
         return (ticket.dueDate as any).toDate();
       }
       const d = new Date(ticket.dueDate as any);
@@ -147,7 +179,11 @@ const TicketRow = ({
   const handleDateConfirm = async (newDate: Date) => {
     setDueDate(newDate.toLocaleDateString());
     try {
-      await onUpdateField(ticket.ticketNumber, "dueDate", newDate.toISOString().split("T")[0]);
+      await onUpdateField(
+        ticket.ticketNumber,
+        "dueDate",
+        newDate.toISOString().split("T")[0],
+      );
     } catch (err) {
       console.error("Failed to update due date:", err);
     }
@@ -164,9 +200,19 @@ const TicketRow = ({
       }}
     >
       {/* Summary */}
-      <View style={{ flex: 2, minWidth: 180, paddingHorizontal: 12, paddingVertical: 10 }}>
+      <View
+        style={{
+          flex: 2,
+          minWidth: 180,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+        }}
+      >
         <TouchableOpacity onPress={handleSummaryPress} activeOpacity={0.7}>
-          <Text style={{ fontSize: 12, fontWeight: "600", color: theme.text }} numberOfLines={2}>
+          <Text
+            style={{ fontSize: 12, fontWeight: "600", color: theme.text }}
+            numberOfLines={2}
+          >
             {ticket.summary}
           </Text>
           <Text style={{ fontSize: 10, color: theme.subtext, marginTop: 2 }}>
@@ -175,63 +221,130 @@ const TicketRow = ({
         </TouchableOpacity>
       </View>
 
-      {/* Requester */}
-      <View style={{ flex: 1.5, minWidth: 120, paddingHorizontal: 12, paddingVertical: 10 }}>
-        <InlineDropdown
-          value={ticket.requesterName || "Unknown"}
-          options={employeeOptions}
-          onSelect={async (val: string) => {
-            const selected = employeeOptions.find((e) => e.value === val);
+      {/* Requester — people picker */}
+      <View
+        style={{
+          flex: 1.5,
+          minWidth: 120,
+          paddingHorizontal: 8,
+          paddingVertical: 8,
+        }}
+      >
+        <AssigneeDropdown
+          value={
+            ticket.requesterId ||
+            assigneeOptions.find(
+              (e) =>
+                e.label.toLowerCase() ===
+                (ticket.requesterName ?? "").toLowerCase(),
+            )?.value ||
+            ""
+          }
+          fallbackName={ticket.requesterName || undefined}
+          options={assigneeOptions}
+          placeholder="Requester"
+          onSelect={async (val) => {
+            const selected = assigneeOptions.find((e) => e.value === val);
             await onUpdateField(ticket.ticketNumber, "requesterId", val);
-            await onUpdateField(ticket.ticketNumber, "requesterName", selected?.label ?? "");
+            await onUpdateField(
+              ticket.ticketNumber,
+              "requesterName",
+              selected?.label ?? "",
+            );
           }}
         />
       </View>
 
-      {/* Assignee */}
-      <View style={{ flex: 1.5, minWidth: 120, paddingHorizontal: 12, paddingVertical: 10 }}>
-        <InlineDropdown
-          value={ticket.assigneeName || "Unassigned"}
-          options={[{ label: "Unassigned", value: "" }, ...assigneeOptions]}
-          onSelect={async (val: string) => {
+      {/* Assignee — people picker */}
+      <View
+        style={{
+          flex: 1.5,
+          minWidth: 120,
+          paddingHorizontal: 8,
+          paddingVertical: 8,
+        }}
+      >
+        <AssigneeDropdown
+          value={ticket.assigneeId}
+          options={assigneeOptions}
+          placeholder="Unassigned"
+          onSelect={async (val) => {
             const selected = assigneeOptions.find((e) => e.value === val);
             await onUpdateField(ticket.ticketNumber, "assigneeId", val);
-            await onUpdateField(ticket.ticketNumber, "assigneeName", selected?.label ?? "");
+            await onUpdateField(
+              ticket.ticketNumber,
+              "assigneeName",
+              selected?.label ?? "",
+            );
           }}
         />
       </View>
 
       {/* Category */}
-      <View style={{ flex: 1.5, minWidth: 130, paddingHorizontal: 12, paddingVertical: 10 }}>
+      <View
+        style={{
+          flex: 1.5,
+          minWidth: 130,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+        }}
+      >
         <InlineDropdown
           value={ticket.category}
           options={CATEGORY_OPTIONS}
-          onSelect={async (val: string) => onUpdateField(ticket.ticketNumber, "category", val)}
+          onSelect={async (val: string) =>
+            onUpdateField(ticket.ticketNumber, "category", val)
+          }
         />
       </View>
 
       {/* Priority */}
-      <View style={{ flex: 1, minWidth: 90, paddingHorizontal: 12, paddingVertical: 10 }}>
+      <View
+        style={{
+          flex: 1,
+          minWidth: 90,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+        }}
+      >
         <InlineDropdown
           value={ticket.priority}
           options={PRIORITY_OPTIONS}
-          onSelect={async (val: string) => onUpdateField(ticket.ticketNumber, "priority", val)}
+          onSelect={async (val: string) =>
+            onUpdateField(ticket.ticketNumber, "priority", val)
+          }
           renderBadge={renderPriorityBadge}
         />
       </View>
 
       {/* Status */}
-      <View style={{ flex: 1.2, minWidth: 110, paddingHorizontal: 12, paddingVertical: 10 }}>
+      <View
+        style={{
+          flex: 1.2,
+          minWidth: 110,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+        }}
+      >
         <InlineDropdown
           value={ticket.status}
           options={STATUS_OPTIONS}
-          onSelect={async (val: string) => onUpdateField(ticket.ticketNumber, "status", val)}
+          onSelect={async (val: string) =>
+            onUpdateField(ticket.ticketNumber, "status", val)
+          }
           renderBadge={renderStatusBadge}
         />
       </View>
 
       {/* Due Date */}
-      <View style={{ flex: 1.2, minWidth: 110, paddingHorizontal: 12, paddingVertical: 10 }}>
+      <View
+        style={{
+          flex: 1.2,
+          minWidth: 110,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+        }}
+      >
         <InlineDatePicker
           value={dueDate}
           initialDate={getDateValue()}
@@ -251,8 +364,10 @@ export default function TicketsPage() {
   const [search, setSearch] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editingTicket, setEditingTicket] = useState<ConcernTicket | null>(null);
-  const { employees } = useEmployees();
+  const [editingTicket, setEditingTicket] = useState<ConcernTicket | null>(
+    null,
+  );
+  const { employees, currentUserId } = useEmployees();
 
   const loadTickets = async () => {
     setLoading(true);
@@ -272,19 +387,34 @@ export default function TicketsPage() {
 
   const filteredTickets = search.trim()
     ? tickets.filter((ticket) =>
-        [ticket.summary, ticket.details || "", ticket.requesterName, ticket.assigneeName, ticket.category, ticket.priority, ticket.status]
+        [
+          ticket.summary,
+          ticket.details || "",
+          ticket.requesterName,
+          ticket.assigneeName,
+          ticket.category,
+          ticket.priority,
+          ticket.status,
+        ]
           .join(" ")
           .toLowerCase()
-          .includes(search.trim().toLowerCase())
+          .includes(search.trim().toLowerCase()),
       )
     : tickets;
 
-  const handleUpdateField = async (ticketNumber: string, field: string, value: any) => {
+  const handleUpdateField = async (
+    ticketNumber: string,
+    field: string,
+    value: any,
+  ) => {
     try {
       await updateTicketField(ticketNumber, field, value);
       await loadTickets();
     } catch (err) {
-      console.error(`Unable to update ${field} for ticket ${ticketNumber}:`, err);
+      console.error(
+        `Unable to update ${field} for ticket ${ticketNumber}:`,
+        err,
+      );
     }
   };
 
@@ -293,16 +423,19 @@ export default function TicketsPage() {
     setEditModalVisible(true);
   };
 
-  const handleSaveEditedTicket = async (ticketNumber: string, updates: {
-    summary: string;
-    details: string;
-    category: string;
-    priority: string;
-    status: string;
-    assigneeId: string;
-    assigneeName: string;
-    dueDate: string;
-  }) => {
+  const handleSaveEditedTicket = async (
+    ticketNumber: string,
+    updates: {
+      summary: string;
+      details: string;
+      category: string;
+      priority: string;
+      status: string;
+      assigneeId: string;
+      assigneeName: string;
+      dueDate: string;
+    },
+  ) => {
     try {
       const due = new Date(updates.dueDate);
       await Promise.all([
@@ -322,25 +455,44 @@ export default function TicketsPage() {
     }
   };
 
-  const assigneeOptions = employees.map((e: EmployeeOption) => ({ label: e.name, value: e.id }));
-  const employeeOptions = employees.map((e: EmployeeOption) => ({ label: e.name, value: e.id }));
+  // Full name + isMe flag for the people picker
+  const assigneeOptions = employees.map((e: EmployeeOption) => ({
+    label: e.name,
+    value: e.id,
+    isMe: e.id === currentUserId,
+  }));
 
   return (
     <View style={{ flex: 1, padding: 16, backgroundColor: theme.background }}>
-
       {/* Header */}
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 16,
+        }}
+      >
         <View>
-          <Text style={{ fontSize: 20, fontWeight: "700", color: theme.text }}>Concern Tickets</Text>
+          <Text style={{ fontSize: 20, fontWeight: "700", color: theme.text }}>
+            Concern Tickets
+          </Text>
           <Text style={{ fontSize: 12, color: theme.subtext, marginTop: 2 }}>
             {filteredTickets.length} of {tickets.length} tickets
           </Text>
         </View>
         <TouchableOpacity
           onPress={() => setModalVisible(true)}
-          style={{ backgroundColor: theme.iconActive, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}
+          style={{
+            backgroundColor: theme.iconActive,
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+            borderRadius: 8,
+          }}
         >
-          <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}>+ Add Ticket</Text>
+          <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}>
+            + Add Ticket
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -366,24 +518,50 @@ export default function TicketsPage() {
 
       {/* Table */}
       {loading ? (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <View
+          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+        >
           <ActivityIndicator size="large" color={theme.iconActive} />
         </View>
       ) : filteredTickets.length === 0 ? (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 80 }}>
-          <Text style={{ color: theme.subtext, fontSize: 13 }}>No tickets found.</Text>
+        <View
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            paddingVertical: 80,
+          }}
+        >
+          <Text style={{ color: theme.subtext, fontSize: 13 }}>
+            No tickets found.
+          </Text>
         </View>
       ) : (
         <ScrollView
           horizontal
-          showsHorizontalScrollIndicator={false}
+          showsHorizontalScrollIndicator={true}
           style={{ flex: 1 }}
           contentContainerStyle={{ flexGrow: 1, minWidth: "100%" }}
         >
-          <View style={{ flex: 1, minWidth: "100%", borderRadius: 10, borderWidth: 1, borderColor: theme.border, overflow: "hidden" }}>
-
+          <View
+            style={{
+              flex: 1,
+              minWidth: "100%",
+              borderRadius: 10,
+              borderWidth: 1,
+              borderColor: theme.border,
+              overflow: "hidden",
+            }}
+          >
             {/* Header row */}
-            <View style={{ flexDirection: "row", backgroundColor: theme.surface, borderBottomWidth: 1, borderBottomColor: theme.border }}>
+            <View
+              style={{
+                flexDirection: "row",
+                backgroundColor: theme.surface,
+                borderBottomWidth: 1,
+                borderBottomColor: theme.border,
+              }}
+            >
               {COLUMNS.map((col) => (
                 <View
                   key={col.key}
@@ -394,7 +572,15 @@ export default function TicketsPage() {
                     paddingVertical: 10,
                   }}
                 >
-                  <Text style={{ fontSize: 11, fontWeight: "600", color: theme.subtext, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: "600",
+                      color: theme.subtext,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.5,
+                    }}
+                  >
                     {col.label}
                   </Text>
                 </View>
@@ -402,7 +588,7 @@ export default function TicketsPage() {
             </View>
 
             {/* Rows */}
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={true}>
               {filteredTickets.map((ticket, index) => {
                 try {
                   return (
@@ -411,7 +597,6 @@ export default function TicketsPage() {
                       ticket={ticket}
                       index={index}
                       assigneeOptions={assigneeOptions}
-                      employeeOptions={employeeOptions}
                       onUpdateField={handleUpdateField}
                       onOpenDetails={openEditModal}
                     />
@@ -419,14 +604,23 @@ export default function TicketsPage() {
                 } catch (err) {
                   console.error("Error rendering ticket row:", err, ticket);
                   return (
-                    <View key={ticket.ticketNumber} style={{ paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.border }}>
-                      <Text style={{ color: "#dc2626", fontSize: 12 }}>Error rendering ticket</Text>
+                    <View
+                      key={ticket.ticketNumber}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        borderBottomWidth: 1,
+                        borderBottomColor: theme.border,
+                      }}
+                    >
+                      <Text style={{ color: "#dc2626", fontSize: 12 }}>
+                        Error rendering ticket
+                      </Text>
                     </View>
                   );
                 }
               })}
             </ScrollView>
-
           </View>
         </ScrollView>
       )}

@@ -22,7 +22,7 @@ export interface ITInventory {
   status:       "Deployed" | "Spare" | "Defective";
   assigneeId:   string;
   assigneeName: string;
-  category:     "Laptop" | "Monitor" | "Desktop";
+  category:     "Laptop" | "Monitor" | "Desktop" | "UPS" | "Network Device" | "Server";
   location:     "Unit 1 & 2" | "Unit 3" | "BDO Makati" | "Triumph" | "WFH";
   datePurchased: Timestamp;
   notes:        string;

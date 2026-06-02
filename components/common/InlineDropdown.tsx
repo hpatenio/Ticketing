@@ -137,7 +137,7 @@ const InlineDropdown: React.FC<Props> = ({
                 item.label.toLowerCase().includes(searchQuery.trim().toLowerCase())
               ) : options}
               keyExtractor={(item) => item.value}
-              scrollEnabled={options.length > 6}
+              scrollEnabled={options.length > 5}
               style={{ maxHeight: 220 }}
               ListEmptyComponent={
                 showSearch ? (

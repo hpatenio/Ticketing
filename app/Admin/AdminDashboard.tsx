@@ -9,9 +9,10 @@ import {
 import { ADUser } from "../../types";
 import Sidebar from "../../components/Navigations/Sidebar";
 import BottomNavBar from "../../components/Navigations/BottmNavBar";
-import TopBar from "../../components/TopBar";
 import ITInventoryPage from "./Modules/ITInventory/ITInventoryPage";
-import ITInventorySummary from "./Modules/ITInventory/ITInventorySummary";
+import ITInventorySummary, {
+  InventoryFilter,
+} from "./Modules/ITInventory/ITInventorySummary";
 import ConsumablesPage from "./Modules/Consumables/ConsumablesPage";
 import TicketsPage from "./Modules/Tickets/TicketsPage";
 import { useTheme } from "../../theme/ThemeContext";
@@ -23,59 +24,97 @@ type Props = {
 
 export default function AdminDashboard({ user, onLogout }: Props) {
   const [activeKey, setActiveKey] = useState("dashboard");
+  const [inventoryFilter, setInventoryFilter] =
+    useState<InventoryFilter | null>(null);
   const { width } = useWindowDimensions();
   const { theme } = useTheme();
-  const isMobile = Platform.OS === "android" || Platform.OS === "ios" || width < 768;
+  const isMobile =
+    Platform.OS === "android" || Platform.OS === "ios" || width < 768;
+
+  // Called when user taps a summary card — switch to inventory tab with filter
+  const handleFilterNavigate = (filter: InventoryFilter | null) => {
+    setInventoryFilter(filter);
+    setActiveKey("inventory");
+  };
 
   const renderContent = () => {
     switch (activeKey) {
-      case "inventory":   return <ITInventoryPage />;
-      case "consumables": return <ConsumablesPage />;
-      case "tickets":     return <TicketsPage />;
+      case "inventory":
+        return <ITInventoryPage initialFilter={inventoryFilter} />;
+      case "consumables":
+        return <ConsumablesPage />;
+      case "tickets":
+        return <TicketsPage />;
       case "dashboard":
-      default:            return <DashboardHome user={user} />;
+      default:
+        return (
+          <DashboardHome user={user} onFilterNavigate={handleFilterNavigate} />
+        );
     }
   };
 
   const getTitle = () => {
     switch (activeKey) {
-      case "inventory":   return "IT Inventory";
-      case "consumables": return "IT Consumables";
-      case "tickets":     return "Concern Tickets";
-      default:            return "Dashboard";
+      case "inventory":
+        return "IT Inventory";
+      case "consumables":
+        return "IT Consumables";
+      case "tickets":
+        return "Concern Tickets";
+      default:
+        return "Dashboard";
     }
   };
 
   return (
-    <View style={{ flex: 1, flexDirection: "row", backgroundColor: theme.background }}>
+    <View
+      style={{
+        flex: 1,
+        flexDirection: "row",
+        backgroundColor: theme.background,
+      }}
+    >
       {!isMobile && (
         <Sidebar
           user={user}
           activeKey={activeKey}
-          onNavigate={(key) => setActiveKey(key)}
+          onNavigate={(key) => {
+            // clear filter when manually navigating away
+            if (key !== "inventory") setInventoryFilter(null);
+            setActiveKey(key);
+          }}
           onLogout={onLogout}
         />
       )}
 
-      <View style={{ flex: 1, flexDirection: "column", backgroundColor: theme.background }}>
-        <TopBar
-          title={getTitle()}
-          onBellPress={() => console.log("bell pressed")}
-          onProfilePress={() => console.log("profile pressed")}
-        />
+      <View
+        style={{
+          flex: 1,
+          flexDirection: "column",
+          backgroundColor: theme.background,
+        }}
+      >
+        
 
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ flexGrow: 1 }}
-        >
-          {renderContent()}
-        </ScrollView>
+        {activeKey === "dashboard" ? (
+          <ScrollView
+            style={{ flex: 1, height: 0 }}
+            contentContainerStyle={{ flexGrow: 1 }}
+          >
+            {renderContent()}
+          </ScrollView>
+        ) : (
+          <View style={{ flex: 1 }}>{renderContent()}</View>
+        )}
 
         {isMobile && (
           <BottomNavBar
             user={user}
             activeKey={activeKey}
-            onNavigate={(key) => setActiveKey(key)}
+            onNavigate={(key) => {
+              if (key !== "inventory") setInventoryFilter(null);
+              setActiveKey(key);
+            }}
           />
         )}
       </View>
@@ -83,7 +122,13 @@ export default function AdminDashboard({ user, onLogout }: Props) {
   );
 }
 
-function DashboardHome({ user }: { user: ADUser }) {
+function DashboardHome({
+  user,
+  onFilterNavigate,
+}: {
+  user: ADUser;
+  onFilterNavigate: (filter: InventoryFilter | null) => void;
+}) {
   const { theme } = useTheme();
 
   return (
@@ -108,7 +153,7 @@ function DashboardHome({ user }: { user: ADUser }) {
       >
         Here's your admin overview.
       </Text>
-      <ITInventorySummary />
+      <ITInventorySummary onFilterNavigate={onFilterNavigate} />
     </View>
   );
 }
