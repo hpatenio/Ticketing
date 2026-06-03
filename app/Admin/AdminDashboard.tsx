@@ -31,7 +31,6 @@ export default function AdminDashboard({ user, onLogout }: Props) {
   const isMobile =
     Platform.OS === "android" || Platform.OS === "ios" || width < 768;
 
-  // Called when user taps a summary card — switch to inventory tab with filter
   const handleFilterNavigate = (filter: InventoryFilter | null) => {
     setInventoryFilter(filter);
     setActiveKey("inventory");
@@ -44,7 +43,7 @@ export default function AdminDashboard({ user, onLogout }: Props) {
       case "consumables":
         return <ConsumablesPage />;
       case "tickets":
-        return <TicketsPage />;
+        return <TicketsPage user={user} />;  // ← pass user here
       case "dashboard":
       default:
         return (
@@ -79,7 +78,6 @@ export default function AdminDashboard({ user, onLogout }: Props) {
           user={user}
           activeKey={activeKey}
           onNavigate={(key) => {
-            // clear filter when manually navigating away
             if (key !== "inventory") setInventoryFilter(null);
             setActiveKey(key);
           }}
@@ -94,8 +92,6 @@ export default function AdminDashboard({ user, onLogout }: Props) {
           backgroundColor: theme.background,
         }}
       >
-        
-
         {activeKey === "dashboard" ? (
           <ScrollView
             style={{ flex: 1, height: 0 }}

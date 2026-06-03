@@ -1,15 +1,4 @@
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  Modal,
-  ActivityIndicator,
-  StyleSheet,
-} from "react-native";
-import InlineDropdown from "../../../../components/common/InlineDropdown";
 import { ConcernTicket } from "../../../../types";
 
 export type TicketEditUpdates = {
@@ -33,127 +22,26 @@ interface Props {
 }
 
 const CATEGORY_OPTIONS = [
-  { label: "CCTV", value: "CCTV" },
-  { label: "Licenses Accounts", value: "Licenses Accounts" },
-  { label: "Hardware", value: "Hardware" },
-  { label: "Email", value: "Email" },
-  { label: "Network", value: "Network" },
-  { label: "Maintenance", value: "Maintenance" },
-  { label: "Medicine", value: "Medicine" },
-  { label: "Office Supplies", value: "Office Supplies" },
-  { label: "Software", value: "Software" },
-  { label: "Other", value: "Other" },
+  "CCTV", "Licenses Accounts", "Hardware", "Email", "Network",
+  "Maintenance", "Medicine", "Office Supplies", "Software", "Other",
 ] as const;
 
-const PRIORITY_OPTIONS = [
-  { label: "Low", value: "Low" },
-  { label: "Medium", value: "Medium" },
-  { label: "High", value: "High" },
-] as const;
-
-const STATUS_OPTIONS = [
-  { label: "Pending", value: "Pending" },
-  { label: "In Progress", value: "In Progress" },
-  { label: "Resolved", value: "Resolved" },
-] as const;
-
-const DAYS_OF_WEEK = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-
-// ── Inline calendar (same as AddTicketModal) ──────────────────────────────────
-const MiniCalendar: React.FC<{
-  selected: Date | null;
-  onSelect: (d: Date) => void;
-  onClose: () => void;
-}> = ({ selected, onSelect, onClose }) => {
-  const [current, setCurrent] = useState(new Date(selected ?? new Date()));
-
-  const year = current.getFullYear();
-  const month = current.getMonth();
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const monthLabel = current.toLocaleString("default", { month: "long", year: "numeric" });
-
-  const cells: (number | null)[] = [
-    ...Array(firstDay).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-  ];
-
-  const isSelected = (day: number) =>
-    selected !== null &&
-    selected.getFullYear() === year &&
-    selected.getMonth() === month &&
-    selected.getDate() === day;
-
-  const isToday = (day: number) => {
-    const t = new Date();
-    return t.getFullYear() === year && t.getMonth() === month && t.getDate() === day;
-  };
-
-  return (
-    <View style={cal.wrapper}>
-      <View style={cal.header}>
-        <TouchableOpacity onPress={() => setCurrent(new Date(year, month - 1, 1))} style={cal.navBtn}>
-          <Text style={cal.navText}>‹</Text>
-        </TouchableOpacity>
-        <Text style={cal.monthLabel}>{monthLabel}</Text>
-        <TouchableOpacity onPress={() => setCurrent(new Date(year, month + 1, 1))} style={cal.navBtn}>
-          <Text style={cal.navText}>›</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={cal.row}>
-        {DAYS_OF_WEEK.map((d) => (
-          <View key={d} style={cal.cell}>
-            <Text style={cal.dayHeader}>{d}</Text>
-          </View>
-        ))}
-      </View>
-
-      <View style={cal.grid}>
-        {cells.map((day, i) => (
-          <TouchableOpacity
-            key={i}
-            disabled={!day}
-            onPress={() => {
-              if (day) {
-                onSelect(new Date(year, month, day));
-                onClose();
-              }
-            }}
-            style={[
-              cal.cell,
-              cal.dayCell,
-              day && isSelected(day) ? cal.selectedCell : undefined,
-              day && isToday(day) && !isSelected(day) ? cal.todayCell : undefined,
-            ]}
-          >
-            <Text
-              style={[
-                cal.dayText,
-                day && isSelected(day) ? cal.selectedText : undefined,
-                day && isToday(day) && !isSelected(day) ? cal.todayText : undefined,
-                !day ? { opacity: 0 } : undefined,
-              ]}
-            >
-              {day ?? "·"}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-};
+const PRIORITY_OPTIONS = ["Low", "Medium", "High"] as const;
+const STATUS_OPTIONS   = ["Pending", "In Progress", "Resolved"] as const;
 
 // ── Helper: parse whatever dueDate shape comes from Firestore ─────────────────
-const parseDueDate = (raw: any): Date | null => {
-  if (!raw) return null;
-  if (typeof raw.toDate === "function") return raw.toDate();
-  if (raw instanceof Date) return raw;
+const parseDueDate = (raw: any): string => {
+  if (!raw) return "";
+  if (typeof raw.toDate === "function") {
+    const d = raw.toDate();
+    return d.toISOString().split("T")[0];
+  }
+  if (raw instanceof Date) return raw.toISOString().split("T")[0];
   const d = new Date(raw);
-  return isNaN(d.getTime()) ? null : d;
+  return isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
 };
 
-// ── Main modal ────────────────────────────────────────────────────────────────
+// ─── component ────────────────────────────────────────────────────────────────
 const EditTicketModal: React.FC<Props> = ({
   visible,
   selectedTicket,
@@ -162,25 +50,24 @@ const EditTicketModal: React.FC<Props> = ({
   onSave,
   onDelete,
 }) => {
-  const [summary, setSummary]       = useState("");
-  const [details, setDetails]       = useState("");
-  const [category, setCategory]     = useState("");
-  const [priority, setPriority]     = useState("");
-  const [status, setStatus]         = useState("");
-  const [assigneeId, setAssigneeId] = useState("");
+  const [summary, setSummary]           = useState("");
+  const [details, setDetails]           = useState("");
+  const [category, setCategory]         = useState("");
+  const [priority, setPriority]         = useState("");
+  const [status, setStatus]             = useState("");
+  const [assigneeId, setAssigneeId]     = useState("");
   const [assigneeName, setAssigneeName] = useState("");
-  const [dueDate, setDueDate]       = useState<Date | null>(null);
-  const [showCal, setShowCal]       = useState(false);
-  const [error, setError]           = useState("");
-  const [saving, setSaving]         = useState(false);
-  const [deleting, setDeleting]     = useState(false);
+  const [dueDate, setDueDate]           = useState("");
+  const [error, setError]               = useState("");
+  const [saving, setSaving]             = useState(false);
+  const [deleting, setDeleting]         = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (!selectedTicket) {
       setSummary(""); setDetails(""); setCategory(""); setPriority("");
       setStatus(""); setAssigneeId(""); setAssigneeName("");
-      setDueDate(null); setShowCal(false); setError(""); setConfirmDelete(false);
+      setDueDate(""); setError(""); setConfirmDelete(false);
       return;
     }
     setSummary(selectedTicket.summary);
@@ -191,7 +78,6 @@ const EditTicketModal: React.FC<Props> = ({
     setAssigneeId(selectedTicket.assigneeId || "");
     setAssigneeName(selectedTicket.assigneeName || "");
     setDueDate(parseDueDate(selectedTicket.dueDate));
-    setShowCal(false);
     setError("");
     setConfirmDelete(false);
   }, [selectedTicket, visible]);
@@ -199,7 +85,7 @@ const EditTicketModal: React.FC<Props> = ({
   const handleSave = async () => {
     if (!selectedTicket) return;
     setError("");
-    if (!summary.trim()) { setError("Summary is required."); return; }
+    if (!summary.trim()) { setError("Summary is required.");  return; }
     if (!details.trim()) { setError("Details are required."); return; }
     if (!dueDate)        { setError("Due date is required."); return; }
 
@@ -213,7 +99,7 @@ const EditTicketModal: React.FC<Props> = ({
         status,
         assigneeId,
         assigneeName,
-        dueDate: dueDate.toISOString().split("T")[0],
+        dueDate,
       });
       onClose();
     } catch (err) {
@@ -245,354 +131,158 @@ const EditTicketModal: React.FC<Props> = ({
     onClose();
   };
 
-  const dueDateLabel = dueDate
-    ? dueDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
-    : "Select a date";
-
   if (!visible || !selectedTicket) return null;
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.overlay}>
-        <View style={styles.sheet}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
 
-          {/* Header — matches IT Inventory edit: title + asset tag subtitle + close */}
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.headerTitle}>Ticket Details</Text>
-              <Text style={styles.headerSub}>{selectedTicket.ticketNumber}</Text>
-            </View>
-            <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
-              <Text style={styles.closeBtnText}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.body}
-            keyboardShouldPersistTaps="handled"
+        {/* Header */}
+        <div className="flex items-start justify-between mb-5">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-800">Ticket Details</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{selectedTicket.ticketNumber}</p>
+          </div>
+          <button
+            onClick={handleClose}
+            className="text-gray-400 hover:text-gray-600 text-xl font-bold transition-colors"
           >
-            {/* Error banner */}
-            {error ? (
-              <View style={styles.errorBanner}>
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            ) : null}
+            ✕
+          </button>
+        </div>
 
-            {/* Summary */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Summary *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Short summary"
-                placeholderTextColor="#9ca3af"
-                value={summary}
-                onChangeText={setSummary}
-              />
-            </View>
+        {/* Error */}
+        {error && (
+          <p className="text-red-500 text-sm mb-4 bg-red-50 px-3 py-2 rounded-md">{error}</p>
+        )}
 
-            {/* Details */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Details *</Text>
-              <TextInput
-                style={[styles.input, styles.textarea]}
-                placeholder="Describe the issue"
-                placeholderTextColor="#9ca3af"
-                multiline
-                value={details}
-                onChangeText={setDetails}
-              />
-            </View>
+        <div className="flex flex-col gap-3">
 
-            {/* Category */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Category</Text>
-              <InlineDropdown
-                value={category}
-                options={CATEGORY_OPTIONS}
-                onSelect={async (val: string) => setCategory(val)}
-              />
-            </View>
+          {/* Summary */}
+          <input
+            placeholder="Summary *"
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+            className={inputClass}
+          />
 
-            {/* Priority */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Priority</Text>
-              <InlineDropdown
-                value={priority}
-                options={PRIORITY_OPTIONS}
-                onSelect={async (val: string) => setPriority(val)}
-              />
-            </View>
+          {/* Details */}
+          <textarea
+            placeholder="Details *"
+            value={details}
+            onChange={(e) => setDetails(e.target.value)}
+            rows={3}
+            className={`${inputClass} resize-none`}
+          />
 
-            {/* Status */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Status</Text>
-              <InlineDropdown
-                value={status}
-                options={STATUS_OPTIONS}
-                onSelect={async (val: string) => setStatus(val)}
-              />
-            </View>
+          {/* Category */}
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className={inputClass}
+          >
+            {CATEGORY_OPTIONS.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
 
-            {/* Assignee */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Assignee</Text>
-              <InlineDropdown
-                value={assigneeName || "Unassigned"}
-                options={
-                  assigneeOptions.length > 0
-                    ? assigneeOptions
-                    : [{ label: "No employees found", value: "" }]
-                }
-                onSelect={async (val: string) => {
-                  setAssigneeId(val);
-                  const found = assigneeOptions.find((item) => item.value === val);
-                  setAssigneeName(found?.label ?? "");
-                }}
-              />
-            </View>
+          {/* Priority */}
+          <select
+            value={priority}
+            onChange={(e) => setPriority(e.target.value)}
+            className={inputClass}
+          >
+            {PRIORITY_OPTIONS.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
 
-            {/* Due Date */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Due Date *</Text>
-              <TouchableOpacity
-                style={[styles.dateBtn, showCal && styles.dateBtnActive]}
-                onPress={() => setShowCal((v) => !v)}
-                activeOpacity={0.8}
+          {/* Status */}
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className={inputClass}
+          >
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+
+          {/* Assignee */}
+          <select
+            value={assigneeId}
+            onChange={(e) => {
+              const found = assigneeOptions.find((o) => o.value === e.target.value);
+              setAssigneeId(e.target.value);
+              setAssigneeName(found?.label ?? "");
+            }}
+            className={inputClass}
+          >
+            <option value="">Select Assignee</option>
+            {assigneeOptions.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+
+          {/* Due Date */}
+          <input
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            className={inputClass}
+          />
+
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between mt-6">
+
+          {/* Delete — only if onDelete prop provided */}
+          {onDelete ? (
+            <button
+              onClick={handleDeletePress}
+              disabled={deleting || saving}
+              className={
+                confirmDelete
+                  ? "px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                  : "px-4 py-2 text-sm font-medium text-red-500 bg-white border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              }
+            >
+              {deleting ? "Deleting..." : confirmDelete ? "Confirm Delete" : "Delete Ticket"}
+            </button>
+          ) : (
+            <div />
+          )}
+
+          <div className="flex gap-3">
+            {confirmDelete ? (
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className={cancelBtn}
               >
-                <Text style={dueDate ? styles.dateBtnText : styles.dateBtnPlaceholder}>
-                  {dueDateLabel}
-                </Text>
-                <Text style={styles.calIcon}>📅</Text>
-              </TouchableOpacity>
+                Cancel
+              </button>
+            ) : (
+              <>
+                <button onClick={handleClose} className={cancelBtn}>Cancel</button>
+                <button onClick={handleSave} disabled={saving} className={primaryBtn}>
+                  {saving ? "Saving..." : "Save Changes"}
+                </button>
+              </>
+            )}
+          </div>
 
-              {showCal && (
-                <MiniCalendar
-                  selected={dueDate}
-                  onSelect={(d) => setDueDate(d)}
-                  onClose={() => setShowCal(false)}
-                />
-              )}
-            </View>
-
-            {/* Footer — matches IT Inventory: Delete left, Cancel + Save right */}
-            <View style={styles.footer}>
-              {/* Delete — only shown if onDelete prop provided */}
-              {onDelete ? (
-                <TouchableOpacity
-                  onPress={handleDeletePress}
-                  disabled={deleting || saving}
-                  style={[
-                    styles.deleteBtn,
-                    confirmDelete && styles.deleteBtnConfirm,
-                    (deleting || saving) && styles.btnDisabled,
-                  ]}
-                >
-                  <Text style={[styles.deleteBtnText, confirmDelete && styles.deleteBtnTextConfirm]}>
-                    {deleting ? "Deleting..." : confirmDelete ? "Confirm Delete" : "Delete Ticket"}
-                  </Text>
-                </TouchableOpacity>
-              ) : (
-                <View /> // spacer so Save stays right-aligned
-              )}
-
-              <View style={styles.footerRight}>
-                {confirmDelete ? (
-                  // Cancel the confirm-delete prompt
-                  <TouchableOpacity
-                    onPress={() => setConfirmDelete(false)}
-                    style={styles.cancelBtn}
-                  >
-                    <Text style={styles.cancelBtnText}>Cancel</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <>
-                    <TouchableOpacity onPress={handleClose} style={styles.cancelBtn}>
-                      <Text style={styles.cancelBtnText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={handleSave}
-                      disabled={saving}
-                      style={[styles.primaryBtn, saving && styles.btnDisabled]}
-                    >
-                      {saving ? (
-                        <ActivityIndicator size="small" color="#ffffff" />
-                      ) : (
-                        <Text style={styles.primaryBtnText}>Save Changes</Text>
-                      )}
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
-            </View>
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
+        </div>
+      </div>
+    </div>
   );
 };
 
-// ── Calendar styles (identical to AddTicketModal) ─────────────────────────────
-const cal = StyleSheet.create({
-  wrapper: {
-    marginTop: 6,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 10,
-    padding: 10,
-    backgroundColor: "#ffffff",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  navBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: "#f1f5f9",
-    borderRadius: 6,
-  },
-  navText: { fontSize: 16, color: "#374151", fontWeight: "600" },
-  monthLabel: { fontSize: 13, fontWeight: "600", color: "#111827" },
-  row: { flexDirection: "row", marginBottom: 4 },
-  grid: { flexDirection: "row", flexWrap: "wrap" },
-  cell: { width: `${100 / 7}%` as any, alignItems: "center", justifyContent: "center" },
-  dayHeader: { fontSize: 10, fontWeight: "600", color: "#6b7280", textAlign: "center", paddingVertical: 2 },
-  dayCell: { height: 34, borderRadius: 999, marginBottom: 2 },
-  selectedCell: { backgroundColor: "#2563eb" },
-  todayCell: { backgroundColor: "#eff6ff" },
-  dayText: { fontSize: 13, fontWeight: "500", color: "#111827", textAlign: "center" },
-  selectedText: { color: "#ffffff", fontWeight: "700" },
-  todayText: { color: "#2563eb", fontWeight: "700" },
-});
-
-// ── Modal styles (identical to AddTicketModal) ────────────────────────────────
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 16,
-  },
-  sheet: {
-    backgroundColor: "#ffffff",
-    borderRadius: 12,
-    width: "92%",
-    maxWidth: 540,
-    maxHeight: "90%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
-    elevation: 12,
-    padding: 24,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    marginBottom: 20,
-  },
-  headerTitle: { fontSize: 18, fontWeight: "600", color: "#1f2937" },
-  headerSub: { fontSize: 11, color: "#9ca3af", marginTop: 2 },
-  closeBtn: { padding: 4 },
-  closeBtnText: { fontSize: 18, fontWeight: "700", color: "#9ca3af" },
-  body: { gap: 12, paddingBottom: 8 },
-  errorBanner: {
-    backgroundColor: "#fef2f2",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 4,
-  },
-  errorText: { color: "#ef4444", fontSize: 13 },
-  fieldGroup: { gap: 4 },
-  label: { fontSize: 12, fontWeight: "500", color: "#4b5563", marginBottom: 2 },
-  input: {
-    width: "100%",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: "#111827",
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-  },
-  textarea: { height: 96, textAlignVertical: "top" },
-  dateBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    backgroundColor: "#ffffff",
-  },
-  dateBtnActive: {
-    borderColor: "#2563eb",
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-  },
-  dateBtnText: { fontSize: 14, color: "#111827" },
-  dateBtnPlaceholder: { fontSize: 14, color: "#9ca3af" },
-  calIcon: { fontSize: 16 },
-
-  // Footer — matches IT Inventory edit layout
-  footer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 20,
-  },
-  footerRight: { flexDirection: "row", gap: 10 },
-
-  // Delete button (outlined red → filled red on confirm)
-  deleteBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#fca5a5",
-    backgroundColor: "#ffffff",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  deleteBtnConfirm: {
-    backgroundColor: "#dc2626",
-    borderColor: "#dc2626",
-  },
-  deleteBtnText: { fontSize: 13, fontWeight: "500", color: "#dc2626" },
-  deleteBtnTextConfirm: { color: "#ffffff" },
-
-  cancelBtn: {
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    backgroundColor: "#ffffff",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  cancelBtnText: { fontSize: 14, fontWeight: "500", color: "#4b5563" },
-
-  primaryBtn: {
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: "#2563eb",
-    justifyContent: "center",
-    alignItems: "center",
-    minWidth: 110,
-  },
-  primaryBtnText: { fontSize: 14, fontWeight: "500", color: "#ffffff" },
-  btnDisabled: { opacity: 0.6 },
-});
+const inputClass =
+  "w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent";
+const cancelBtn =
+  "px-5 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors";
+const primaryBtn =
+  "px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors";
 
 export default EditTicketModal;

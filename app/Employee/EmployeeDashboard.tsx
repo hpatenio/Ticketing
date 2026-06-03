@@ -242,7 +242,7 @@ export default function EmployeeDashboard({ user, onLogout }: Props) {
         summary: summary.trim(),
         details: details.trim(),
         requesterId: user.username,
-        requesterName: user.displayName,
+        requesterName: user.username,
         assigneeId: "",
         assigneeName: "",
         category,

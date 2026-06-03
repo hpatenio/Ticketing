@@ -1,4 +1,3 @@
-// theme/ThemeContext.tsx
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useColorScheme } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -7,13 +6,25 @@ const THEME_KEY = "user_theme_preference";
 
 const lightTheme = {
   mode: "light" as const,
-  // App
   background: "#F7FBFE",
   surface: "#FFFFFF",
+  surfaceRaised: "#FAFCFD",
   border: "#E8F4F8",
+  borderStrong: "#B8D8E4",
+  overlay: "rgba(15,28,34,0.4)",
   text: "#1D4B5C",
   subtext: "#669BAE",
-  // Sidebar / BottomNav
+  textDisabled: "#A8C8D4",
+  textInverse: "#FFFFFF",
+  textLink: "#35A2CA",
+  textLinkHover: "#1D7FA8",
+  primary: "#35A2CA",
+  primaryHover: "#2A8DB2",
+  primaryPressed: "#1F7A9A",
+  primaryDisabled: "#93D3EA",
+  primaryText: "#FFFFFF",
+  primarySubtle: "#E6F6FB",
+  primarySubtleText: "#1D7FA8",
   sidebarBg: "#FFFFFF",
   navBorder: "#E8F4F8",
   iconActive: "#35A2CA",
@@ -23,15 +34,58 @@ const lightTheme = {
   bgActive: "#F4FBFE",
   bgHover: "#F0F9FF",
   activeBar: "#35A2CA",
+  successBg: "#EAF7F0",
+  successBorder: "#6ECFA0",
+  successText: "#0F6E56",
+  successIcon: "#1D9E75",
+  warningBg: "#FEF6E4",
+  warningBorder: "#F5C842",
+  warningText: "#7A5A00",
+  warningIcon: "#E5A800",
+  dangerBg: "#FDEAEA",
+  dangerBorder: "#E57373",
+  dangerText: "#8B1A1A",
+  dangerIcon: "#D32F2F",
+  infoBg: "#E6F4FB",
+  infoBorder: "#7CC4E0",
+  infoText: "#0C4A6E",
+  infoIcon: "#35A2CA",
+  inputBg: "#FFFFFF",
+  inputBorder: "#E8F4F8",
+  inputBorderFocus: "#35A2CA",
+  inputBorderError: "#E57373",
+  inputPlaceholder: "#A8C8D4",
+  inputText: "#1D4B5C",
+  inputDisabledBg: "#F0F7FA",
+  skeletonBase: "#E8F4F8",
+  skeletonHighlight: "#F5FBFE",
+  scrollbar: "#B8D8E4",
+  shadow: "rgba(29,75,92,0.08)",
+  badgeText: "#FFFFFF",
+  badgeBg: "#E53935",
 };
 
 const darkTheme = {
   mode: "dark" as const,
   background: "#0F1C22",
   surface: "#162630",
+  surfaceRaised: "#1C3040",
   border: "#1E3340",
+  borderStrong: "#2A5F78",
+  overlay: "rgba(0,0,0,0.6)",
   text: "#E2F0F5",
   subtext: "#6B9BAD",
+  textDisabled: "#3A6070",
+  textInverse: "#0F1C22",
+  textLink: "#5DC8E8",
+  textLinkHover: "#8DDAF2",
+  primary: "#35A2CA",
+  primaryHover: "#3FB8E0",
+  primaryPressed: "#2A8DB2",
+  primaryDisabled: "#2E6B82",
+  primaryText: "#0F1C22",
+  primarySubtle: "#1A3A4A",
+  primarySubtleText: "#7ECDE8",
   sidebarBg: "#111E26",
   navBorder: "#1E3340",
   iconActive: "#35A2CA",
@@ -41,25 +95,39 @@ const darkTheme = {
   bgActive: "#1A3040",
   bgHover: "#1E3545",
   activeBar: "#35A2CA",
+  successBg: "#0D2E22",
+  successBorder: "#1D9E75",
+  successText: "#5DCAA5",
+  successIcon: "#1D9E75",
+  warningBg: "#2A2000",
+  warningBorder: "#BA7517",
+  warningText: "#FAC775",
+  warningIcon: "#EF9F27",
+  dangerBg: "#2A0D0D",
+  dangerBorder: "#A32D2D",
+  dangerText: "#F09595",
+  dangerIcon: "#E24B4A",
+  infoBg: "#0C2030",
+  infoBorder: "#185FA5",
+  infoText: "#85B7EB",
+  infoIcon: "#35A2CA",
+  inputBg: "#162630",
+  inputBorder: "#1E3340",
+  inputBorderFocus: "#35A2CA",
+  inputBorderError: "#A32D2D",
+  inputPlaceholder: "#3A6070",
+  inputText: "#E2F0F5",
+  inputDisabledBg: "#111E26",
+  skeletonBase: "#1E3340",
+  skeletonHighlight: "#243E4E",
+  scrollbar: "#2A5060",
+  shadow: "rgba(0,0,0,0.4)",
+  badgeText: "#FFFFFF",
+  badgeBg: "#E24B4A",
 };
 
-export type Theme = {
-  mode: "light" | "dark";
-  background: string;
-  surface: string;
-  border: string;
-  text: string;
-  subtext: string;
-  sidebarBg: string;
-  navBorder: string;
-  iconActive: string;
-  iconInactive: string;
-  textActive: string;
-  textInactive: string;
-  bgActive: string;
-  bgHover: string;
-  activeBar: string;
-};
+// Type is derived automatically — no manual sync needed
+export type Theme = Omit<typeof lightTheme, "mode"> & { mode: "light" | "dark" };
 
 type ThemeMode = "light" | "dark" | "system";
 
@@ -79,7 +147,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemScheme = useColorScheme();
   const [themeMode, setThemeModeState] = useState<ThemeMode>("system");
 
-  // Load saved preference on mount
   useEffect(() => {
     AsyncStorage.getItem(THEME_KEY).then((saved) => {
       if (saved === "light" || saved === "dark" || saved === "system") {
@@ -88,7 +155,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // Save preference whenever it changes
   const setThemeMode = (mode: ThemeMode) => {
     setThemeModeState(mode);
     AsyncStorage.setItem(THEME_KEY, mode);
@@ -96,9 +162,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const resolvedMode =
     themeMode === "system"
-      ? systemScheme === "dark"
-        ? "dark"
-        : "light"
+      ? systemScheme === "dark" ? "dark" : "light"
       : themeMode;
 
   const theme = resolvedMode === "dark" ? darkTheme : lightTheme;

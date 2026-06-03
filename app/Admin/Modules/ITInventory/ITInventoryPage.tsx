@@ -1,12 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-} from "react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   getAllAssets,
   deleteAsset,
@@ -17,38 +9,42 @@ import { ITInventory } from "../../../../types";
 import { InventoryFilter } from "./ITInventorySummary";
 import AddAssetModal from "./AddAssetModal";
 import EditAssetModal from "./EditAssetModal";
-import InlineDropdown from "../../../../components/common/InlineDropdown";
-import AssigneeDropdown from "../../../../components/common/AssigneeDropdown";
+import BadgeSelect from "../../../../components/common/BadgeSelect";
 import { useTheme } from "../../../../theme/ThemeContext";
 
-// --- dropdown options ---
+// ─── Dropdown options ─────────────────────────────────────────────────────────
+
 const LOCATION_OPTIONS = [
-  { label: "Unit 1 & 2", value: "Unit 1 & 2", color: "bg-pink-500" },
-  { label: "Unit 3", value: "Unit 3", color: "bg-purple-600" },
-  { label: "BDO Makati", value: "BDO Makati", color: "bg-teal-500" },
-  { label: "Triumph", value: "Triumph", color: "bg-green-500" },
-  { label: "WFH", value: "WFH", color: "bg-cyan-500" },
+  { label: "Unit 1 & 2", value: "Unit 1 & 2", badgeClass: "bg-pink-100   text-pink-800   inline-flex justify-center min-w-[100px] px-2 py-1 rounded-full text-sm" },
+  { label: "Unit 3",     value: "Unit 3",     badgeClass: "bg-purple-100 text-purple-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-full text-sm" },
+  { label: "BDO Makati", value: "BDO Makati", badgeClass: "bg-teal-100   text-teal-800   inline-flex justify-center min-w-[100px] px-2 py-1 rounded-full text-sm" },
+  { label: "Triumph",    value: "Triumph",    badgeClass: "bg-green-100  text-green-800  inline-flex justify-center min-w-[100px] px-2 py-1 rounded-full text-sm" },
+  { label: "WFH",        value: "WFH",        badgeClass: "bg-cyan-100   text-cyan-800   inline-flex justify-center min-w-[100px] px-2 py-1 rounded-full text-sm" },
 ];
 
 const STATUS_OPTIONS = [
-  { label: "Deployed", value: "Deployed", color: "bg-green-500" },
-  { label: "Spare", value: "Spare", color: "bg-blue-500" },
-  { label: "Defective", value: "Defective", color: "bg-red-500" },
+  { label: "Deployed",  value: "Deployed",  badgeClass: "bg-emerald-100 text-emerald-800 inline-flex justify-center min-w-[90px] px-2 py-1 rounded-full text-sm" },
+  { label: "Spare",     value: "Spare",     badgeClass: "bg-blue-100    text-blue-800    inline-flex justify-center min-w-[90px] px-2 py-1 rounded-full text-sm" },
+  { label: "Defective", value: "Defective", badgeClass: "bg-red-100     text-red-800     inline-flex justify-center min-w-[90px] px-2 py-1 rounded-full text-sm" },
 ];
 
 const CATEGORY_OPTIONS = [
-  { label: "Laptop", value: "Laptop", color: "bg-orange-500" },
-  { label: "Monitor", value: "Monitor", color: "bg-yellow-500" },
-  { label: "Desktop", value: "Desktop", color: "bg-indigo-500" },
-  { label: "UPS", value: "UPS", color: "bg-cyan-500" },
-  { label: "Network Device", value: "Network Device", color: "bg-emerald-500" },
-  { label: "Server", value: "Server", color: "bg-violet-500" },
+  { label: "Laptop",         value: "Laptop",         badgeClass: "bg-orange-100  text-orange-800  inline-flex justify-center min-w-[130px] px-2 py-1 rounded-full text-sm" },
+  { label: "Monitor",        value: "Monitor",        badgeClass: "bg-yellow-100  text-yellow-800  inline-flex justify-center min-w-[130px] px-2 py-1 rounded-full text-sm" },
+  { label: "Desktop",        value: "Desktop",        badgeClass: "bg-indigo-100  text-indigo-800  inline-flex justify-center min-w-[130px] px-2 py-1 rounded-full text-sm" },
+  { label: "UPS",            value: "UPS",            badgeClass: "bg-cyan-100    text-cyan-800    inline-flex justify-center min-w-[130px] px-2 py-1 rounded-full text-sm" },
+  { label: "Network Device", value: "Network Device", badgeClass: "bg-emerald-100 text-emerald-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-full text-sm" },
+  { label: "Server",         value: "Server",         badgeClass: "bg-violet-100  text-violet-800  inline-flex justify-center min-w-[130px] px-2 py-1 rounded-full text-sm" },
 ];
 
 const COMPANY_OPTIONS = [
-  { label: "OCG", value: "OCG", color: "bg-blue-600" },
-  { label: "SDB", value: "SDB", color: "bg-violet-600" },
+  { label: "OCG", value: "OCG", badgeClass: "bg-blue-100   text-blue-800   inline-flex justify-center min-w-[60px] px-2 py-1 rounded-full text-sm" },
+  { label: "SDB", value: "SDB", badgeClass: "bg-violet-100 text-violet-800 inline-flex justify-center min-w-[60px] px-2 py-1 rounded-full text-sm" },
 ];
+
+// ─── Sort helpers (tri-state: default → asc → desc → default) ────────────────
+
+type SortDir = "asc" | "desc" | "default";
 
 type InventorySortKey =
   | "assetTag"
@@ -63,77 +59,182 @@ type InventorySortKey =
   | "datePurchased"
   | "notes";
 
-const TABLE_HEADERS: { label: string; key: InventorySortKey; width: number }[] =
-  [
-    { label: "Asset Tag", key: "assetTag", width: 130 },
-    { label: "Company", key: "company", width: 110 },
-    { label: "Serial Number", key: "serialNumber", width: 140 },
-    { label: "Model", key: "model", width: 110 },
-    { label: "Brand", key: "brand", width: 110 },
-    { label: "Category", key: "category", width: 160 },
-    { label: "Status", key: "status", width: 110 },
-    { label: "Assignee", key: "assigneeName", width: 110 },
-    { label: "Location", key: "location", width: 110 },
-    { label: "Date Purchased", key: "datePurchased", width: 130 },
-    { label: "Notes", key: "notes", width: 200 },
-  ];
+const STATUS_ORDER: Record<string, number> = {
+  Deployed: 0,
+  Spare: 1,
+  Defective: 2,
+};
 
-// --- status badge colors ---
-const StatusBadge = (value: string) => {
-  const bgColor =
-    value === "Deployed"
-      ? "#dcfce7"
-      : value === "Defective"
-        ? "#fee2e2"
-        : "#f3f4f6";
-  const textColor =
-    value === "Deployed"
-      ? "#15803d"
-      : value === "Defective"
-        ? "#b91c1c"
-        : "#4b5563";
+function cycleDir(current: SortDir): SortDir {
+  if (current === "default") return "asc";
+  if (current === "asc") return "desc";
+  return "default";
+}
+
+const TABLE_HEADERS: { label: string; key: InventorySortKey }[] = [
+  { label: "Asset Tag", key: "assetTag" },
+  { label: "Company", key: "company" },
+  { label: "Serial Number", key: "serialNumber" },
+  { label: "Model", key: "model" },
+  { label: "Brand", key: "brand" },
+  { label: "Category", key: "category" },
+  { label: "Status", key: "status" },
+  { label: "Assignee", key: "assigneeName" },
+  { label: "Location", key: "location" },
+  { label: "Date Purchased", key: "datePurchased" },
+  { label: "Notes", key: "notes" },
+];
+
+const SortIcon = ({ dir }: { dir: SortDir }) => {
+  if (dir === "asc") return <span className="ml-1 text-blue-500">▲</span>;
+  if (dir === "desc") return <span className="ml-1 text-blue-500">▼</span>;
+  return <span className="ml-1 text-gray-300">▲▼</span>;
+};
+
+const cellSelect =
+  "w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white cursor-pointer";
+const cellInput =
+  "w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white";
+
+type SearchableSelectProps = {
+  value: string;
+  displayName: string;
+  options: { label: string; value: string }[];
+  placeholder?: string;
+  onChange: (value: string, label: string) => void;
+};
+
+const SearchableSelect = ({
+  value,
+  displayName,
+  options,
+  placeholder = "Unassigned",
+  onChange,
+}: SearchableSelectProps) => {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  const filtered = query
+    ? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()))
+    : options;
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 999,
-        backgroundColor: bgColor,
-      }}
-    >
-      <Text style={{ fontSize: 11, fontWeight: "600", color: textColor }}>
-        {value}
-      </Text>
-      <Text style={{ fontSize: 11, color: textColor, opacity: 0.5 }}>▾</Text>
-    </View>
+    <div ref={wrapRef} className="relative min-w-[120px]">
+      <button
+        type="button"
+        onClick={() => {
+          setOpen((prev) => !prev);
+          setQuery("");
+        }}
+        className="text-left"
+      >
+        {value ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-800 px-3 py-1 text-xs font-semibold">
+            <svg
+              className="w-3 h-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+              />
+            </svg>
+            {displayName}
+          </span>
+        ) : (
+          <span className="inline-flex items-center rounded-full bg-gray-100 text-gray-500 px-3 py-1 text-xs italic">
+            {placeholder}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute z-50 left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg">
+          <input
+            autoFocus
+            type="text"
+            value={query}
+            placeholder="Search..."
+            className="w-full px-3 py-2 text-xs border-b border-gray-100 focus:outline-none"
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setOpen(false);
+                setQuery("");
+              }
+            }}
+          />
+          <ul className="max-h-44 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <li className="px-3 py-2 text-xs text-gray-400">No results</li>
+            ) : (
+              filtered.map((o) => (
+                <li
+                  key={o.value}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    onChange(o.value, o.label);
+                    setOpen(false);
+                    setQuery("");
+                  }}
+                  className={
+                    "px-3 py-1.5 text-xs cursor-pointer hover:bg-blue-50 " +
+                    (o.value === value
+                      ? "font-semibold text-blue-600"
+                      : "text-gray-800")
+                  }
+                >
+                  {o.label}
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 };
 
-// --- plain dropdown badge ---
-const PlainBadge = (value: string) => (
-  <View
-    style={{
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 4,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      backgroundColor: "#f3f4f6",
-      borderRadius: 8,
-    }}
-  >
-    <Text style={{ fontSize: 11, color: "#374151" }}>{value || "—"}</Text>
-    <Text style={{ fontSize: 11, color: "#9ca3af" }}>▾</Text>
-  </View>
-);
+const toDateString = (value: any) => {
+  if (!value) return "";
+  if (typeof value.toDate === "function")
+    return value.toDate().toISOString().split("T")[0];
+  if (value instanceof Date) return value.toISOString().split("T")[0];
+  const date = new Date(value);
+  return isNaN(date.getTime()) ? "" : date.toISOString().split("T")[0];
+};
 
-const getSurname = (fullName: string) => {
-  const parts = fullName?.trim().split(" ").filter(Boolean) ?? [];
-  return parts.length > 0 ? parts[parts.length - 1] : fullName || "—";
+const formatDisplayDate = (value: any) => {
+  if (!value) return "—";
+  if (typeof value.toDate === "function")
+    return value.toDate().toLocaleDateString();
+  if (value instanceof Date) return value.toLocaleDateString();
+  const date = new Date(value);
+  return isNaN(date.getTime()) ? "—" : date.toLocaleDateString();
+};
+
+const normalizeValue = (value: any) => {
+  if (value == null) return "";
+  if (typeof value === "number") return value;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value.toDate === "function") return value.toDate().getTime();
+  return String(value).toLowerCase();
 };
 
 type Props = {
@@ -141,6 +242,7 @@ type Props = {
 };
 
 const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
+  const { theme } = useTheme();
   const [data, setData] = useState<ITInventory[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -148,31 +250,36 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
     initialFilter,
   );
   const [sortKey, setSortKey] = useState<InventorySortKey | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [sortDir, setSortDir] = useState<SortDir>("default");
   const [addVisible, setAddVisible] = useState(false);
   const [editVisible, setEditVisible] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<ITInventory | null>(null);
-  const { theme } = useTheme();
+  const [editingNoteTag, setEditingNoteTag] = useState<string | null>(null);
+
   const { employees, currentUserId } = useEmployees();
 
-  const assigneeOptions = employees.map((e) => ({
-    label: e.name,
-    value: e.id,
-    isMe: e.id === currentUserId, // marks the logged-in user as "Me" in the picker
+  const assigneeOptions = employees.map((employee) => ({
+    label: employee.name,
+    value: employee.id,
+    isMe: employee.id === currentUserId,
   }));
 
   const fetchData = async () => {
     setLoading(true);
-    const result = await getAllAssets();
-    setData(result);
-    setLoading(false);
+    try {
+      const result = await getAllAssets();
+      setData(result);
+    } catch (err) {
+      console.error("Unable to load inventory", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchData();
   }, []);
 
-  // update a single field in local state immediately (optimistic update)
   const updateLocalField = (assetTag: string, field: string, value: string) => {
     setData((prev) =>
       prev.map((item) =>
@@ -186,8 +293,26 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
     field: string,
     value: string,
   ) => {
-    updateLocalField(assetTag, field, value); // update UI instantly
-    await updateAssetField(assetTag, field, value); // then save to Firestore
+    updateLocalField(assetTag, field, value);
+    try {
+      await updateAssetField(assetTag, field, value);
+    } catch (err) {
+      console.error(`Unable to update ${field} for ${assetTag}:`, err);
+      fetchData();
+    }
+  };
+
+  const handleAssigneeChange = async (assetTag: string, assigneeId: string) => {
+    const selected = employees.find((employee) => employee.id === assigneeId);
+    updateLocalField(assetTag, "assigneeId", assigneeId);
+    updateLocalField(assetTag, "assigneeName", selected?.name ?? "");
+    try {
+      await updateAssetField(assetTag, "assigneeId", assigneeId);
+      await updateAssetField(assetTag, "assigneeName", selected?.name ?? "");
+    } catch (err) {
+      console.error(`Unable to update assignee for ${assetTag}:`, err);
+      fetchData();
+    }
   };
 
   const handleDelete = async (assetTag: string) => {
@@ -195,17 +320,27 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
     fetchData();
   };
 
-  const handleEdit = (row: ITInventory) => {
-    setSelectedAsset(row);
+  const handleEdit = (asset: ITInventory) => {
+    setSelectedAsset(asset);
     setEditVisible(true);
   };
 
-  // track last tap times per assetTag to detect double-tap
-  const lastTapRef = useRef<Record<string, number>>({});
+  const handleSort = (key: InventorySortKey) => {
+    if (sortKey !== key) {
+      setSortKey(key);
+      setSortDir("asc");
+    } else {
+      const next = cycleDir(sortDir);
+      setSortDir(next);
+      if (next === "default") setSortKey(null);
+    }
+  };
+
+  const dirFor = (key: InventorySortKey): SortDir =>
+    sortKey === key ? sortDir : "default";
 
   const q = search.toLowerCase().trim();
 
-  // apply summary filter first, then search on top
   const filterApplied = activeFilter
     ? data.filter(
         (item) => (item[activeFilter.field] ?? "") === activeFilter.value,
@@ -215,7 +350,7 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
   const filtered = q
     ? filterApplied.filter((item) => {
         const assigneeName =
-          employees.find((e) => e.id === item.assigneeId)?.name ??
+          employees.find((employee) => employee.id === item.assigneeId)?.name ??
           item.assigneeName ??
           "";
         return [
@@ -229,490 +364,363 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
           item.serialNumber,
           assigneeName,
           item.notes,
-          item.datePurchased
-            ? item.datePurchased.toDate().toLocaleDateString()
-            : "",
+          item.datePurchased ? formatDisplayDate(item.datePurchased) : "",
         ]
-          .map((v) => (v ?? "").toLowerCase())
-          .some((v) => v.includes(q));
+          .map((value) => (value ?? "").toString().toLowerCase())
+          .some((value) => value.includes(q));
       })
     : filterApplied;
 
-  const normalizeValue = (value: any) => {
-    if (value == null) return "";
-    if (typeof value === "number") return value;
-    if (value instanceof Date) return value.getTime();
-    if (typeof value.toDate === "function") return value.toDate().getTime();
-    return String(value).toLowerCase();
-  };
-
-  const getAssigneeName = (item: ITInventory) =>
-    employees.find((e) => e.id === item.assigneeId)?.name ??
-    item.assigneeName ??
-    "";
-
   const sortedFiltered = useMemo(() => {
-    if (!sortKey) return filtered;
-
+    if (!sortKey || sortDir === "default") return filtered;
     return [...filtered].sort((a, b) => {
-      const aValue =
-        sortKey === "assigneeName"
-          ? normalizeValue(getAssigneeName(a))
-          : normalizeValue(a[sortKey]);
-      const bValue =
-        sortKey === "assigneeName"
-          ? normalizeValue(getAssigneeName(b))
-          : normalizeValue(b[sortKey]);
+      const aVal =
+        sortKey === "status"
+          ? (STATUS_ORDER[a.status] ?? 0)
+          : sortKey === "assigneeName"
+            ? normalizeValue(
+                employees.find((employee) => employee.id === a.assigneeId)
+                  ?.name ?? a.assigneeName,
+              )
+            : normalizeValue(a[sortKey]);
+      const bVal =
+        sortKey === "status"
+          ? (STATUS_ORDER[b.status] ?? 0)
+          : sortKey === "assigneeName"
+            ? normalizeValue(
+                employees.find((employee) => employee.id === b.assigneeId)
+                  ?.name ?? b.assigneeName,
+              )
+            : normalizeValue(b[sortKey]);
 
-      if (typeof aValue === "number" && typeof bValue === "number") {
-        return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
-      }
-      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
-      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
-      return 0;
+      const cmp =
+        typeof aVal === "number" && typeof bVal === "number"
+          ? aVal - bVal
+          : aVal < bVal
+            ? -1
+            : aVal > bVal
+              ? 1
+              : 0;
+      return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [filtered, sortKey, sortDirection, employees]);
-
-  const toggleSort = (key: InventorySortKey) => {
-    if (sortKey !== key) {
-      setSortKey(key);
-      setSortDirection("asc");
-      return;
-    }
-
-    if (sortDirection === "asc") {
-      setSortDirection("desc");
-      return;
-    }
-
-    setSortKey(null);
-  };
+  }, [filtered, sortKey, sortDir, employees]);
 
   return (
-    <View
-      style={{
-        flex: 1,
-        padding: 16,
-        width: "100%",
-        backgroundColor: theme.background,
-      }}
+    <div
+      style={{ backgroundColor: theme.background }}
+      className="flex flex-col h-full p-4"
     >
       {/* Header */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 16,
-        }}
-      >
-        <View>
-          <Text style={{ fontSize: 20, fontWeight: "700", color: theme.text }}>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h1 style={{ color: theme.text }} className="text-xl font-bold">
             IT Inventory
-          </Text>
-          <Text style={{ fontSize: 12, color: theme.subtext, marginTop: 2 }}>
-            {filtered.length} of {data.length} records
-          </Text>
-        </View>
-        <TouchableOpacity
-          onPress={() => setAddVisible(true)}
-          style={{
-            backgroundColor: theme.iconActive,
-            paddingHorizontal: 16,
-            paddingVertical: 8,
-            borderRadius: 8,
-          }}
+          </h1>
+          <p style={{ color: theme.subtext }} className="text-xs mt-0.5">
+            {sortedFiltered.length} of {data.length} records
+          </p>
+        </div>
+        <button
+          onClick={() => setAddVisible(true)}
+          style={{ backgroundColor: theme.primary, color: theme.primaryText }}
+          className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors"
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.backgroundColor = theme.primaryHover)
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.backgroundColor = theme.primary)
+          }
         >
-          <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}>
-            + Add Asset
-          </Text>
-        </TouchableOpacity>
-      </View>
+          + Add Asset
+        </button>
+      </div>
 
       {/* Search */}
-      <TextInput
+      <input
+        type="text"
         placeholder="Search asset tag, brand, model..."
-        placeholderTextColor={theme.subtext}
         value={search}
-        onChangeText={setSearch}
+        onChange={(e) => setSearch(e.target.value)}
         style={{
-          width: "100%",
-          paddingHorizontal: 16,
-          paddingVertical: 10,
-          marginBottom: activeFilter ? 8 : 16,
-          fontSize: 13,
-          borderWidth: 1,
-          borderColor: theme.border,
-          borderRadius: 8,
-          backgroundColor: theme.surface,
-          color: theme.text,
+          backgroundColor: theme.inputBg,
+          borderColor: theme.inputBorder,
+          color: theme.inputText,
         }}
+        className="w-full px-4 py-2.5 mb-4 text-sm border rounded-lg focus:outline-none"
+        onFocus={(e) =>
+          (e.currentTarget.style.borderColor = theme.inputBorderFocus)
+        }
+        onBlur={(e) => (e.currentTarget.style.borderColor = theme.inputBorder)}
       />
 
       {/* Active filter pill */}
       {activeFilter && (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            marginBottom: 12,
-            gap: 8,
-          }}
-        >
-          <Text style={{ fontSize: 11, color: theme.subtext }}>
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <span style={{ color: theme.subtext }} className="text-xs">
             Filtered by:
-          </Text>
-          <View
+          </span>
+          <div
             style={{
-              flexDirection: "row",
-              alignItems: "center",
-              backgroundColor: theme.bgActive,
-              paddingHorizontal: 10,
-              paddingVertical: 4,
-              borderRadius: 99,
-              gap: 6,
+              backgroundColor: theme.primarySubtle,
+              color: theme.primarySubtleText,
             }}
+            className="flex items-center gap-2 px-3 py-1 rounded-full"
           >
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "600",
-                color: theme.iconActive,
-                textTransform: "capitalize",
-              }}
-            >
+            <span className="text-xs font-semibold">
               {activeFilter.field}: {activeFilter.value}
-            </Text>
-            <TouchableOpacity
-              onPress={() => setActiveFilter(null)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            </span>
+            <button
+              type="button"
+              onClick={() => setActiveFilter(null)}
+              className="text-xs font-bold"
             >
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: theme.iconActive,
-                  fontWeight: "700",
-                }}
-              >
-                ✕
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={{ fontSize: 11, color: theme.subtext }}>
+              ✕
+            </button>
+          </div>
+          <span style={{ color: theme.subtext }} className="text-xs">
             {filtered.length} result{filtered.length !== 1 ? "s" : ""}
-          </Text>
-        </View>
+          </span>
+        </div>
       )}
 
-      {/* Table */}
+      {/* Loading */}
       {loading ? (
-        <View
-          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
-        >
-          <ActivityIndicator size="large" color={theme.iconActive} />
-        </View>
+        <div className="flex flex-1 items-center justify-center py-20">
+          <div
+            style={{ borderColor: theme.primary }}
+            className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin"
+          />
+        </div>
+      ) : sortedFiltered.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center py-20">
+          <p style={{ color: theme.subtext }} className="text-sm">
+            No inventory records found.
+          </p>
+        </div>
       ) : (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ flex: 1 }}
-          contentContainerStyle={{ flexGrow: 1, minWidth: "100%" }}
+        <div
+          style={{ borderColor: theme.border }}
+          className="overflow-auto rounded-lg border flex-1"
         >
-          <View style={{ flex: 1, minWidth: "100%" }}>
-            {/* Table Header */}
-            <View
-              style={{
-                flexDirection: "row",
-                backgroundColor: theme.surface,
-                borderRadius: 8,
-                minWidth: "100%",
-                borderBottomWidth: 1,
-                borderBottomColor: theme.border,
-              }}
+          <table className="min-w-full text-sm">
+            <thead
+              style={{ backgroundColor: theme.surfaceRaised }}
+              className="sticky top-0 z-10"
             >
-              {TABLE_HEADERS.map((header) => {
-                const isSorted = sortKey === header.key;
-                const icon = isSorted
-                  ? sortDirection === "asc"
-                    ? "▲"
-                    : "▼"
-                  : "⇅";
-                return (
-                  <TouchableOpacity
-                    key={header.key}
-                    onPress={() => toggleSort(header.key)}
-                    activeOpacity={0.7}
-                    style={{
-                      flex: 1,
-                      minWidth: header.width,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      paddingHorizontal: 12,
-                      paddingVertical: 12,
-                    }}
+              <tr>
+                {TABLE_HEADERS.map(({ label, key }) => (
+                  <th
+                    key={key}
+                    onClick={() => handleSort(key)}
+                    style={{ color: theme.subtext, borderColor: theme.border }}
+                    className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap border-b cursor-pointer select-none transition-colors"
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.color = theme.text)
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.color = theme.subtext)
+                    }
                   >
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        fontWeight: "600",
-                        color: theme.subtext,
-                        textTransform: "uppercase",
-                        letterSpacing: 0.5,
-                        marginRight: 4,
-                      }}
-                    >
-                      {header.label}
-                    </Text>
-                    <Text style={{ color: theme.subtext, fontSize: 11 }}>
-                      {icon}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Table Rows */}
-            <ScrollView showsVerticalScrollIndicator={false}>
+                    <span className="inline-flex items-center gap-1">
+                      {label}
+                      <SortIcon dir={dirFor(key)} />
+                    </span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
               {sortedFiltered.map((item, index) => (
-                <View
-                  key={item.id}
+                <tr
+                  key={item.assetTag}
                   style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    borderBottomWidth: 1,
-                    borderBottomColor: theme.border,
                     backgroundColor:
-                      index % 2 === 0 ? theme.background : theme.surface,
-                    minWidth: "100%",
+                      index % 2 === 0 ? theme.surface : theme.background,
+                    borderBottom: `1px solid ${theme.border}`,
                   }}
                 >
-                  {/* Asset Tag — double-tap to edit (removed separate edit icon) */}
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 6,
-                      paddingHorizontal: 12,
-                      paddingVertical: 12,
-                      flex: 1,
-                      minWidth: 130,
-                    }}
-                  >
-                    <TouchableOpacity
-                      onPress={() => {
-                        const now = Date.now();
-                        const last = lastTapRef.current[item.assetTag] || 0;
-                        if (now - last < 300) {
-                          handleEdit(item);
-                        }
-                        lastTapRef.current[item.assetTag] = now;
-                      }}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      style={{ flex: 1 }}
+                  {/* Asset Tag */}
+                  <td className="px-3 py-2.5 min-w-[130px]">
+                    <button
+                      type="button"
+                      onDoubleClick={() => handleEdit(item)}
+                      className="text-left w-full"
                     >
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          color: theme.text,
-                          flexShrink: 1,
-                        }}
-                        numberOfLines={1}
+                      <p
+                        style={{ color: theme.text }}
+                        className="text-sm font-semibold transition-opacity hover:opacity-70"
                       >
                         {item.assetTag}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
+                      </p>
+                    </button>
+                  </td>
 
-                  {/* Company — inline dropdown */}
-                  <View
-                    style={{
-                      paddingHorizontal: 8,
-                      paddingVertical: 8,
-                      flex: 1,
-                      minWidth: 110,
-                    }}
-                  >
-                    <InlineDropdown
+                  {/* Company */}
+                  <td className="text-sm px-3 py-2.5 min-w-[110px]">
+                    <BadgeSelect
                       value={item.company}
+                      displayName={item.company || "—"}
                       options={COMPANY_OPTIONS}
-                      onSelect={(val) =>
+                      placeholder="—"
+                      onChange={(val) =>
                         handleFieldUpdate(item.assetTag, "company", val)
                       }
-                      renderBadge={PlainBadge}
                     />
-                  </View>
+                  </td>
 
                   {/* Serial Number */}
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: theme.text,
-                      paddingHorizontal: 12,
-                      paddingVertical: 12,
-                      flex: 1,
-                      minWidth: 140,
-                    }}
-                  >
-                    {item.serialNumber || "—"}
-                  </Text>
+                  <td className="px-3 py-2.5 min-w-[140px]">
+                    <span style={{ color: theme.text }} className="text-sm">
+                      {item.serialNumber || "—"}
+                    </span>
+                  </td>
 
-                  {/* Model — read only */}
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: theme.text,
-                      paddingHorizontal: 12,
-                      paddingVertical: 12,
-                      flex: 1,
-                      minWidth: 110,
-                    }}
-                  >
-                    {item.model}
-                  </Text>
+                  {/* Model */}
+                  <td className="px-3 py-2.5 min-w-[110px]">
+                    <span style={{ color: theme.text }} className="text-sm">
+                      {item.model || "—"}
+                    </span>
+                  </td>
 
-                  {/* Brand — read only */}
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: theme.text,
-                      paddingHorizontal: 12,
-                      paddingVertical: 12,
-                      flex: 1,
-                      minWidth: 110,
-                    }}
-                  >
-                    {item.brand}
-                  </Text>
+                  {/* Brand */}
+                  <td className="px-3 py-2.5 min-w-[110px]">
+                    <span style={{ color: theme.text }} className="text-sm">
+                      {item.brand || "—"}
+                    </span>
+                  </td>
 
-                  {/* Category — inline dropdown */}
-                  <View
-                    style={{
-                      paddingHorizontal: 8,
-                      paddingVertical: 8,
-                      flex: 1,
-                      minWidth: 160,
-                    }}
-                  >
-                    <InlineDropdown
+                  {/* Category */}
+                  <td className="px-3 py-2.5 min-w-[160px]">
+                    <BadgeSelect
                       value={item.category}
+                      displayName={item.category || "—"}
                       options={CATEGORY_OPTIONS}
-                      onSelect={(val) =>
+                      placeholder="—"
+                      onChange={(val) =>
                         handleFieldUpdate(item.assetTag, "category", val)
                       }
-                      renderBadge={PlainBadge}
                     />
-                  </View>
+                  </td>
 
-                  {/* Status — inline dropdown with badge */}
-                  <View
-                    style={{
-                      paddingHorizontal: 8,
-                      paddingVertical: 8,
-                      flex: 1,
-                      minWidth: 110,
-                    }}
-                  >
-                    <InlineDropdown
+                  {/* Status */}
+                  <td className="px-3 py-2.5 min-w-[120px]">
+                    <BadgeSelect
                       value={item.status}
+                      displayName={item.status || "—"}
                       options={STATUS_OPTIONS}
-                      onSelect={(val) =>
+                      placeholder="—"
+                      onChange={(val) =>
                         handleFieldUpdate(item.assetTag, "status", val)
                       }
-                      renderBadge={StatusBadge}
                     />
-                  </View>
+                  </td>
 
-                  {/* Assignee — people-picker dropdown */}
-                  <View
-                    style={{
-                      paddingHorizontal: 8,
-                      paddingVertical: 8,
-                      flex: 1,
-                      minWidth: 110,
-                    }}
-                  >
-                    <AssigneeDropdown
-                      value={item.assigneeId}
-                      options={assigneeOptions}
-                      onSelect={async (val) => {
-                        const selected = employees.find((e) => e.id === val);
-                        updateLocalField(item.assetTag, "assigneeId", val);
-                        updateLocalField(
-                          item.assetTag,
-                          "assigneeName",
-                          selected?.name ?? "",
-                        );
-                        await updateAssetField(
-                          item.assetTag,
-                          "assigneeId",
-                          val,
-                        );
-                        await updateAssetField(
-                          item.assetTag,
-                          "assigneeName",
-                          selected?.name ?? "",
-                        );
+                  {/* Assignee */}
+                  <td className="px-3 py-2.5 min-w-[140px]">
+                    <SearchableSelect
+                      value={item.assigneeId ?? ""}
+                      displayName={
+                        employees.find((e) => e.id === item.assigneeId)?.name ??
+                        item.assigneeName ??
+                        "Unassigned"
+                      }
+                      options={assigneeOptions.map((a) => ({
+                        label: a.label,
+                        value: a.value,
+                      }))}
+                      placeholder="Unassigned"
+                      onChange={async (value) => {
+                        await handleAssigneeChange(item.assetTag, value);
                       }}
                     />
-                  </View>
+                  </td>
 
-                  {/* Location — inline dropdown */}
-                  <View
-                    style={{
-                      paddingHorizontal: 8,
-                      paddingVertical: 8,
-                      flex: 1,
-                      minWidth: 110,
-                    }}
-                  >
-                    <InlineDropdown
+                  {/* Location */}
+                  <td className="px-3 py-2.5 min-w-[120px]">
+                    <BadgeSelect
                       value={item.location}
+                      displayName={item.location || "—"}
                       options={LOCATION_OPTIONS}
-                      onSelect={(val) =>
+                      placeholder="—"
+                      onChange={(val) =>
                         handleFieldUpdate(item.assetTag, "location", val)
                       }
-                      renderBadge={PlainBadge}
                     />
-                  </View>
+                  </td>
 
                   {/* Date Purchased */}
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: theme.text,
-                      paddingHorizontal: 12,
-                      paddingVertical: 12,
-                      flex: 1,
-                      minWidth: 130,
-                    }}
-                  >
-                    {item.datePurchased
-                      ? item.datePurchased.toDate().toLocaleDateString()
-                      : "—"}
-                  </Text>
+                  <td className="px-3 py-2.5 min-w-[130px]">
+                    <input
+                      type="date"
+                      value={toDateString(item.datePurchased)}
+                      onChange={(e) =>
+                        handleFieldUpdate(
+                          item.assetTag,
+                          "datePurchased",
+                          e.target.value,
+                        )
+                      }
+                      onClick={(e) =>
+                        (e.target as HTMLInputElement).showPicker()
+                      }
+                      style={{ color: theme.text, colorScheme: theme.mode }}
+                      className="text-sm bg-transparent border-none outline-none cursor-pointer w-full"
+                    />
+                  </td>
 
                   {/* Notes */}
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: theme.text,
-                      paddingHorizontal: 12,
-                      paddingVertical: 12,
-                      flex: 1,
-                      minWidth: 200,
-                    }}
-                    numberOfLines={2}
-                  >
-                    {item.notes || "—"}
-                  </Text>
-                </View>
+                  <td className="px-3 py-2.5 min-w-[200px]">
+                    {editingNoteTag === item.assetTag ? (
+                      <input
+                        type="text"
+                        value={item.notes ?? ""}
+                        onChange={(e) =>
+                          handleFieldUpdate(
+                            item.assetTag,
+                            "notes",
+                            e.target.value,
+                          )
+                        }
+                        autoFocus
+                        placeholder="Notes"
+                        style={{
+                          backgroundColor: theme.inputBg,
+                          borderColor: theme.inputBorder,
+                          color: theme.inputText,
+                        }}
+                        className="w-full px-2 py-1.5 text-xs border rounded-md focus:outline-none"
+                        onFocus={(e) =>
+                          (e.currentTarget.style.borderColor =
+                            theme.inputBorderFocus)
+                        }
+                        onBlur={(e) => {
+                          setEditingNoteTag(null);
+                          e.currentTarget.style.borderColor = theme.inputBorder;
+                        }}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onDoubleClick={() => setEditingNoteTag(item.assetTag)}
+                        className="text-left w-full"
+                        title="Double-click to edit"
+                      >
+                        <span
+                          style={{ color: theme.text }}
+                          className="text-xs line-clamp-2"
+                        >
+                          {item.notes || "—"}
+                        </span>
+                      </button>
+                    )}
+                  </td>
+                </tr>
               ))}
-            </ScrollView>
-          </View>
-        </ScrollView>
+            </tbody>
+          </table>
+        </div>
       )}
 
-      {/* Modals */}
       <AddAssetModal
         visible={addVisible}
         onClose={() => setAddVisible(false)}
@@ -725,7 +733,7 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
         selectedAsset={selectedAsset}
         onDelete={handleDelete}
       />
-    </View>
+    </div>
   );
 };
 
