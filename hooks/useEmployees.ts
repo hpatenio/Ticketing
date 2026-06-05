@@ -5,8 +5,8 @@ import { onAuthStateChanged, User } from "firebase/auth";
 import { db, auth } from "../firebase";
 
 export interface EmployeeOption {
-  id: string;
-  name: string;
+  id: string;   // lookup key stored in tickets (doc.id OR uid field)
+  name: string; // full display name
 }
 
 const USER_COLLECTIONS = ["admin_users", "employee_users", "superadmin_users"];
@@ -22,7 +22,8 @@ const resolveCurrentUserName = async (user: User): Promise<string> => {
       );
       if (!snap.empty) {
         const data = snap.docs[0].data();
-        const name = data.name || data.username || snap.docs[0].id;
+        // doc.id is the full name in this schema; prefer it over username
+        const name = snap.docs[0].id || data.name || data.username;
         if (name) return name;
       }
     } catch {
@@ -40,7 +41,7 @@ export const useEmployees = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserName, setCurrentUserName] = useState<string | null>(null);
 
-  // Track the logged-in Firebase Auth user and resolve their name
+  // Track the logged-in Firebase Auth user and resolve their full name
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUserId(user?.uid ?? null);
@@ -54,9 +55,18 @@ export const useEmployees = () => {
     return unsubscribe;
   }, []);
 
-  // Fetch all employees from all 3 collections for the assignee/requester dropdowns
+  // Fetch all employees from all 3 collections for assignee/requester dropdowns.
+  //
+  // Firestore schema:  document ID = full name (e.g. "Mikaela Joan Sy")
+  //                    fields: email, role, username, Department
+  //                    optional field: uid  (Firebase Auth UID)
+  //
+  // Tickets may store EITHER the doc.id OR the Auth uid in requesterId/assigneeId.
+  // We create one entry keyed by doc.id and, when a uid field exists, a second
+  // entry keyed by that uid — both pointing to the same full name so the display
+  // lookup succeeds regardless of which key was persisted.
   useEffect(() => {
-    const fetch = async () => {
+    const fetchEmployees = async () => {
       try {
         const [adminSnap, empSnap, superSnap] = await Promise.all([
           getDocs(collection(db, "admin_users")),
@@ -64,16 +74,31 @@ export const useEmployees = () => {
           getDocs(collection(db, "superadmin_users")),
         ]);
 
-        const all: EmployeeOption[] = [
-          ...adminSnap.docs,
-          ...empSnap.docs,
-          ...superSnap.docs,
-        ].map((doc) => ({
-          id:   doc.id,
-          name: doc.data().name || doc.data().username || doc.id,
-        }));
+        const allDocs = [...adminSnap.docs, ...empSnap.docs, ...superSnap.docs];
+        const result: EmployeeOption[] = [];
+        const seen = new Set<string>();
 
-        setEmployees(all);
+        for (const doc of allDocs) {
+          const data = doc.data();
+          // doc.id IS the full name in this schema (e.g. "Mikaela Joan Sy").
+          // Fall back to name/username fields just in case.
+          const fullName: string = doc.id || data.name || data.username || "Unknown";
+
+          // Entry keyed by doc.id (canonical key)
+          if (!seen.has(doc.id)) {
+            result.push({ id: doc.id, name: fullName });
+            seen.add(doc.id);
+          }
+
+          // Entry keyed by Firebase Auth uid field, if present on the document
+          const uid: string | undefined = data.uid;
+          if (uid && !seen.has(uid)) {
+            result.push({ id: uid, name: fullName });
+            seen.add(uid);
+          }
+        }
+
+        setEmployees(result);
       } catch (err) {
         console.error("Failed to fetch employees:", err);
       } finally {
@@ -81,7 +106,7 @@ export const useEmployees = () => {
       }
     };
 
-    fetch();
+    fetchEmployees();
   }, []);
 
   return { employees, loading, currentUserId, currentUserName };

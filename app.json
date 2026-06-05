@@ -2,6 +2,7 @@
   "expo": {
     "name": "Silverdab",
     "slug": "your-app",
+    "userInterfaceStyle": "automatic",
     "web": {
       "favicon": "./assets/favicon.png"
     },

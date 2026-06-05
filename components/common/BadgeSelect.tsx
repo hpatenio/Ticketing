@@ -16,7 +16,8 @@ type BadgeSelectProps = {
   className?: string;
 };
 
-const defaultBadge = "inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold";
+const defaultBadge =
+  "inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold";
 
 export default function BadgeSelect({
   value,
@@ -30,7 +31,9 @@ export default function BadgeSelect({
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  const selectedOption = options.find((option) => option.value === value);
+  const selectedOption = options.find(
+    (option) => option.value === value && option.value !== "",
+  );
   const selectedBadgeClass = selectedOption?.badgeClass ?? defaultBadge;
 
   useEffect(() => {
@@ -45,20 +48,15 @@ export default function BadgeSelect({
 
   return (
     <div ref={wrapRef} className={`relative min-w-[140px] ${className}`}>
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-      >
+      <button type="button" onClick={() => setOpen((prev) => !prev)}>
         {selectedOption ? (
-          <span className={selectedBadgeClass}>
-            {selectedOption.label}
-          </span>
+          <span className={selectedBadgeClass}>{selectedOption.label}</span>
         ) : (
           <span
-            className="inline-flex items-center rounded-full px-3 py-1 text-sm italic"
-            style={{ backgroundColor: theme.surfaceRaised, color: theme.subtext }}
+            className="inline-flex items-center px-2 py-1 text-sm"
+            style={{ color: theme.subtext }}
           >
-            {placeholder}
+            —
           </span>
         )}
       </button>
@@ -84,12 +82,27 @@ export default function BadgeSelect({
                   onChange(option.value, option.label);
                   setOpen(false);
                 }}
-                className="w-full px-4 py-3 text-left transition-colors"
+                className="w-full px-4 py-1.5 flex items-center justify-center transition-colors"
                 style={{ backgroundColor: "transparent" }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = theme.bgHover)}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = theme.bgHover)
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = "transparent")
+                }
               >
-                <span className={option.badgeClass ?? defaultBadge}>{option.label}</span>
+                {option.value === "" ? (
+                  <span
+                    className="inline-flex items-center px-2 py-1 text-sm"
+                    style={{ color: theme.subtext }}
+                  >
+                    —
+                  </span>
+                ) : (
+                  <span className={option.badgeClass ?? defaultBadge}>
+                    {option.label}
+                  </span>
+                )}
               </button>
             </li>
           ))}

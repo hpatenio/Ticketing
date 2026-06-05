@@ -1,12 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-} from "react-native";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   getAllConsumables,
   deleteConsumable,
@@ -15,28 +13,105 @@ import {
 import { ITConsumable } from "../../../../types";
 import AddConsumableModal from "./AddAssetModal";
 import EditConsumableModal from "./EditAssetModal";
-import InlineDropdown from "../../../../components/common/InlineDropdown";
+import BadgeSelect from "../../../../components/common/BadgeSelect";
 import { useTheme } from "../../../../theme/ThemeContext";
 
-// ─── options ──────────────────────────────────────────────────────────────────
+// ─── Options ──────────────────────────────────────────────────────────────────
 
 const LOCATION_OPTIONS = [
-  { label: "Unit 1 & 2", value: "Unit 1 & 2", color: "bg-pink-500" },
-  { label: "Unit 3",     value: "Unit 3",     color: "bg-purple-600" },
-  { label: "BDO Makati", value: "BDO Makati", color: "bg-teal-500" },
-  { label: "Triumph",    value: "Triumph",    color: "bg-green-500" },
-  { label: "WFH",        value: "WFH",        color: "bg-cyan-500" },
+  { label: "-", value: "" },
+  {
+    label: "Unit 1 & 2",
+    value: "Unit 1 & 2",
+    badgeClass:
+      "bg-pink-100   text-pink-800   inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+  },
+  {
+    label: "Unit 3",
+    value: "Unit 3",
+    badgeClass:
+      "bg-purple-100 text-purple-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+  },
+  {
+    label: "BDO Makati",
+    value: "BDO Makati",
+    badgeClass:
+      "bg-teal-100   text-teal-800   inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+  },
+  {
+    label: "Triumph",
+    value: "Triumph",
+    badgeClass:
+      "bg-green-100  text-green-800  inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+  },
+  {
+    label: "WFH",
+    value: "WFH",
+    badgeClass:
+      "bg-cyan-100   text-cyan-800   inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+  },
 ];
 
-// ─── ink colors ───────────────────────────────────────────────────────────────
+const STATUS_OPTIONS = [
+  { label: "-", value: "" },
+  {
+    label: "Spare",
+    value: "Spare",
+    badgeClass:
+      "bg-sky-100     text-sky-800     inline-flex justify-center min-w-[80px] px-2 py-1 rounded-full text-sm font-semibold",
+  },
+  {
+    label: "Deployed",
+    value: "Deployed",
+    badgeClass:
+      "bg-emerald-100 text-emerald-800 inline-flex justify-center min-w-[80px] px-2 py-1 rounded-full text-sm font-semibold",
+  },
+  {
+    label: "Defective",
+    value: "Defective",
+    badgeClass:
+      "bg-red-100     text-red-800     inline-flex justify-center min-w-[80px] px-2 py-1 rounded-full text-sm font-semibold",
+  },
+];
+
+// ─── Sort helpers ─────────────────────────────────────────────────────────────
+
+type SortDir = "asc" | "desc" | "default";
+type ConsumablesSortKey =
+  | "name"
+  | "model"
+  | "status"
+  | "location"
+  | "ipAddress"
+  | "macAddress"
+  | "black"
+  | "cyan"
+  | "magenta"
+  | "yellow"
+  | "maintenanceBox"
+  | "photoBlack";
+
+function cycleDir(d: SortDir): SortDir {
+  if (d === "default") return "asc";
+  if (d === "asc") return "desc";
+  return "default";
+}
+
+const SortIcon = ({ dir }: { dir: SortDir }) => {
+  if (dir === "asc") return <span className="ml-1 text-blue-500">▲</span>;
+  if (dir === "desc") return <span className="ml-1 text-blue-500">▼</span>;
+  return <span className="ml-1 text-gray-300">▲▼</span>;
+};
+
+// ─── Ink helpers ──────────────────────────────────────────────────────────────
 
 const INK_COLORS: Record<string, { bg: string; text: string }> = {
-  black:          { bg: "#f3f4f6", text: "#1f2937" },
-  photoBlack:     { bg: "#f3f4f6", text: "#374151" },
-  cyan:           { bg: "#ecfeff", text: "#0e7490"  },
-  magenta:        { bg: "#fdf2f8", text: "#be185d"  },
-  yellow:         { bg: "#fefce8", text: "#a16207"  },
-  maintenanceBox: { bg: "#f5f3ff", text: "#6d28d9"  },
+  black: { bg: "#f3f4f6", text: "#1f2937" },
+  photoBlack: { bg: "#f3f4f6", text: "#374151" },
+  cyan: { bg: "#ecfeff", text: "#0e7490" },
+  magenta: { bg: "#fdf2f8", text: "#be185d" },
+  yellow: { bg: "#fefce8", text: "#a16207" },
+  maintenanceBox: { bg: "#f5f3ff", text: "#6d28d9" },
 };
 
 const InkBadge = ({ value, type }: { value: number; type: string }) => {
@@ -44,386 +119,872 @@ const InkBadge = ({ value, type }: { value: number; type: string }) => {
   const low = value <= 2;
   const mid = value > 2 && value <= 5;
   return (
-    <View
+    <span
       style={{
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 8,
         backgroundColor: low ? "#fef2f2" : mid ? "#fffbeb" : cfg.bg,
-        alignItems: "center",
-        minWidth: 36,
+        color: low ? "#dc2626" : mid ? "#d97706" : cfg.text,
       }}
+      className="inline-flex items-center justify-center min-w-[36px] px-2.5 py-1 rounded-lg text-xs font-bold"
     >
-      <Text
-        style={{
-          fontSize: 12,
-          fontWeight: "700",
-          color: low ? "#dc2626" : mid ? "#d97706" : cfg.text,
-        }}
-      >
-        {value}
-      </Text>
-    </View>
+      {value}
+    </span>
   );
 };
 
-const PlainBadge = (value: string) => (
-  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: "#f3f4f6", borderRadius: 8 }}>
-    <Text style={{ fontSize: 11, color: "#374151" }}>{value || "—"}</Text>
-    <Text style={{ fontSize: 11, color: "#9ca3af" }}>▾</Text>
-  </View>
-);
+type InkCellProps = {
+  itemId: string;
+  inkKey: string;
+  value: number;
+  onUpdate: (id: string, field: string, value: number) => void;
+};
 
-// ─── column config ────────────────────────────────────────────────────────────
+const InkCell = ({ itemId, inkKey, value, onUpdate }: InkCellProps) => {
+  const { theme } = useTheme();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(value));
 
-const COLUMNS = [
-  { key: "name",           label: "Printer Name", flex: 2,   minWidth: 130, align: "left"   },
-  { key: "model",          label: "Model",        flex: 1.5, minWidth: 110, align: "left"   },
-  { key: "status",         label: "Status",       flex: 1,   minWidth: 100, align: "center" },
-  { key: "location",       label: "Location",     flex: 1.5, minWidth: 110, align: "center" },
-  { key: "ipAddress",      label: "IP Address",   flex: 1.5, minWidth: 110, align: "left"   },
-  { key: "macAddress",     label: "MAC Address",  flex: 1.8, minWidth: 130, align: "left"   },
-  { key: "black",          label: "Black",        flex: 1,   minWidth: 70,  align: "center" },
-  { key: "cyan",           label: "Cyan",         flex: 1,   minWidth: 70,  align: "center" },
-  { key: "magenta",        label: "Magenta",      flex: 1,   minWidth: 70,  align: "center" },
-  { key: "yellow",         label: "Yellow",       flex: 1,   minWidth: 70,  align: "center" },
-  { key: "maintenanceBox", label: "Maint. Box",   flex: 1,   minWidth: 70,  align: "center" },
-  { key: "photoBlack",     label: "Photo Black",  flex: 1,   minWidth: 70,  align: "center" },
-] as const;
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
 
-type ConsumablesSortKey = typeof COLUMNS[number]["key"];
+  const commit = () => {
+    const num = parseInt(draft, 10);
+    if (!isNaN(num) && num >= 0) onUpdate(itemId, inkKey, num);
+    setEditing(false);
+  };
 
-const INK_KEYS = ["black", "cyan", "magenta", "yellow", "maintenanceBox", "photoBlack"] as const;
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        type="number"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") setEditing(false);
+        }}
+        style={{
+          borderColor: theme.inputBorderFocus,
+          backgroundColor: theme.inputBg,
+          color: theme.text,
+        }}
+        className="w-12 text-center text-xs px-1.5 py-1 border rounded-md focus:outline-none"
+      />
+    );
+  }
 
-const STATUS_OPTIONS = [
-  { label: "Spare", value: "Spare" },
-  { label: "Deployed", value: "Deployed" },
-  { label: "Defective", value: "Defective" },
+  return (
+    <button
+      type="button"
+      onDoubleClick={() => setEditing(true)}
+      title="Double-click to edit"
+      className="cursor-pointer"
+    >
+      <InkBadge value={value} type={inkKey} />
+    </button>
+  );
+};
+
+// ─── Column config ────────────────────────────────────────────────────────────
+
+const COLUMNS: { key: ConsumablesSortKey; label: string }[] = [
+  { key: "name", label: "Printer Name" },
+  { key: "model", label: "Model" },
+  { key: "status", label: "Status" },
+  { key: "location", label: "Location" },
+  { key: "ipAddress", label: "IP Address" },
+  { key: "macAddress", label: "MAC Address" },
+  { key: "black", label: "Black" },
+  { key: "cyan", label: "Cyan" },
+  { key: "magenta", label: "Magenta" },
+  { key: "yellow", label: "Yellow" },
+  { key: "maintenanceBox", label: "Maint. Box" },
+  { key: "photoBlack", label: "Photo Black" },
 ];
 
-const renderStatusBadge = (value: string) => {
-  const isDefective = value === "Defective";
-  const isDeployed = value === "Deployed";
+const INK_KEYS = [
+  "black",
+  "cyan",
+  "magenta",
+  "yellow",
+  "maintenanceBox",
+  "photoBlack",
+] as const;
+
+// ─── Tab types ────────────────────────────────────────────────────────────────
+
+// 3 main tabs:
+//   "all"      → flat merged table (all statuses together)
+//   "grouped"  → collapsible sections per status
+//   "filter"   → flat table filtered by the status dropdown
+
+type MainTab = "all" | "grouped" | "filter";
+
+// ─── Status group definitions ─────────────────────────────────────────────────
+
+type StatusGroupDef = {
+  key: "Deployed" | "Defective" | "Spare";
+  label: string;
+  headerBg: string;
+  headerText: string;
+  badgeBg: string;
+  badgeText: string;
+};
+
+const STATUS_GROUPS: StatusGroupDef[] = [
+  {
+    key: "Deployed",
+    label: "DEPLOYED",
+    headerBg: "#d1fae5",
+    headerText: "#065f46",
+    badgeBg: "#a7f3d0",
+    badgeText: "#065f46",
+  },
+  {
+    key: "Defective",
+    label: "DEFECTIVE",
+    headerBg: "#fee2e2",
+    headerText: "#991b1b",
+    badgeBg: "#fecaca",
+    badgeText: "#991b1b",
+  },
+  {
+    key: "Spare",
+    label: "SPARE",
+    headerBg: "#ede9fe",
+    headerText: "#4c1d95",
+    badgeBg: "#ddd6fe",
+    badgeText: "#4c1d95",
+  },
+];
+
+// ─── StatusSection (outside page — prevents remount on re-render) ─────────────
+
+type StatusSectionProps = {
+  group: StatusGroupDef;
+  items: ITConsumable[];
+  isCollapsed: boolean;
+  theme: ReturnType<typeof useTheme>["theme"];
+  onToggle: (key: string) => void;
+  renderTableHead: (stickyTop: number) => React.ReactNode;
+  renderTableBody: (items: ITConsumable[]) => React.ReactNode;
+};
+
+const StatusSection: React.FC<StatusSectionProps> = React.memo(
+  ({
+    group,
+    items,
+    isCollapsed,
+    theme,
+    onToggle,
+    renderTableHead,
+    renderTableBody,
+  }) => {
+    const headerRef = useRef<HTMLDivElement>(null);
+    const measuredRef = useRef(false);
+    const [headerHeight, setHeaderHeight] = useState(37);
+
+    useEffect(() => {
+      if (measuredRef.current) return;
+      if (headerRef.current) {
+        measuredRef.current = true;
+        setHeaderHeight(headerRef.current.getBoundingClientRect().height);
+      }
+    }, []);
+
+    return (
+      <div className="mb-3">
+        <div
+          ref={headerRef}
+          style={{
+            backgroundColor: group.headerBg,
+            position: "sticky",
+            top: 0,
+            zIndex: 20,
+            borderRadius: isCollapsed ? 8 : "8px 8px 0 0",
+            border: `0.5px solid ${theme.border}`,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => onToggle(group.key)}
+            className="w-full flex items-center gap-2 px-3 py-2 text-left select-none"
+          >
+            <span
+              style={{ color: group.headerText, fontSize: 13, fontWeight: 600 }}
+            >
+              {isCollapsed ? "▶" : "▼"}
+            </span>
+            <span
+              style={{
+                color: group.headerText,
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: "0.05em",
+              }}
+            >
+              {group.label}
+            </span>
+            <span
+              className="px-2 py-0.5 rounded-full text-xs font-semibold ml-1"
+              style={{ backgroundColor: group.badgeBg, color: group.badgeText }}
+            >
+              {items.length}
+            </span>
+          </button>
+        </div>
+
+        {!isCollapsed && (
+          <div
+            style={{
+              border: `0.5px solid ${theme.border}`,
+              borderTop: "none",
+              borderRadius: "0 0 8px 8px",
+            }}
+          >
+            {items.length === 0 ? (
+              <p style={{ color: theme.subtext }} className="text-sm px-4 py-3">
+                No {group.key.toLowerCase()} printers.
+              </p>
+            ) : (
+              <table
+                className="min-w-full text-sm"
+                style={{ borderCollapse: "collapse" }}
+              >
+                {renderTableHead(headerHeight)}
+                <tbody>{renderTableBody(items)}</tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  },
+);
+
+// ─── Filter tab — acts as both a tab button and an instant dropdown ───────────
+
+type FilterTabDropdownProps = {
+  isActive: boolean;
+  filterStatus: string;
+  counts: Record<string, number>;
+  theme: ReturnType<typeof useTheme>["theme"];
+  onActivate: () => void;
+  onChange: (val: string) => void;
+};
+
+const FilterTabDropdown: React.FC<FilterTabDropdownProps> = ({
+  isActive,
+  filterStatus,
+  counts,
+  theme,
+  onActivate,
+  onChange,
+}) => {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<React.CSSProperties>({});
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const options = [
+    { label: "All statuses", value: "", dot: undefined },
+    { label: "Deployed", value: "Deployed", dot: "#10b981" },
+    { label: "Defective", value: "Defective", dot: "#ef4444" },
+    { label: "Spare", value: "Spare", dot: "#8b5cf6" },
+  ];
+
+  const selected = options.find((o) => o.value === filterStatus) ?? options[0];
+
+  const handleClick = () => {
+    onActivate();
+    if (!triggerRef.current) return;
+    const r = triggerRef.current.getBoundingClientRect();
+    setPos({
+      position: "fixed",
+      top: r.bottom + 4,
+      left: r.left,
+      minWidth: r.width,
+      zIndex: 9999,
+    });
+    setOpen((prev) => !prev);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => {
+      if (
+        !triggerRef.current?.contains(e.target as Node) &&
+        !dropdownRef.current?.contains(e.target as Node)
+      )
+        setOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open]);
+
+  const displayCount = filterStatus ? (counts[filterStatus] ?? 0) : counts.all;
+
   return (
-    <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: isDefective ? "#fee2e2" : isDeployed ? "#dcfce7" : "#e0f2fe" }}>
-      <Text style={{ fontSize: 11, fontWeight: "700", color: isDefective ? "#b91c1c" : isDeployed ? "#15803d" : "#0284c7" }}>
-        {value || "—"}
-      </Text>
-    </View>
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={handleClick}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all"
+        style={{
+          backgroundColor: isActive ? theme.primary : theme.surface,
+          color: isActive ? theme.primaryText : theme.subtext,
+          borderColor: isActive ? theme.primary : theme.border,
+        }}
+      >
+        <span>⊟</span>
+        {isActive && filterStatus ? selected.label : "Filter"}
+        {isActive && selected.dot && (
+          <span
+            className="w-2 h-2 rounded-full"
+            style={{ backgroundColor: selected.dot }}
+          />
+        )}
+        <span
+          className="px-1.5 py-0.5 rounded-full"
+          style={{
+            backgroundColor: isActive
+              ? "rgba(255,255,255,0.25)"
+              : theme.surfaceRaised,
+            color: isActive ? theme.primaryText : theme.subtext,
+          }}
+        >
+          {displayCount}
+        </span>
+        <span style={{ opacity: 0.7 }}>▾</span>
+      </button>
+
+      {open && (
+        <div
+          ref={dropdownRef}
+          style={{
+            ...pos,
+            backgroundColor: theme.surface,
+            border: `1px solid ${theme.border}`,
+          }}
+          className="rounded-lg shadow-lg overflow-hidden"
+        >
+          {options.map((opt) => {
+            const isSelected = opt.value === filterStatus;
+            const cnt = opt.value ? (counts[opt.value] ?? 0) : counts.all;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onChange(opt.value);
+                  setOpen(false);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left"
+                style={{
+                  backgroundColor: isSelected
+                    ? theme.surfaceRaised
+                    : "transparent",
+                  color: theme.text,
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = theme.surfaceRaised)
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = isSelected
+                    ? theme.surfaceRaised
+                    : "transparent")
+                }
+              >
+                {opt.dot ? (
+                  <span
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: opt.dot }}
+                  />
+                ) : (
+                  <span className="w-2 h-2 flex-shrink-0" />
+                )}
+                <span className="flex-1">{opt.label}</span>
+                <span style={{ color: theme.subtext }}>{cnt}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </>
   );
 };
 
-// ─── component ────────────────────────────────────────────────────────────────
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 const ConsumablesPage: React.FC = () => {
   const { theme } = useTheme();
-  const [data, setData]             = useState<ITConsumable[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [search, setSearch]         = useState("");
-  const [sortKey, setSortKey]       = useState<ConsumablesSortKey | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [data, setData] = useState<ITConsumable[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState<ConsumablesSortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("default");
+  const [mainTab, setMainTab] = useState<MainTab>("all");
+  const [filterStatus, setFilterStatus] = useState<string>(""); // for "filter" tab dropdown
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [addVisible, setAddVisible] = useState(false);
   const [editVisible, setEditVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ITConsumable | null>(null);
 
-  const fetchData = async () => {
+  // ─── Data ──────────────────────────────────────────────────────────────────
+
+  const fetchData = useCallback(async () => {
     setLoading(true);
     const result = await getAllConsumables();
     setData(result);
     setLoading(false);
-  };
+  }, []);
 
-  useEffect(() => { fetchData(); }, []);
-
-  const updateLocalField = (serial: string, field: string, value: string | number) => {
-    setData((prev) =>
-      prev.map((item) => item.model === serial ? { ...item, [field]: value } : item)
-    );
-  };
-
-  const handleFieldUpdate = async (serial: string, field: string, value: string | number) => {
-    updateLocalField(serial, field, value);
-    await updateConsumableField(serial, field, value);
-  };
-
-  const handleDelete = async (serial: string) => {
-    await deleteConsumable(serial);
+  useEffect(() => {
     fetchData();
-  };
+  }, []);
 
-  const handleEdit = (item: ITConsumable) => {
+  const updateLocalField = useCallback(
+    (id: string, field: string, value: string | number) => {
+      setData((prev) =>
+        prev.map((item) =>
+          item.model === id ? { ...item, [field]: value } : item,
+        ),
+      );
+    },
+    [],
+  );
+
+  const handleFieldUpdate = useCallback(
+    async (id: string, field: string, value: string | number) => {
+      updateLocalField(id, field, value);
+      try {
+        await updateConsumableField(id, field, value);
+      } catch (err) {
+        console.error(`Unable to update ${field} for ${id}:`, err);
+        fetchData();
+      }
+    },
+    [updateLocalField, fetchData],
+  );
+
+  const handleDelete = useCallback(
+    async (id: string) => {
+      await deleteConsumable(id);
+      fetchData();
+    },
+    [fetchData],
+  );
+
+  const handleEdit = useCallback((item: ITConsumable) => {
     setSelectedItem(item);
     setEditVisible(true);
-  };
+  }, []);
 
-  const renderCell = (item: ITConsumable, col: typeof COLUMNS[number]) => {
-    const cellKey = `${item.model}-${col.key}`;
-    switch (col.key) {
-      case "name":
-        return (
-          <TouchableOpacity
-            onPress={() => {
-              const now = Date.now();
-              const last = lastTapRef.current[cellKey] || 0;
-              if (now - last < 300) {
-                handleEdit(item);
-              }
-              lastTapRef.current[cellKey] = now;
-            }}
-            activeOpacity={0.7}
-            style={{ width: "100%" }}
-          >
-            <Text style={{ fontSize: 12, fontWeight: "600", color: theme.text }} numberOfLines={1}>
-              {item.name}
-            </Text>
-          </TouchableOpacity>
-        );
-      case "model":
-        return (
-          <Text style={{ fontSize: 12, color: theme.subtext, fontFamily: "monospace" }} numberOfLines={1}>
-            {item.model || "—"}
-          </Text>
-        );
-      case "status":
-        return (
-          <InlineDropdown
-            value={item.status}
-            options={STATUS_OPTIONS}
-            onSelect={(val) => handleFieldUpdate(item.model, "status", val)}
-            renderBadge={renderStatusBadge}
-          />
-        );
-      case "location":
-        return (
-          <InlineDropdown
-            value={item.location}
-            options={LOCATION_OPTIONS}
-            onSelect={(val) => handleFieldUpdate(item.model, "location", val)}
-            renderBadge={PlainBadge}
-          />
-        );
-      case "ipAddress":
-        return (
-          <Text style={{ fontSize: 12, color: theme.text, fontFamily: "monospace" }} numberOfLines={1}>
-            {item.ipAddress || "—"}
-          </Text>
-        );
-      case "macAddress":
-        return (
-          <Text style={{ fontSize: 11, color: theme.subtext, fontFamily: "monospace" }} numberOfLines={1}>
-            {item.macAddress || "—"}
-          </Text>
-        );
-      default:
-        if ((INK_KEYS as readonly string[]).includes(col.key)) {
-          const inkKey = col.key as typeof INK_KEYS[number];
-          const inkValue = Number(item[inkKey] ?? 0);
-          const isEditing = !!editingCells[cellKey];
-          return isEditing ? (
-            <TextInput
-              value={String(inkValue)}
-              onChangeText={(v) => {
-                const num = Math.max(0, parseInt(v.replace(/[^0-9]/g, ""), 10) || 0);
-                handleFieldUpdate(item.model, inkKey, num);
-              }}
-              keyboardType="numeric"
-              autoFocus
-              onBlur={() => setEditingCells((s) => ({ ...s, [cellKey]: false }))}
-              style={{
-                width: 48,
-                textAlign: "center",
-                fontSize: 12,
-                paddingHorizontal: 6,
-                paddingVertical: 4,
-                borderWidth: 1,
-                borderColor: theme.iconActive,
-                borderRadius: 6,
-                backgroundColor: theme.bgActive,
-                color: theme.text,
-              }}
-            />
-          ) : (
-            <TouchableOpacity onPress={() => handleCellPress(item.model, inkKey)} activeOpacity={0.7}>
-              <InkBadge value={inkValue} type={inkKey} />
-            </TouchableOpacity>
-          );
-        }
-        return null;
-    }
-  };
+  const toggleCollapsed = useCallback(
+    (key: string) => setCollapsed((prev) => ({ ...prev, [key]: !prev[key] })),
+    [],
+  );
 
-  // double-tap to edit ink cells
-  const lastTapRef = useRef<Record<string, number>>({});
-  const [editingCells, setEditingCells] = useState<Record<string, boolean>>({});
+  // ─── Sort ──────────────────────────────────────────────────────────────────
 
-  const handleCellPress = (serial: string, field: string) => {
-    const key = `${serial}-${field}`;
-    const now = Date.now();
-    if (now - (lastTapRef.current[key] || 0) < 300) {
-      setEditingCells((s) => ({ ...s, [key]: true }));
-    }
-    lastTapRef.current[key] = now;
-  };
+  const handleSort = useCallback(
+    (key: ConsumablesSortKey) => {
+      if (sortKey !== key) {
+        setSortKey(key);
+        setSortDir("asc");
+      } else {
+        const next = cycleDir(sortDir);
+        setSortDir(next);
+        if (next === "default") setSortKey(null);
+      }
+    },
+    [sortKey, sortDir],
+  );
 
-  const q = search.toLowerCase().trim();
-  const filtered = q
-    ? data.filter((item) =>
-        [item.name, item.model, item.status, item.location, item.ipAddress, item.macAddress].some((v) =>
-          (v ?? "").toLowerCase().includes(q)
-        )
-      )
-    : data;
+  const dirFor = (key: ConsumablesSortKey): SortDir =>
+    sortKey === key ? sortDir : "default";
 
-  const normalizeValue = (value: any) => {
-    if (value == null) return "";
-    if (typeof value === "number") return value;
-    if (typeof value === "boolean") return value ? 1 : 0;
-    return String(value).toLowerCase();
-  };
+  // ─── Filter + sort ─────────────────────────────────────────────────────────
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return data;
+    return data.filter((item) =>
+      [
+        item.name,
+        item.model,
+        item.status,
+        item.location,
+        item.ipAddress,
+        item.macAddress,
+      ].some((v) => (v ?? "").toLowerCase().includes(q)),
+    );
+  }, [data, search]);
 
   const sortedFiltered = useMemo(() => {
-    if (!sortKey) return filtered;
-
+    if (!sortKey || sortDir === "default") return filtered;
     return [...filtered].sort((a, b) => {
-      const aValue = normalizeValue(a[sortKey]);
-      const bValue = normalizeValue(b[sortKey]);
-
-      if (typeof aValue === "number" && typeof bValue === "number") {
-        return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
-      }
-      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
-      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
-      return 0;
+      const av = a[sortKey] ?? "";
+      const bv = b[sortKey] ?? "";
+      const cmp =
+        typeof av === "number" && typeof bv === "number"
+          ? av - bv
+          : String(av).toLowerCase() < String(bv).toLowerCase()
+            ? -1
+            : String(av).toLowerCase() > String(bv).toLowerCase()
+              ? 1
+              : 0;
+      return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [filtered, sortKey, sortDirection]);
+  }, [filtered, sortKey, sortDir]);
 
-  const toggleSort = (key: ConsumablesSortKey) => {
-    if (sortKey !== key) {
-      setSortKey(key);
-      setSortDirection("asc");
-      return;
-    }
+  // ─── Stable per-group arrays (prevent unrelated sections from re-rendering) ─
 
-    if (sortDirection === "asc") {
-      setSortDirection("desc");
-      return;
-    }
+  const groupedDeployed = useMemo(
+    () => sortedFiltered.filter((i) => i.status === "Deployed"),
+    [sortedFiltered],
+  );
+  const groupedDefective = useMemo(
+    () => sortedFiltered.filter((i) => i.status === "Defective"),
+    [sortedFiltered],
+  );
+  const groupedSpare = useMemo(
+    () => sortedFiltered.filter((i) => i.status === "Spare"),
+    [sortedFiltered],
+  );
 
-    setSortKey(null);
+  const groupedItemsMap = useMemo(
+    () => ({
+      Deployed: groupedDeployed,
+      Defective: groupedDefective,
+      Spare: groupedSpare,
+    }),
+    [groupedDeployed, groupedDefective, groupedSpare],
+  );
+
+  // Items shown in the "filter" tab — respects the status dropdown
+  const filterTabItems = useMemo(
+    () =>
+      filterStatus
+        ? sortedFiltered.filter((i) => i.status === filterStatus)
+        : sortedFiltered,
+    [sortedFiltered, filterStatus],
+  );
+
+  const counts = {
+    all: sortedFiltered.length,
+    Deployed: groupedDeployed.length,
+    Defective: groupedDefective.length,
+    Spare: groupedSpare.length,
   };
 
-  return (
-    <View style={{ flex: 1, padding: 16, backgroundColor: theme.background }}>
+  // ─── Table head ────────────────────────────────────────────────────────────
 
-      {/* Header */}
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <View>
-          <Text style={{ fontSize: 20, fontWeight: "700", color: theme.text }}>IT Consumables</Text>
-          <Text style={{ fontSize: 12, color: theme.subtext, marginTop: 2 }}>
-            {filtered.length} of {data.length} printers
-          </Text>
-        </View>
-        <TouchableOpacity
-          onPress={() => setAddVisible(true)}
-          style={{ backgroundColor: theme.iconActive, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}
+  const renderTableHead = useCallback(
+    (stickyTop: number = 0) => (
+      <thead>
+        <tr>
+          {COLUMNS.map(({ key, label }) => (
+            <th
+              key={key}
+              onClick={() => handleSort(key)}
+              style={{
+                color: theme.subtext,
+                borderColor: theme.border,
+                backgroundColor: theme.surfaceRaised,
+                position: "sticky",
+                top: stickyTop,
+                zIndex: 10,
+              }}
+              className="px-3 py-1 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap border-b cursor-pointer select-none transition-colors"
+              onMouseEnter={(e) => (e.currentTarget.style.color = theme.text)}
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.color = theme.subtext)
+              }
+            >
+              <span className="inline-flex items-center gap-1">
+                {label}
+                <SortIcon dir={dirFor(key)} />
+              </span>
+            </th>
+          ))}
+        </tr>
+      </thead>
+    ),
+    [theme, sortKey, sortDir, handleSort],
+  );
+
+  // ─── Table body ────────────────────────────────────────────────────────────
+
+  const renderTableBody = useCallback(
+    (items: ITConsumable[]) =>
+      items.map((item, index) => (
+        <tr
+          key={item.id ?? item.model}
+          style={{
+            backgroundColor: index % 2 === 0 ? theme.surface : theme.background,
+            borderBottom: `1px solid ${theme.border}`,
+          }}
         >
-          <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}>+ Add Printer</Text>
-        </TouchableOpacity>
-      </View>
+          {/* Printer Name */}
+          <td className="px-3 py-1 min-w-[130px]">
+            <button
+              type="button"
+              onDoubleClick={() => handleEdit(item)}
+              className="text-left w-full"
+            >
+              <p
+                style={{ color: theme.text }}
+                className="text-sm font-semibold transition-opacity hover:opacity-70 truncate"
+              >
+                {item.name}
+              </p>
+            </button>
+          </td>
 
-      {/* Search */}
-      <TextInput
-        placeholder="Search printer name, model, IP, location..."
-        placeholderTextColor={theme.subtext}
-        value={search}
-        onChangeText={setSearch}
-        style={{
-          width: "100%",
-          paddingHorizontal: 16,
-          paddingVertical: 10,
-          marginBottom: 16,
-          fontSize: 13,
-          borderWidth: 1,
-          borderColor: theme.border,
-          borderRadius: 8,
-          backgroundColor: theme.surface,
-          color: theme.text,
-        }}
-      />
+          {/* Model */}
+          <td className="px-3 py-1 min-w-[110px]">
+            <span
+              style={{ color: theme.subtext }}
+              className="text-xs font-mono truncate block"
+            >
+              {item.model || "—"}
+            </span>
+          </td>
 
-      {/* Table */}
-      {loading ? (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator size="large" color={theme.iconActive} />
-        </View>
-      ) : filtered.length === 0 ? (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 80 }}>
-          <Text style={{ color: theme.subtext, fontSize: 13 }}>No printers found.</Text>
-        </View>
-      ) : (
-        <View style={{ flex: 1, borderRadius: 10, borderWidth: 1, borderColor: theme.border, overflow: "hidden" }}>
-          {/* Header row */}
-          <View style={{ flexDirection: "row", backgroundColor: theme.surface, borderBottomWidth: 1, borderBottomColor: theme.border }}>
-            {COLUMNS.map((col) => {
-              const isSorted = sortKey === col.key;
-              const icon = isSorted ? (sortDirection === "asc" ? "▲" : "▼") : "⇅";
-              return (
-                <TouchableOpacity
-                  key={col.key}
-                  onPress={() => toggleSort(col.key)}
-                  activeOpacity={0.7}
-                  style={{
-                    flex: col.flex,
-                    minWidth: col.minWidth,
-                    paddingHorizontal: 12,
-                    paddingVertical: 10,
-                    alignItems: col.align === "center" ? "center" : "flex-start",
-                    flexDirection: "row",
-                  }}
-                >
-                  <Text style={{ fontSize: 11, fontWeight: "600", color: theme.subtext, textTransform: "uppercase", letterSpacing: 0.5, marginRight: 4 }}>
-                    {col.label}
-                  </Text>
-                  <Text style={{ fontSize: 11, color: theme.subtext }}>{icon}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          {/* Status */}
+          <td className="px-3 py-1 min-w-[120px]">
+            <BadgeSelect
+              value={item.status}
+              displayName={item.status || "—"}
+              options={STATUS_OPTIONS}
+              placeholder="—"
+              onChange={(val) => handleFieldUpdate(item.model, "status", val)}
+            />
+          </td>
 
-          {/* Rows */}
-          <ScrollView showsVerticalScrollIndicator={false} style={{ backgroundColor: theme.background }}>
-            {sortedFiltered.map((item, index) => (
-              <View
-                key={item.id}
+          {/* Location */}
+          <td className="px-3 py-1 min-w-[120px]">
+            <BadgeSelect
+              value={item.location}
+              displayName={item.location || "—"}
+              options={LOCATION_OPTIONS}
+              placeholder="—"
+              onChange={(val) => handleFieldUpdate(item.model, "location", val)}
+            />
+          </td>
+
+          {/* IP Address */}
+          <td className="px-3 py-1 min-w-[110px]">
+            <span style={{ color: theme.text }} className="text-xs font-mono">
+              {item.ipAddress || "—"}
+            </span>
+          </td>
+
+          {/* MAC Address */}
+          <td className="px-3 py-1 min-w-[130px]">
+            <span
+              style={{ color: theme.subtext }}
+              className="text-xs font-mono"
+            >
+              {item.macAddress || "—"}
+            </span>
+          </td>
+
+          {/* Ink columns */}
+          {INK_KEYS.map((inkKey) => (
+            <td key={inkKey} className="px-3 py-1 min-w-[70px] text-center">
+              {item[inkKey] !== undefined && item[inkKey] !== null ? (
+                <InkCell
+                  itemId={item.model}
+                  inkKey={inkKey}
+                  value={item[inkKey] as number}
+                  onUpdate={handleFieldUpdate}
+                />
+              ) : (
+                <span style={{ color: theme.subtext }} className="text-xs">
+                  —
+                </span>
+              )}
+            </td>
+          ))}
+        </tr>
+      )),
+    [theme, handleFieldUpdate, handleEdit],
+  );
+
+  // ─── Render ────────────────────────────────────────────────────────────────
+
+  return (
+    <div
+      style={{ backgroundColor: theme.background }}
+      className="flex flex-col h-full overflow-hidden"
+    >
+      {/* ── Fixed top bar ── */}
+      <div className="flex-shrink-0 px-4 pt-4 pb-0">
+        {/* Header + Search */}
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div>
+            <h1 style={{ color: theme.text }} className="text-xl font-bold">
+              IT Consumables
+            </h1>
+            <p style={{ color: theme.subtext }} className="text-xs mt-0.5">
+              {sortedFiltered.length} of {data.length} printers
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              placeholder="Search printer name, model, IP, location..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{
+                backgroundColor: theme.inputBg,
+                borderColor: theme.inputBorder,
+                color: theme.inputText,
+              }}
+              className="w-80 px-4 py-2.5 text-sm border rounded-lg focus:outline-none"
+              onFocus={(e) =>
+                (e.currentTarget.style.borderColor = theme.inputBorderFocus)
+              }
+              onBlur={(e) =>
+                (e.currentTarget.style.borderColor = theme.inputBorder)
+              }
+            />
+
+            <button
+              onClick={() => setAddVisible(true)}
+              style={{
+                backgroundColor: theme.primary,
+                color: theme.primaryText,
+              }}
+              className="px-4 py-2 text-sm font-semibold rounded-lg whitespace-nowrap"
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = theme.primaryHover)
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = theme.primary)
+              }
+            >
+              + Add Printer
+            </button>
+          </div>
+        </div>
+
+        {/* Tab bar */}
+        <div className="flex items-center gap-2 mb-3">
+          {/* All */}
+          {(["all", "grouped"] as const).map((key) => {
+            const isActive = mainTab === key;
+            const label = key === "all" ? "All" : "By Status";
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setMainTab(key)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all"
                 style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  borderBottomWidth: 1,
-                  borderBottomColor: theme.border,
-                  backgroundColor: index % 2 === 0 ? theme.background : theme.surface,
+                  backgroundColor: isActive ? theme.primary : theme.surface,
+                  color: isActive ? theme.primaryText : theme.subtext,
+                  borderColor: isActive ? theme.primary : theme.border,
                 }}
               >
-                {COLUMNS.map((col) => (
-                  <View
-                    key={col.key}
-                    style={{
-                      flex: col.flex,
-                      minWidth: col.minWidth,
-                      paddingHorizontal: 12,
-                      paddingVertical: 10,
-                      alignItems: col.align === "center" ? "center" : "flex-start",
-                    }}
-                  >
-                    {renderCell(item, col)}
-                  </View>
-                ))}
-              </View>
-            ))}
-          </ScrollView>
-        </View>
+                {key === "all" && <span>☰</span>}
+                {key === "grouped" && <span>▤</span>}
+                {label}
+                <span
+                  className="px-1.5 py-0.5 rounded-full"
+                  style={{
+                    backgroundColor: isActive
+                      ? "rgba(255,255,255,0.25)"
+                      : theme.surfaceRaised,
+                    color: isActive ? theme.primaryText : theme.subtext,
+                  }}
+                >
+                  {counts.all}
+                </span>
+              </button>
+            );
+          })}
+
+          {/* Filter tab — clicking it opens the dropdown immediately */}
+          <FilterTabDropdown
+            isActive={mainTab === "filter"}
+            filterStatus={filterStatus}
+            counts={counts}
+            theme={theme}
+            onActivate={() => setMainTab("filter")}
+            onChange={(val) => {
+              setMainTab("filter");
+              setFilterStatus(val);
+            }}
+          />
+        </div>
+      </div>
+
+      {/* ── Scrollable content ── */}
+      {loading ? (
+        <div className="flex flex-1 items-center justify-center py-20">
+          <div
+            style={{ borderColor: theme.primary }}
+            className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin"
+          />
+        </div>
+      ) : sortedFiltered.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center py-20">
+          <p style={{ color: theme.subtext }} className="text-sm">
+            No printers found.
+          </p>
+        </div>
+      ) : mainTab === "grouped" ? (
+        /* ── By Status: collapsible sections ── */
+        <div className="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
+          {STATUS_GROUPS.map((group) => (
+            <StatusSection
+              key={group.key}
+              group={group}
+              items={groupedItemsMap[group.key]}
+              isCollapsed={!!collapsed[group.key]}
+              theme={theme}
+              onToggle={toggleCollapsed}
+              renderTableHead={renderTableHead}
+              renderTableBody={renderTableBody}
+            />
+          ))}
+        </div>
+      ) : mainTab === "filter" && filterTabItems.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center py-20">
+          <p style={{ color: theme.subtext }} className="text-sm">
+            No {filterStatus || "printers"} found.
+          </p>
+        </div>
+      ) : (
+        /* ── All / Filter: flat table ── */
+        <div className="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
+          <div
+            style={{ borderColor: theme.border }}
+            className="rounded-lg border"
+          >
+            <table
+              className="min-w-full text-sm"
+              style={{ borderCollapse: "collapse" }}
+            >
+              {renderTableHead(0)}
+              <tbody>
+                {renderTableBody(
+                  mainTab === "filter" ? filterTabItems : sortedFiltered,
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
-      {/* Modals */}
       <AddConsumableModal
         visible={addVisible}
         onClose={() => setAddVisible(false)}
@@ -436,7 +997,7 @@ const ConsumablesPage: React.FC = () => {
         selectedItem={selectedItem}
         onDelete={handleDelete}
       />
-    </View>
+    </div>
   );
 };
 
