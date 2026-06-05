@@ -29,7 +29,12 @@ const STORAGE_KEY = "AD_USER_DATA";
 function getRoleFromDepartment(department: string): UserRole {
   const dept = department.toLowerCase().trim();
   console.log("Department from AD:", dept);
-  if (dept.includes("information technology") || dept.includes(" it") || dept === "it") return "superadmin";
+  if (
+    dept.includes("information technology") ||
+    dept.includes(" it") ||
+    dept === "it"
+  )
+    return "superadmin";
   if (dept.includes("admin")) return "admin";
   return "employee";
 }
@@ -38,18 +43,22 @@ function getRoleFromDepartment(department: string): UserRole {
 function getCollectionForRole(role: UserRole): string {
   const map: Record<UserRole, string> = {
     superadmin: "superadmin_users",
-    admin:      "admin_users",
-    employee:   "employee_users",
+    admin: "admin_users",
+    employee: "employee_users",
   };
   return map[role];
 }
 
 // ─── Role badge colors (semantic, not theme-dependent) ────────────────────────
-function getRoleStyle(role: UserRole): { bg: string; text: string; label: string } {
+function getRoleStyle(role: UserRole): {
+  bg: string;
+  text: string;
+  label: string;
+} {
   const map: Record<UserRole, { bg: string; text: string; label: string }> = {
     superadmin: { bg: "#1e3a5f", text: "#93c5fd", label: "Super Admin" },
-    admin:      { bg: "#3b1f5e", text: "#d8b4fe", label: "Admin"       },
-    employee:   { bg: "#2d3748", text: "#cbd5e0", label: "Employee"    },
+    admin: { bg: "#3b1f5e", text: "#d8b4fe", label: "Admin" },
+    employee: { bg: "#2d3748", text: "#cbd5e0", label: "Employee" },
   };
   return map[role];
 }
@@ -70,7 +79,10 @@ async function saveUserToFirestore(user: ADUser): Promise<void> {
     const collectionName = getCollectionForRole(user.role);
     const usersRef = collection(db, collectionName);
 
-    const q = query(usersRef, where("username", "==", user.username.toLowerCase().trim()));
+    const q = query(
+      usersRef,
+      where("username", "==", user.username.toLowerCase().trim()),
+    );
     const snapshot = await getDocs(q);
 
     if (!snapshot.empty) {
@@ -81,10 +93,10 @@ async function saveUserToFirestore(user: ADUser): Promise<void> {
     const resolvedEmail = user.email || `${user.username}@ocgbim.com`;
     const newDocRef = doc(db, collectionName, user.displayName);
     await setDoc(newDocRef, {
-      username:   user.username,
-      email:      resolvedEmail,
+      username: user.username,
+      email: resolvedEmail,
       Department: user.department,
-      role:       user.role,
+      role: user.role,
     });
     console.log(`Firestore created in ${collectionName}:`, user.displayName);
   } catch (err) {
@@ -93,7 +105,10 @@ async function saveUserToFirestore(user: ADUser): Promise<void> {
 }
 
 // ─── Step 3: Fetch profile from correct role collection ───────────────────────
-async function fetchProfileFromFirestore(username: string, role: UserRole): Promise<ADUser | null> {
+async function fetchProfileFromFirestore(
+  username: string,
+  role: UserRole,
+): Promise<ADUser | null> {
   try {
     const collectionName = getCollectionForRole(role);
     const usersRef = collection(db, collectionName);
@@ -102,7 +117,10 @@ async function fetchProfileFromFirestore(username: string, role: UserRole): Prom
     let snapshot = await getDocs(q);
 
     if (snapshot.empty) {
-      q = query(usersRef, where("username", "==", username.toLowerCase().trim()));
+      q = query(
+        usersRef,
+        where("username", "==", username.toLowerCase().trim()),
+      );
       snapshot = await getDocs(q);
     }
 
@@ -112,13 +130,13 @@ async function fetchProfileFromFirestore(username: string, role: UserRole): Prom
     const data = docSnap.data();
 
     return {
-      username:    data.username    ?? username,
+      username: data.username ?? username,
       displayName: docSnap.id,
-      email:       data.email       ?? `${username}@ocgbim.com`,
-      department:  data.Department  ?? data.department ?? "",
-      title:       data.title       ?? "",
-      phone:       data.phone       ?? "",
-      role:        (data.role as UserRole) ?? "employee",
+      email: data.email ?? `${username}@ocgbim.com`,
+      department: data.Department ?? data.department ?? "",
+      title: data.title ?? "",
+      phone: data.phone ?? "",
+      role: (data.role as UserRole) ?? "employee",
     };
   } catch (err) {
     console.error("Firestore fetch error:", err);
@@ -135,18 +153,21 @@ async function handleSignIn(
   console.log("AD raw response:", JSON.stringify(adResult));
 
   if (!adResult.success) {
-    return { success: false, message: adResult.message || "Login failed. Please try again." };
+    return {
+      success: false,
+      message: adResult.message || "Login failed. Please try again.",
+    };
   }
 
   const adUser = adResult.user;
   const user: ADUser = {
-    username:    adUser?.username    ?? username,
+    username: adUser?.username ?? username,
     displayName: adUser?.displayName ?? username,
-    email:       adUser?.email       ?? `${username}@ocgbim.com`,
-    department:  adUser?.department  ?? "",
-    title:       adUser?.title       ?? "",
-    phone:       adUser?.phone       ?? "",
-    role:        getRoleFromDepartment(adUser?.department ?? ""),
+    email: adUser?.email ?? `${username}@ocgbim.com`,
+    department: adUser?.department ?? "",
+    title: adUser?.title ?? "",
+    phone: adUser?.phone ?? "",
+    role: getRoleFromDepartment(adUser?.department ?? ""),
   };
 
   const firestoreProfile = await fetchProfileFromFirestore(username, user.role);
@@ -173,9 +194,9 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState("");
-  const [user,     setUser]     = useState<ADUser | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [user, setUser] = useState<ADUser | null>(null);
 
   useEffect(() => {
     const restoreUser = async () => {
@@ -195,8 +216,14 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
 
   const handleLogin = async () => {
     setError("");
-    if (!username.trim()) { setError("Please enter your username."); return; }
-    if (!password)        { setError("Please enter your password.");  return; }
+    if (!username.trim()) {
+      setError("Please enter your username.");
+      return;
+    }
+    if (!password) {
+      setError("Please enter your password.");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -204,6 +231,7 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
       if (response.success && response.user) {
         setUser(response.user);
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(response.user));
+        await AsyncStorage.setItem("just_logged_in", "true");
         onLoginSuccess(response.user);
       } else {
         setError(response.message || "Login failed. Please try again.");
@@ -232,7 +260,12 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: theme.background }}
-      contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center", padding: 16 }}
+      contentContainerStyle={{
+        flexGrow: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
       keyboardShouldPersistTaps="handled"
     >
       <View
@@ -247,7 +280,14 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
         }}
       >
         {/* Logo */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 28 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 28,
+          }}
+        >
           <View
             style={{
               width: 40,
@@ -261,17 +301,32 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
             <Text style={{ fontSize: 20 }}>🎫</Text>
           </View>
           <View>
-            <Text style={{ color: theme.text, fontSize: 15, fontWeight: "700" }}>Silverdab</Text>
-            <Text style={{ color: theme.subtext, fontSize: 11 }}>Unified Ticketing System</Text>
+            <Text
+              style={{ color: theme.text, fontSize: 15, fontWeight: "700" }}
+            >
+              Silverdab
+            </Text>
+            <Text style={{ color: theme.subtext, fontSize: 11 }}>
+              Unified Ticketing System
+            </Text>
           </View>
         </View>
 
         {user ? (
           <>
-            <Text style={{ color: theme.text, fontSize: 20, fontWeight: "700", marginBottom: 4 }}>
+            <Text
+              style={{
+                color: theme.text,
+                fontSize: 20,
+                fontWeight: "700",
+                marginBottom: 4,
+              }}
+            >
               Welcome, {user.displayName.split(" ")[0]}! 👋
             </Text>
-            <Text style={{ color: theme.subtext, fontSize: 11, marginBottom: 20 }}>
+            <Text
+              style={{ color: theme.subtext, fontSize: 11, marginBottom: 20 }}
+            >
               Authenticated via Active Directory · ocgbim.com
             </Text>
 
@@ -312,20 +367,45 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
               }}
             >
               {[
-                { label: "Full Name",   value: user.displayName },
-                { label: "Username",    value: user.username },
-                { label: "Email",       value: user.email || `${user.username}@ocgbim.com` },
-                { label: "Department",  value: user.department || "—" },
+                { label: "Full Name", value: user.displayName },
+                { label: "Username", value: user.username },
+                {
+                  label: "Email",
+                  value: user.email || `${user.username}@ocgbim.com`,
+                },
+                { label: "Department", value: user.department || "—" },
                 ...(user.title ? [{ label: "Title", value: user.title }] : []),
                 ...(user.phone ? [{ label: "Phone", value: user.phone }] : []),
               ].map((row, i, arr) => (
                 <View key={row.label}>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                    <Text style={{ color: theme.subtext, fontSize: 11 }}>{row.label}</Text>
-                    <Text style={{ color: theme.text, fontSize: 11, fontWeight: "600" }}>{row.value}</Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text style={{ color: theme.subtext, fontSize: 11 }}>
+                      {row.label}
+                    </Text>
+                    <Text
+                      style={{
+                        color: theme.text,
+                        fontSize: 11,
+                        fontWeight: "600",
+                      }}
+                    >
+                      {row.value}
+                    </Text>
                   </View>
                   {i < arr.length - 1 && (
-                    <View style={{ height: 1, backgroundColor: theme.border, marginTop: 12 }} />
+                    <View
+                      style={{
+                        height: 1,
+                        backgroundColor: theme.border,
+                        marginTop: 12,
+                      }}
+                    />
                   )}
                 </View>
               ))}
@@ -345,7 +425,14 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
                 gap: 8,
               }}
             >
-              <View style={{ width: 8, height: 8, borderRadius: 99, backgroundColor: "#4ade80" }} />
+              <View
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 99,
+                  backgroundColor: "#4ade80",
+                }}
+              />
               <Text style={{ color: theme.iconActive, fontSize: 11 }}>
                 Connected to AD + Firestore · ocgbim.com
               </Text>
@@ -360,13 +447,28 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
               }}
               onPress={handleLogout}
             >
-              <Text style={{ color: theme.text, fontSize: 13, fontWeight: "600" }}>Log out</Text>
+              <Text
+                style={{ color: theme.text, fontSize: 13, fontWeight: "600" }}
+              >
+                Log out
+              </Text>
             </TouchableOpacity>
           </>
         ) : (
           <>
-            <Text style={{ color: theme.text, fontSize: 22, fontWeight: "700", marginBottom: 4 }}>Sign in</Text>
-            <Text style={{ color: theme.subtext, fontSize: 13, marginBottom: 20 }}>
+            <Text
+              style={{
+                color: theme.text,
+                fontSize: 22,
+                fontWeight: "700",
+                marginBottom: 4,
+              }}
+            >
+              Sign in
+            </Text>
+            <Text
+              style={{ color: theme.subtext, fontSize: 13, marginBottom: 20 }}
+            >
               Use your company Windows account
             </Text>
 
@@ -393,7 +495,8 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
             {error ? (
               <View
                 style={{
-                  backgroundColor: theme.mode === "dark" ? "#2e0f0f" : "#fef2f2",
+                  backgroundColor:
+                    theme.mode === "dark" ? "#2e0f0f" : "#fef2f2",
                   borderWidth: 1,
                   borderColor: theme.mode === "dark" ? "#7f1d1d" : "#fecaca",
                   borderRadius: 12,
@@ -401,7 +504,12 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
                   marginBottom: 16,
                 }}
               >
-                <Text style={{ color: theme.mode === "dark" ? "#f87171" : "#b91c1c", fontSize: 13 }}>
+                <Text
+                  style={{
+                    color: theme.mode === "dark" ? "#f87171" : "#b91c1c",
+                    fontSize: 13,
+                  }}
+                >
                   ⚠ {error}
                 </Text>
               </View>
@@ -439,7 +547,9 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
               autoCapitalize="none"
               autoCorrect={false}
             />
-            <Text style={{ color: theme.subtext, fontSize: 11, marginBottom: 16 }}>
+            <Text
+              style={{ color: theme.subtext, fontSize: 11, marginBottom: 16 }}
+            >
               Your Windows login username (e.g. hpatenio for Henrick Patenio)
             </Text>
 
@@ -476,7 +586,9 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
               autoCapitalize="none"
               onSubmitEditing={handleLogin}
             />
-            <Text style={{ color: theme.subtext, fontSize: 11, marginBottom: 20 }}>
+            <Text
+              style={{ color: theme.subtext, fontSize: 11, marginBottom: 20 }}
+            >
               Same password you use to log in to your work PC
             </Text>
 
@@ -494,15 +606,32 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
               {loading ? (
                 <ActivityIndicator color={theme.iconActive} />
               ) : (
-                <Text style={{ color: "#ffffff", fontSize: 13, fontWeight: "600" }}>
+                <Text
+                  style={{ color: "#ffffff", fontSize: 13, fontWeight: "600" }}
+                >
                   Sign in with AD
                 </Text>
               )}
             </TouchableOpacity>
 
             {/* Footer */}
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 20, gap: 8 }}>
-              <View style={{ width: 8, height: 8, borderRadius: 99, backgroundColor: theme.iconActive }} />
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                marginTop: 20,
+                gap: 8,
+              }}
+            >
+              <View
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 99,
+                  backgroundColor: theme.iconActive,
+                }}
+              />
               <Text style={{ color: theme.subtext, fontSize: 11 }}>
                 Authenticating via Active Directory · ocgbim.com
               </Text>

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useEmployees, EmployeeOption } from "../../../../hooks/useEmployees";
 import { ADUser, ConcernTicket } from "../../../../types";
 import {
@@ -131,6 +131,8 @@ type SortKey =
   | "status"
   | "dueDate";
 
+type MainTab = "all" | "grouped" | "filter";
+
 const PRIORITY_ORDER: Record<string, number> = { Low: 0, Medium: 1, High: 2 };
 const STATUS_ORDER: Record<string, number> = {
   Pending: 0,
@@ -218,17 +220,16 @@ const SearchableSelect = ({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const wrapRef = useRef<HTMLDivElement>(null);
+
   const getInitials = (name: string) => {
     const parts = name.trim().split(" ").filter(Boolean);
     if (parts.length === 0) return "?";
-
     const first = parts[0]?.[0] ?? "";
     const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
-
     return (first + last).toUpperCase();
   };
-  const allOptions = [{ label: "—", value: "" }, ...options];
 
+  const allOptions = [{ label: "—", value: "" }, ...options];
   const filtered = query
     ? allOptions.filter((o) =>
         o.label.toLowerCase().includes(query.toLowerCase()),
@@ -264,7 +265,6 @@ const SearchableSelect = ({
             }}
             className="inline-flex items-center justify-center gap-2 rounded-full px-3 py-1 text-xs font-semibold max-w-full whitespace-nowrap"
           >
-            {/* INITIALS CIRCLE */}
             <span
               className="flex items-center justify-center rounded-full"
               style={{
@@ -279,12 +279,9 @@ const SearchableSelect = ({
             >
               {getInitials(displayName)}
             </span>
-
-            {/* NAME */}
             <span className="truncate">{displayName}</span>
           </span>
         ) : (
-          // ─── Unassigned state (ICON ONLY) ───
           <span
             style={{
               backgroundColor: theme.surfaceRaised,
@@ -292,7 +289,6 @@ const SearchableSelect = ({
             }}
             className="inline-flex items-center justify-center rounded-full p-2"
           >
-            {/* OUTLINE ICON */}
             <svg
               className="w-4 h-4"
               viewBox="0 0 24 24"
@@ -336,10 +332,7 @@ const SearchableSelect = ({
           />
           <ul className="max-h-44 overflow-y-auto">
             {filtered.length === 0 ? (
-              <li
-                style={{ color: theme.subtext }}
-                className="px-3 py-2 text-xs"
-              >
+              <li style={{ color: theme.subtext }} className="px-3 py-2 text-xs">
                 No results
               </li>
             ) : (
@@ -377,6 +370,298 @@ const SearchableSelect = ({
   );
 };
 
+// ─── Status group definitions ─────────────────────────────────────────────────
+
+type StatusGroupDef = {
+  key: "Pending" | "In Progress" | "Resolved";
+  label: string;
+  headerBg: string;
+  headerText: string;
+  badgeBg: string;
+  badgeText: string;
+};
+
+const STATUS_GROUPS: StatusGroupDef[] = [
+  {
+    key: "Pending",
+    label: "PENDING",
+    headerBg: "#fef9c3",
+    headerText: "#854d0e",
+    badgeBg: "#fef08a",
+    badgeText: "#854d0e",
+  },
+  {
+    key: "In Progress",
+    label: "IN PROGRESS",
+    headerBg: "#dbeafe",
+    headerText: "#1e40af",
+    badgeBg: "#bfdbfe",
+    badgeText: "#1e40af",
+  },
+  {
+    key: "Resolved",
+    label: "RESOLVED",
+    headerBg: "#d1fae5",
+    headerText: "#065f46",
+    badgeBg: "#a7f3d0",
+    badgeText: "#065f46",
+  },
+];
+
+// ─── StatusSection ────────────────────────────────────────────────────────────
+
+type StatusSectionProps = {
+  group: StatusGroupDef;
+  items: ConcernTicket[];
+  isCollapsed: boolean;
+  theme: ReturnType<typeof useTheme>["theme"];
+  onToggle: (key: string) => void;
+  renderTableHead: (stickyTop: number) => React.ReactNode;
+  renderTableBody: (items: ConcernTicket[]) => React.ReactNode;
+};
+
+const StatusSection: React.FC<StatusSectionProps> = React.memo(
+  ({
+    group,
+    items,
+    isCollapsed,
+    theme,
+    onToggle,
+    renderTableHead,
+    renderTableBody,
+  }) => {
+    const headerRef = useRef<HTMLDivElement>(null);
+    const measuredRef = useRef(false);
+    const [headerHeight, setHeaderHeight] = useState(37);
+
+    useEffect(() => {
+      if (measuredRef.current) return;
+      if (headerRef.current) {
+        measuredRef.current = true;
+        setHeaderHeight(headerRef.current.getBoundingClientRect().height);
+      }
+    }, []);
+
+    return (
+      <div className="mb-3">
+        <div
+          ref={headerRef}
+          style={{
+            backgroundColor: group.headerBg,
+            position: "sticky",
+            top: 0,
+            zIndex: 20,
+            borderRadius: isCollapsed ? 8 : "8px 8px 0 0",
+            border: `0.5px solid ${theme.border}`,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => onToggle(group.key)}
+            className="w-full flex items-center gap-2 px-3 py-2 text-left select-none"
+          >
+            <span style={{ color: group.headerText, fontSize: 13, fontWeight: 600 }}>
+              {isCollapsed ? "▶" : "▼"}
+            </span>
+            <span
+              style={{
+                color: group.headerText,
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: "0.05em",
+              }}
+            >
+              {group.label}
+            </span>
+            <span
+              className="px-2 py-0.5 rounded-full text-xs font-semibold ml-1"
+              style={{ backgroundColor: group.badgeBg, color: group.badgeText }}
+            >
+              {items.length}
+            </span>
+          </button>
+        </div>
+
+        {!isCollapsed && (
+          <div
+            style={{
+              border: `0.5px solid ${theme.border}`,
+              borderTop: "none",
+              borderRadius: "0 0 8px 8px",
+            }}
+          >
+            {items.length === 0 ? (
+              <p style={{ color: theme.subtext }} className="text-sm px-4 py-3">
+                No {group.key.toLowerCase()} tickets.
+              </p>
+            ) : (
+              <table
+                className="min-w-full text-sm"
+                style={{ borderCollapse: "collapse" }}
+              >
+                {renderTableHead(headerHeight)}
+                <tbody>{renderTableBody(items)}</tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  },
+);
+
+// ─── FilterTabDropdown ────────────────────────────────────────────────────────
+
+type FilterTabDropdownProps = {
+  isActive: boolean;
+  filterStatus: string;
+  counts: Record<string, number>;
+  theme: ReturnType<typeof useTheme>["theme"];
+  onActivate: () => void;
+  onChange: (val: string) => void;
+};
+
+const FilterTabDropdown: React.FC<FilterTabDropdownProps> = ({
+  isActive,
+  filterStatus,
+  counts,
+  theme,
+  onActivate,
+  onChange,
+}) => {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<React.CSSProperties>({});
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const options = [
+    { label: "All statuses", value: "", dot: undefined },
+    { label: "Pending",     value: "Pending",     dot: "#eab308" },
+    { label: "In Progress", value: "In Progress", dot: "#3b82f6" },
+    { label: "Resolved",    value: "Resolved",    dot: "#10b981" },
+  ];
+
+  const selected = options.find((o) => o.value === filterStatus) ?? options[0];
+
+  const handleClick = () => {
+    onActivate();
+    if (!triggerRef.current) return;
+    const r = triggerRef.current.getBoundingClientRect();
+    setPos({
+      position: "fixed",
+      top: r.bottom + 4,
+      left: r.left,
+      minWidth: r.width,
+      zIndex: 9999,
+    });
+    setOpen((prev) => !prev);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => {
+      if (
+        !triggerRef.current?.contains(e.target as Node) &&
+        !dropdownRef.current?.contains(e.target as Node)
+      )
+        setOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open]);
+
+  const displayCount = filterStatus ? (counts[filterStatus] ?? 0) : counts.all;
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={handleClick}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all"
+        style={{
+          backgroundColor: isActive ? theme.primary : theme.surface,
+          color: isActive ? theme.primaryText : theme.subtext,
+          borderColor: isActive ? theme.primary : theme.border,
+        }}
+      >
+        <span>⊟</span>
+        {isActive && filterStatus ? selected.label : "Filter"}
+        {isActive && selected.dot && (
+          <span
+            className="w-2 h-2 rounded-full"
+            style={{ backgroundColor: selected.dot }}
+          />
+        )}
+        <span
+          className="px-1.5 py-0.5 rounded-full"
+          style={{
+            backgroundColor: isActive
+              ? "rgba(255,255,255,0.25)"
+              : theme.surfaceRaised,
+            color: isActive ? theme.primaryText : theme.subtext,
+          }}
+        >
+          {displayCount}
+        </span>
+        <span style={{ opacity: 0.7 }}>▾</span>
+      </button>
+
+      {open && (
+        <div
+          ref={dropdownRef}
+          style={{
+            ...pos,
+            backgroundColor: theme.surface,
+            border: `1px solid ${theme.border}`,
+          }}
+          className="rounded-lg shadow-lg overflow-hidden"
+        >
+          {options.map((opt) => {
+            const isSelected = opt.value === filterStatus;
+            const cnt = opt.value ? (counts[opt.value] ?? 0) : counts.all;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onChange(opt.value);
+                  setOpen(false);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left"
+                style={{
+                  backgroundColor: isSelected ? theme.surfaceRaised : "transparent",
+                  color: theme.text,
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = theme.surfaceRaised)
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = isSelected
+                    ? theme.surfaceRaised
+                    : "transparent")
+                }
+              >
+                {opt.dot ? (
+                  <span
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: opt.dot }}
+                  />
+                ) : (
+                  <span className="w-2 h-2 flex-shrink-0" />
+                )}
+                <span className="flex-1">{opt.label}</span>
+                <span style={{ color: theme.subtext }}>{cnt}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+};
+
 // ─── Row component ────────────────────────────────────────────────────────────
 
 type TicketRowProps = {
@@ -401,9 +686,7 @@ const TicketRow = ({
   const { theme } = useTheme();
   const [dueDate, setDueDate] = useState(toDateString(ticket.dueDate));
   const [clickCount, setClickCount] = useState(0);
-  const [clickTimer, setClickTimer] = useState<ReturnType<
-    typeof setTimeout
-  > | null>(null);
+  const [clickTimer, setClickTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setDueDate(toDateString(ticket.dueDate));
@@ -435,22 +718,18 @@ const TicketRow = ({
   };
 
   const resolvedRequester = (() => {
-    // Try matching by stored ID (doc.id or uid)
     if (ticket.requesterId) {
       const byId = assigneeOptions.find((e) => e.value === ticket.requesterId);
       if (byId) return byId.label;
     }
-    // Fallback: stored name may already be the full name (doc.id)
     return ticket.requesterName || "—";
   })();
 
   const resolvedAssignee = (() => {
-    // Try matching by stored ID (doc.id or uid)
     if (ticket.assigneeId) {
       const byId = assigneeOptions.find((e) => e.value === ticket.assigneeId);
       if (byId) return byId.label;
     }
-    // Fallback: stored name may already be the full name (doc.id)
     return ticket.assigneeName ?? "";
   })();
 
@@ -462,7 +741,7 @@ const TicketRow = ({
       }}
     >
       {/* Summary */}
-      <td className="px-3 py-2.5 min-w-[180px]">
+      <td className="px-3 py-1.5 min-w-[180px]">
         <button
           onClick={handleSummaryClick}
           className="text-left w-full group"
@@ -481,7 +760,7 @@ const TicketRow = ({
       </td>
 
       {/* Requester */}
-      <td className="px-3 py-2.5 min-w-[140px]">
+      <td className="px-3 py-1.5 min-w-[140px]">
         <SearchableSelect
           value={ticket.requesterId || ""}
           displayName={resolvedRequester}
@@ -495,7 +774,7 @@ const TicketRow = ({
       </td>
 
       {/* Assignee */}
-      <td className="text-smpx-3 py-2.5 min-w-[140px]">
+      <td className="text-sm px-3 py-2.5 min-w-[140px]">
         <SearchableSelect
           value={ticket.assigneeId || ""}
           displayName={resolvedAssignee}
@@ -509,7 +788,7 @@ const TicketRow = ({
       </td>
 
       {/* Category */}
-      <td className="px-3 py-2.5 min-w-[130px]">
+      <td className="px-3 py-1.5 min-w-[130px]">
         <BadgeSelect
           value={ticket.category}
           displayName={ticket.category || "—"}
@@ -522,7 +801,7 @@ const TicketRow = ({
       </td>
 
       {/* Priority */}
-      <td className="px-3 py-2.5 min-w-[90px]">
+      <td className="px-3 py-1.5 min-w-[90px]">
         <BadgeSelect
           value={ticket.priority}
           displayName={ticket.priority}
@@ -535,7 +814,7 @@ const TicketRow = ({
       </td>
 
       {/* Status */}
-      <td className="px-3 py-2.5 min-w-[110px]">
+      <td className="px-3 py-1.5 min-w-[110px]">
         <BadgeSelect
           value={ticket.status}
           displayName={ticket.status}
@@ -548,7 +827,7 @@ const TicketRow = ({
       </td>
 
       {/* Due Date */}
-      <td className="px-3 py-2.5 min-w-[120px]">
+      <td className="px-3 py-1.5 min-w-[120px]">
         <input
           type="date"
           value={dueDate}
@@ -566,6 +845,16 @@ const TicketRow = ({
 
 type Props = { user?: ADUser };
 
+const HEADERS: { label: string; key: SortKey }[] = [
+  { label: "Summary", key: "summary" },
+  { label: "Requester", key: "requester" },
+  { label: "Assignee", key: "assignee" },
+  { label: "Category", key: "category" },
+  { label: "Priority", key: "priority" },
+  { label: "Status", key: "status" },
+  { label: "Due Date", key: "dueDate" },
+];
+
 export default function TicketsPage({ user }: Props) {
   const { theme } = useTheme();
   const [tickets, setTickets] = useState<ConcernTicket[]>([]);
@@ -573,9 +862,10 @@ export default function TicketsPage({ user }: Props) {
   const [search, setSearch] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editingTicket, setEditingTicket] = useState<ConcernTicket | null>(
-    null,
-  );
+  const [editingTicket, setEditingTicket] = useState<ConcernTicket | null>(null);
+  const [mainTab, setMainTab] = useState<MainTab>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("");
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("default");
@@ -611,7 +901,7 @@ export default function TicketsPage({ user }: Props) {
   const dirFor = (key: SortKey): SortDir =>
     sortKey === key ? sortDir : "default";
 
-  const filteredTickets = (() => {
+  const filteredTickets = useMemo(() => {
     const q = search.trim().toLowerCase();
     const base = q
       ? tickets.filter((t) =>
@@ -630,7 +920,53 @@ export default function TicketsPage({ user }: Props) {
         )
       : tickets;
     return sortKey ? sortTickets(base, sortKey, sortDir) : base;
-  })();
+  }, [tickets, search, sortKey, sortDir]);
+
+  const toggleCollapsed = useCallback(
+    (key: string) => setCollapsed((prev) => ({ ...prev, [key]: !prev[key] })),
+    [],
+  );
+
+  // ─── Grouped arrays ──────────────────────────────────────────────────────
+
+  const groupedPending = useMemo(
+    () => filteredTickets.filter((t) => t.status === "Pending"),
+    [filteredTickets],
+  );
+  const groupedInProgress = useMemo(
+    () => filteredTickets.filter((t) => t.status === "In Progress"),
+    [filteredTickets],
+  );
+  const groupedResolved = useMemo(
+    () => filteredTickets.filter((t) => t.status === "Resolved"),
+    [filteredTickets],
+  );
+
+  const groupedItemsMap = useMemo(
+    () => ({
+      Pending: groupedPending,
+      "In Progress": groupedInProgress,
+      Resolved: groupedResolved,
+    }),
+    [groupedPending, groupedInProgress, groupedResolved],
+  );
+
+  const counts = {
+    all: filteredTickets.length,
+    Pending: groupedPending.length,
+    "In Progress": groupedInProgress.length,
+    Resolved: groupedResolved.length,
+  };
+
+  const filterTabItems = useMemo(
+    () =>
+      filterStatus
+        ? filteredTickets.filter((t) => t.status === filterStatus)
+        : filteredTickets,
+    [filteredTickets, filterStatus],
+  );
+
+  // ─── Field update ─────────────────────────────────────────────────────────
 
   const handleUpdateField = async (
     ticketNumber: string,
@@ -641,10 +977,7 @@ export default function TicketsPage({ user }: Props) {
       await updateTicketField(ticketNumber, field, value);
       await loadTickets();
     } catch (err) {
-      console.error(
-        `Unable to update ${field} for ticket ${ticketNumber}:`,
-        err,
-      );
+      console.error(`Unable to update ${field} for ticket ${ticketNumber}:`, err);
     }
   };
 
@@ -684,10 +1017,8 @@ export default function TicketsPage({ user }: Props) {
     }
   };
 
-  // Build dropdown options deduped by name.
-  // useEmployees returns dual entries (doc.id key + uid key) for lookup coverage;
-  // we only need one entry per person in the dropdown, keyed by doc.id (full name).
-  const assigneeOptions = (() => {
+  // Deduplicated assignee options
+  const assigneeOptions = useMemo(() => {
     const seen = new Set<string>();
     return employees
       .filter((e) => {
@@ -696,67 +1027,180 @@ export default function TicketsPage({ user }: Props) {
         return true;
       })
       .map((e) => ({ label: e.name, value: e.id }));
-  })();
+  }, [employees]);
 
-  const HEADERS: { label: string; key: SortKey }[] = [
-    { label: "Summary", key: "summary" },
-    { label: "Requester", key: "requester" },
-    { label: "Assignee", key: "assignee" },
-    { label: "Category", key: "category" },
-    { label: "Priority", key: "priority" },
-    { label: "Status", key: "status" },
-    { label: "Due Date", key: "dueDate" },
-  ];
+  // ─── Table head ───────────────────────────────────────────────────────────
+
+  const renderTableHead = useCallback(
+    (stickyTop: number = 0) => (
+      <thead>
+        <tr>
+          {HEADERS.map(({ label, key }) => (
+            <th
+              key={key}
+              onClick={() => handleSort(key)}
+              style={{
+                color: theme.subtext,
+                borderColor: theme.border,
+                backgroundColor: theme.surfaceRaised,
+                position: "sticky",
+                top: stickyTop,
+                zIndex: 10,
+              }}
+              className="px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap border-b cursor-pointer select-none transition-colors"
+              onMouseEnter={(e) => (e.currentTarget.style.color = theme.text)}
+              onMouseLeave={(e) => (e.currentTarget.style.color = theme.subtext)}
+            >
+              <span className="inline-flex items-center gap-1">
+                {label}
+                <SortIcon dir={dirFor(key)} />
+              </span>
+            </th>
+          ))}
+        </tr>
+      </thead>
+    ),
+    [theme, sortKey, sortDir, handleSort],
+  );
+
+  // ─── Table body ───────────────────────────────────────────────────────────
+
+  const renderTableBody = useCallback(
+    (items: ConcernTicket[]) =>
+      items.map((ticket, index) => {
+        try {
+          return (
+            <TicketRow
+              key={ticket.ticketNumber}
+              ticket={ticket}
+              index={index}
+              assigneeOptions={assigneeOptions}
+              onUpdateField={handleUpdateField}
+              onOpenDetails={openEditModal}
+            />
+          );
+        } catch (err) {
+          console.error("Error rendering ticket row:", err, ticket);
+          return (
+            <tr key={ticket.ticketNumber}>
+              <td
+                colSpan={7}
+                style={{ color: theme.dangerText }}
+                className="px-3 py-2 text-xs"
+              >
+                Error rendering ticket
+              </td>
+            </tr>
+          );
+        }
+      }),
+    [assigneeOptions, handleUpdateField, openEditModal, theme],
+  );
+
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <div
       style={{ backgroundColor: theme.background }}
-      className="flex flex-col h-full p-4"
+      className="flex flex-col h-full overflow-hidden"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 style={{ color: theme.text }} className="text-xl font-bold">
-            Concern Tickets
-          </h1>
-          <p style={{ color: theme.subtext }} className="text-xs mt-0.5">
-            {filteredTickets.length} of {tickets.length} tickets
-          </p>
+      {/* ── Fixed top bar ── */}
+      <div className="flex-shrink-0 px-4 pt-4 pb-0">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 style={{ color: theme.text }} className="text-xl font-bold">
+              Concern Tickets
+            </h1>
+            <p style={{ color: theme.subtext }} className="text-xs mt-0.5">
+              {filteredTickets.length} of {tickets.length} tickets
+            </p>
+          </div>
+          <button
+            onClick={() => setModalVisible(true)}
+            style={{ backgroundColor: theme.primary, color: theme.primaryText }}
+            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors"
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.backgroundColor = theme.primaryHover)
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.backgroundColor = theme.primary)
+            }
+          >
+            + Add Ticket
+          </button>
         </div>
-        <button
-          onClick={() => setModalVisible(true)}
-          style={{ backgroundColor: theme.primary, color: theme.primaryText }}
-          className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors"
-          onMouseEnter={(e) =>
-            (e.currentTarget.style.backgroundColor = theme.primaryHover)
+
+        {/* Search */}
+        <input
+          type="text"
+          placeholder="Search tickets..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{
+            backgroundColor: theme.inputBg,
+            borderColor: theme.inputBorder,
+            color: theme.inputText,
+          }}
+          className="w-full px-4 py-2.5 mb-3 text-sm border rounded-lg focus:outline-none"
+          onFocus={(e) =>
+            (e.currentTarget.style.borderColor = theme.inputBorderFocus)
           }
-          onMouseLeave={(e) =>
-            (e.currentTarget.style.backgroundColor = theme.primary)
+          onBlur={(e) =>
+            (e.currentTarget.style.borderColor = theme.inputBorder)
           }
-        >
-          + Add Ticket
-        </button>
+        />
+
+        {/* Tab bar */}
+        <div className="flex items-center gap-2 mb-3">
+          {(["all", "grouped"] as const).map((key) => {
+            const isActive = mainTab === key;
+            const label = key === "all" ? "All" : "By Status";
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setMainTab(key)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all"
+                style={{
+                  backgroundColor: isActive ? theme.primary : theme.surface,
+                  color: isActive ? theme.primaryText : theme.subtext,
+                  borderColor: isActive ? theme.primary : theme.border,
+                }}
+              >
+                {key === "all" && <span>☰</span>}
+                {key === "grouped" && <span>▤</span>}
+                {label}
+                <span
+                  className="px-1.5 py-0.5 rounded-full"
+                  style={{
+                    backgroundColor: isActive
+                      ? "rgba(255,255,255,0.25)"
+                      : theme.surfaceRaised,
+                    color: isActive ? theme.primaryText : theme.subtext,
+                  }}
+                >
+                  {counts.all}
+                </span>
+              </button>
+            );
+          })}
+
+          <FilterTabDropdown
+            isActive={mainTab === "filter"}
+            filterStatus={filterStatus}
+            counts={counts}
+            theme={theme}
+            onActivate={() => setMainTab("filter")}
+            onChange={(val) => {
+              setMainTab("filter");
+              setFilterStatus(val);
+            }}
+          />
+        </div>
       </div>
 
-      {/* Search */}
-      <input
-        type="text"
-        placeholder="Search tickets..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        style={{
-          backgroundColor: theme.inputBg,
-          borderColor: theme.inputBorder,
-          color: theme.inputText,
-        }}
-        className="w-full px-4 py-2.5 mb-4 text-sm border rounded-lg focus:outline-none"
-        onFocus={(e) =>
-          (e.currentTarget.style.borderColor = theme.inputBorderFocus)
-        }
-        onBlur={(e) => (e.currentTarget.style.borderColor = theme.inputBorder)}
-      />
-
-      {/* Table */}
+      {/* ── Scrollable content ── */}
       {loading ? (
         <div className="flex flex-1 items-center justify-center py-20">
           <div
@@ -770,68 +1214,47 @@ export default function TicketsPage({ user }: Props) {
             No tickets found.
           </p>
         </div>
+      ) : mainTab === "grouped" ? (
+        /* ── By Status: collapsible sections ── */
+        <div className="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
+          {STATUS_GROUPS.map((group) => (
+            <StatusSection
+              key={group.key}
+              group={group}
+              items={groupedItemsMap[group.key]}
+              isCollapsed={!!collapsed[group.key]}
+              theme={theme}
+              onToggle={toggleCollapsed}
+              renderTableHead={renderTableHead}
+              renderTableBody={renderTableBody}
+            />
+          ))}
+        </div>
+      ) : mainTab === "filter" && filterTabItems.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center py-20">
+          <p style={{ color: theme.subtext }} className="text-sm">
+            No {filterStatus || "tickets"} found.
+          </p>
+        </div>
       ) : (
-        <div
-          style={{ borderColor: theme.border }}
-          className="overflow-auto rounded-lg border flex-1"
-        >
-          <table className="min-w-full text-sm">
-            <thead
-              style={{ backgroundColor: theme.surfaceRaised }}
-              className="sticky top-0 z-10"
+        /* ── All / Filter: flat table ── */
+        <div className="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
+          <div
+            style={{ borderColor: theme.border }}
+            className="rounded-lg border"
+          >
+            <table
+              className="min-w-full text-sm"
+              style={{ borderCollapse: "collapse" }}
             >
-              <tr>
-                {HEADERS.map(({ label, key }) => (
-                  <th
-                    key={key}
-                    onClick={() => handleSort(key)}
-                    style={{ color: theme.subtext, borderColor: theme.border }}
-                    className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap border-b cursor-pointer select-none transition-colors"
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.color = theme.text)
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.color = theme.subtext)
-                    }
-                  >
-                    <span className="inline-flex items-center gap-1">
-                      {label}
-                      <SortIcon dir={dirFor(key)} />
-                    </span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTickets.map((ticket, index) => {
-                try {
-                  return (
-                    <TicketRow
-                      key={ticket.ticketNumber}
-                      ticket={ticket}
-                      index={index}
-                      assigneeOptions={assigneeOptions}
-                      onUpdateField={handleUpdateField}
-                      onOpenDetails={openEditModal}
-                    />
-                  );
-                } catch (err) {
-                  console.error("Error rendering ticket row:", err, ticket);
-                  return (
-                    <tr key={ticket.ticketNumber}>
-                      <td
-                        colSpan={7}
-                        style={{ color: theme.dangerText }}
-                        className="px-3 py-2 text-xs"
-                      >
-                        Error rendering ticket
-                      </td>
-                    </tr>
-                  );
-                }
-              })}
-            </tbody>
-          </table>
+              {renderTableHead(0)}
+              <tbody>
+                {renderTableBody(
+                  mainTab === "filter" ? filterTabItems : filteredTickets,
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

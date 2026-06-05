@@ -1,15 +1,21 @@
-import React, { useState, useRef } from "react";
+import React, { useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { ITInventory } from "../../../../types";
 import { addAsset } from "../../../../Services/itInventory";
 import { useEmployees } from "../../../../hooks/useEmployees";
 import { Timestamp } from "firebase/firestore";
+import { useTheme } from "../../../../theme/ThemeContext";
+import BadgeSelect from "../../../../components/common/BadgeSelect";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Props {
   visible: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const EMPTY_SINGLE = {
   assetTag: "",
@@ -58,71 +64,381 @@ const EMPTY_ROW = (id: number): BulkRow => ({
   notes: "",
 });
 
-// Maps flexible column header names from Excel → our field keys
 const HEADER_MAP: Record<string, keyof BulkRow> = {
-  "asset tag":      "assetTag",
-  "assettag":       "assetTag",
-  "tag":            "assetTag",
-  "asset":          "assetTag",
-  "company":        "company",
-  "serial number":  "serialNumber",
-  "serialnumber":   "serialNumber",
-  "serial":         "serialNumber",
-  "model":          "model",
-  "brand":          "brand",
-  "category":       "category",
-  "type":           "category",
-  "status":         "status",
-  "assignee":       "assigneeName",
-  "assigneename":   "assigneeName",
-  "location":       "location",
+  "asset tag": "assetTag",
+  assettag: "assetTag",
+  tag: "assetTag",
+  asset: "assetTag",
+  company: "company",
+  "serial number": "serialNumber",
+  serialnumber: "serialNumber",
+  serial: "serialNumber",
+  model: "model",
+  brand: "brand",
+  category: "category",
+  type: "category",
+  status: "status",
+  assignee: "assigneeName",
+  assigneename: "assigneeName",
+  location: "location",
   "date purchased": "datePurchased",
-  "datepurchased":  "datePurchased",
-  "purchased":      "datePurchased",
-  "notes":          "notes",
+  datepurchased: "datePurchased",
+  purchased: "datePurchased",
+  notes: "notes",
 };
 
 const VALID_CATEGORIES = ["Laptop", "Monitor", "Desktop"];
-const VALID_COMPANIES  = ["OCG", "SDB"];
+const VALID_COMPANIES = ["OCG", "SDB"];
 
 const normalizeCategory = (val: string): ITInventory["category"] => {
   const match = VALID_CATEGORIES.find(
-    (c) => c.toLowerCase() === val?.toString().toLowerCase().trim()
+    (c) => c.toLowerCase() === val?.toString().toLowerCase().trim(),
   );
   return (match as ITInventory["category"]) ?? "Laptop";
 };
 
 const normalizeCompany = (val: string): string => {
   const match = VALID_COMPANIES.find(
-    (c) => c.toLowerCase() === val?.toString().toLowerCase().trim()
+    (c) => c.toLowerCase() === val?.toString().toLowerCase().trim(),
   );
   return match ?? val?.toString().trim() ?? "";
 };
 
-// ─── component ────────────────────────────────────────────────────────────────
+// ─── Badge options (mirrors EditAssetModal) ───────────────────────────────────
+
+const COMPANY_OPTIONS = [
+  {
+    label: "OCG",
+    value: "OCG",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-purple-100 text-purple-800",
+  },
+  {
+    label: "SDB",
+    value: "SDB",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-800",
+  },
+];
+
+const STATUS_OPTIONS = [
+  {
+    label: "Spare",
+    value: "Spare",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-sky-100 text-sky-700",
+  },
+  {
+    label: "Deployed",
+    value: "Deployed",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-green-100 text-green-800",
+  },
+  {
+    label: "Defective",
+    value: "Defective",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-red-100 text-red-700",
+  },
+];
+
+const CATEGORY_OPTIONS = [
+  {
+    label: "Laptop",
+    value: "Laptop",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-orange-100 text-orange-700",
+  },
+  {
+    label: "Monitor",
+    value: "Monitor",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-yellow-100 text-yellow-700",
+  },
+  {
+    label: "Desktop",
+    value: "Desktop",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-teal-100 text-teal-700",
+  },
+];
+
+const LOCATION_OPTIONS = [
+  {
+    label: "Unit 1 & 2",
+    value: "Unit 1 & 2",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-pink-100 text-pink-700",
+  },
+  {
+    label: "Unit 3",
+    value: "Unit 3",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-pink-100 text-pink-700",
+  },
+  {
+    label: "BDO Makati",
+    value: "BDO Makati",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-teal-100 text-teal-700",
+  },
+  {
+    label: "Triumph",
+    value: "Triumph",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-indigo-100 text-indigo-700",
+  },
+  {
+    label: "WFH",
+    value: "WFH",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-gray-100 text-gray-700",
+  },
+];
+
+// ─── Shared sub-components (same as EditAssetModal) ───────────────────────────
+
+const Field: React.FC<{
+  label: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}> = ({ label, icon, children, className = "" }) => {
+  const { theme } = useTheme();
+  return (
+    <div className={`flex flex-col gap-1.5 ${className}`}>
+      <label
+        style={{
+          fontSize: 12,
+          fontWeight: 500,
+          color: theme.subtext,
+          display: "flex",
+          alignItems: "center",
+          gap: 5,
+        }}
+      >
+        <span style={{ opacity: 0.7 }}>{icon}</span>
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+};
+
+const ThemedInput: React.FC<{
+  name: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+  type?: string;
+}> = ({ name, value, onChange, placeholder, type = "text" }) => {
+  const { theme } = useTheme();
+  const [focused, setFocused] = useState(false);
+  return (
+    <input
+      name={name}
+      type={type}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      style={{
+        width: "100%",
+        padding: "0 10px",
+        height: 38,
+        fontSize: 13,
+        borderRadius: 8,
+        border: `1px solid ${focused ? theme.inputBorderFocus : theme.inputBorder}`,
+        backgroundColor: theme.inputBg,
+        color: theme.inputText,
+        outline: "none",
+        boxSizing: "border-box",
+      }}
+    />
+  );
+};
+
+const ThemedTextarea: React.FC<{
+  name: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  placeholder?: string;
+  rows?: number;
+}> = ({ name, value, onChange, placeholder, rows = 3 }) => {
+  const { theme } = useTheme();
+  const [focused, setFocused] = useState(false);
+  return (
+    <textarea
+      name={name}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      rows={rows}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      style={{
+        width: "100%",
+        padding: "8px 10px",
+        fontSize: 13,
+        borderRadius: 8,
+        border: `1px solid ${focused ? theme.inputBorderFocus : theme.inputBorder}`,
+        backgroundColor: theme.inputBg,
+        color: theme.inputText,
+        outline: "none",
+        resize: "none",
+        boxSizing: "border-box",
+        fontFamily: "inherit",
+      }}
+    />
+  );
+};
+
+// Themed <select> wrapper — used in bulk table
+const ThemedSelect: React.FC<{
+  name?: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}> = ({ name, value, onChange, children, style }) => {
+  const { theme } = useTheme();
+  const [focused, setFocused] = useState(false);
+  return (
+    <select
+      name={name}
+      value={value}
+      onChange={onChange}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      style={{
+        padding: "0 8px",
+        height: 32,
+        fontSize: 12,
+        borderRadius: 6,
+        border: `1px solid ${focused ? theme.inputBorderFocus : theme.inputBorder}`,
+        backgroundColor: theme.inputBg,
+        color: theme.inputText,
+        outline: "none",
+        ...style,
+      }}
+    >
+      {children}
+    </select>
+  );
+};
+
+// ─── SVG icons (same set as EditAssetModal) ───────────────────────────────────
+
+const icons = {
+  tag: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M11 3H5a2 2 0 00-2 2v6l9 9 7-7-9-9z" />
+    </svg>
+  ),
+  company: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M9 21V7l6-4v18M9 11H3v10" />
+    </svg>
+  ),
+  hash: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 9h16M4 15h16M10 3l-1 18M15 3l-1 18" />
+    </svg>
+  ),
+  brand: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <rect x="2" y="3" width="20" height="14" rx="2" />
+      <path strokeLinecap="round" d="M8 21h8M12 17v4" />
+    </svg>
+  ),
+  model: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path strokeLinecap="round" d="M3 9h18M9 21V9" />
+    </svg>
+  ),
+  category: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M11 3H5a2 2 0 00-2 2v6l9 9 7-7-9-9zm0 0" />
+    </svg>
+  ),
+  status: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <circle cx="12" cy="12" r="9" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4" />
+    </svg>
+  ),
+  location: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 21s-6-5.686-6-10a6 6 0 1112 0c0 4.314-6 10-6 10z" />
+      <circle cx="12" cy="11" r="2" />
+    </svg>
+  ),
+  date: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18" />
+    </svg>
+  ),
+  assignee: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <circle cx="12" cy="8" r="4" />
+      <path strokeLinecap="round" d="M4 20c0-4 3.582-7 8-7s8 3 8 7" />
+    </svg>
+  ),
+  notes: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+    </svg>
+  ),
+  upload: (
+    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M16 8l-4-4-4 4M12 4v12" />
+    </svg>
+  ),
+  download: (
+    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M8 12l4 4 4-4M12 4v12" />
+    </svg>
+  ),
+  plus: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16M4 12h16" />
+    </svg>
+  ),
+  save: (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+    </svg>
+  ),
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
+  const { theme } = useTheme();
   const [tab, setTab] = useState<"single" | "bulk">("single");
 
   // single
-  const [form, setForm]       = useState(EMPTY_SINGLE);
+  const [form, setForm] = useState(EMPTY_SINGLE);
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
+  const [error, setError] = useState("");
 
   // bulk
-  const [rows, setRows]               = useState<BulkRow[]>([EMPTY_ROW(1)]);
+  const [rows, setRows] = useState<BulkRow[]>([EMPTY_ROW(1)]);
   const [bulkLoading, setBulkLoading] = useState(false);
-  const [bulkError, setBulkError]     = useState("");
+  const [bulkError, setBulkError] = useState("");
   const [bulkSuccess, setBulkSuccess] = useState(0);
   const [parseWarnings, setParseWarnings] = useState<string[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { employees } = useEmployees();
 
-  // ── single handlers ──────────────────────────────────────────────────────
+  // ── single ────────────────────────────────────────────────────────────────
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSingleSubmit = async () => {
@@ -151,82 +467,66 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
     }
   };
 
-  // ── bulk / excel handlers ────────────────────────────────────────────────
+  // ── bulk ──────────────────────────────────────────────────────────────────
 
   const updateRow = (id: number, field: keyof BulkRow, value: string) =>
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+    setRows((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)),
+    );
 
-  const addRow = () =>
-    setRows((prev) => [...prev, EMPTY_ROW(Date.now())]);
+  const addRow = () => setRows((prev) => [...prev, EMPTY_ROW(Date.now())]);
 
   const removeRow = (id: number) =>
     setRows((prev) => prev.filter((r) => r.id !== id));
 
-
-
-  // Parse uploaded .xlsx / .xls / .csv file
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setBulkError("");
     setParseWarnings([]);
-
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
-        const data  = new Uint8Array(evt.target?.result as ArrayBuffer);
-        const wb    = XLSX.read(data, { type: "array" });
+        const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+        const wb = XLSX.read(data, { type: "array" });
         const sheet = wb.Sheets[wb.SheetNames[0]];
-        const json: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, {
-          defval: "",
-        });
-
+        const json: Record<string, unknown>[] = XLSX.utils.sheet_to_json(
+          sheet,
+          { defval: "" },
+        );
         if (json.length === 0) {
-          setBulkError("The file appears to be empty or has no data rows.");
+          setBulkError("The file appears to be empty.");
           return;
         }
-
         const warnings: string[] = [];
-
         const parsed: BulkRow[] = json.map((raw, i) => {
-          // Normalize headers
           const normalized: Record<string, string> = {};
           for (const key of Object.keys(raw)) {
             const mapped = HEADER_MAP[key.toLowerCase().trim()];
             if (mapped) {
               const val = String(raw[key]).trim();
-              if (val) normalized[mapped] = val; // only add if not empty
+              if (val) normalized[mapped] = val;
             }
           }
-
-          if (!normalized.assetTag) {
-            warnings.push(`Row ${i + 2}: Missing Asset Tag`);
-          }
-          if (!normalized.brand) {
-            warnings.push(`Row ${i + 2}: Missing Brand`);
-          }
-          if (!normalized.company) {
-            warnings.push(`Row ${i + 2}: Missing Company`);
-          }
-
+          if (!normalized.assetTag) warnings.push(`Row ${i + 2}: Missing Asset Tag`);
+          if (!normalized.brand) warnings.push(`Row ${i + 2}: Missing Brand`);
+          if (!normalized.company) warnings.push(`Row ${i + 2}: Missing Company`);
           return {
-            id:            Date.now() + i,
-            assetTag:      normalized.assetTag ?? "",
-            brand:         normalized.brand ?? "",
-            model:         normalized.model ?? "",
-            serialNumber:  normalized.serialNumber ?? "",
-            category:      normalizeCategory(normalized.category ?? ""),
-            company:       normalizeCompany(normalized.company ?? ""),
-            status:        (normalized.status as ITInventory["status"]) ?? "Spare",
-            assigneeName:  normalized.assigneeName ?? "",
-            assigneeId:    normalized.assigneeId ?? "",
-            location:      (normalized.location as ITInventory["location"]) ?? "Unit 1 & 2",
+            id: Date.now() + i,
+            assetTag: normalized.assetTag ?? "",
+            brand: normalized.brand ?? "",
+            model: normalized.model ?? "",
+            serialNumber: normalized.serialNumber ?? "",
+            category: normalizeCategory(normalized.category ?? ""),
+            company: normalizeCompany(normalized.company ?? ""),
+            status: (normalized.status as ITInventory["status"]) ?? "Spare",
+            assigneeName: normalized.assigneeName ?? "",
+            assigneeId: normalized.assigneeId ?? "",
+            location: (normalized.location as ITInventory["location"]) ?? "Unit 1 & 2",
             datePurchased: normalized.datePurchased ?? "",
-            notes:         normalized.notes ?? "",
+            notes: normalized.notes ?? "",
           };
         });
-
         setParseWarnings(warnings);
         setRows(parsed);
       } catch {
@@ -234,8 +534,6 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
       }
     };
     reader.readAsArrayBuffer(file);
-
-    // Reset input so same file can be re-uploaded
     e.target.value = "";
   };
 
@@ -251,27 +549,24 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
     try {
       await Promise.all(
         rows.map((r) => {
-          // Build assignee name if not provided (try to find from employees list)
           const assignee = employees.find((e) => e.id === r.assigneeId);
-          const finalAssigneeName = r.assigneeName || assignee?.name || "";
-
           return addAsset({
-            assetTag:      r.assetTag,
-            company:       r.company,
-            serialNumber:  r.serialNumber,
-            model:         r.model,
-            brand:         r.brand,
-            category:      r.category,
-            status:        r.status,
-            assigneeId:    r.assigneeId,
-            assigneeName:  finalAssigneeName,
-            location:      r.location,
-            notes:         r.notes,
+            assetTag: r.assetTag,
+            company: r.company,
+            serialNumber: r.serialNumber,
+            model: r.model,
+            brand: r.brand,
+            category: r.category,
+            status: r.status,
+            assigneeId: r.assigneeId,
+            assigneeName: r.assigneeName || assignee?.name || "",
+            location: r.location,
+            notes: r.notes,
             datePurchased: r.datePurchased
               ? Timestamp.fromDate(new Date(r.datePurchased))
               : Timestamp.now(),
           });
-        })
+        }),
       );
       setBulkSuccess(rows.length);
       setRows([EMPTY_ROW(1)]);
@@ -284,7 +579,7 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
     }
   };
 
-  // ── close / reset ────────────────────────────────────────────────────────
+  // ── close ─────────────────────────────────────────────────────────────────
 
   const handleClose = () => {
     setForm(EMPTY_SINGLE);
@@ -298,186 +593,660 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
 
   if (!visible) return null;
 
+  // ── shared button styles ──────────────────────────────────────────────────
+
+  const cancelBtnStyle: React.CSSProperties = {
+    padding: "7px 16px",
+    fontSize: 13,
+    borderRadius: 8,
+    cursor: "pointer",
+    border: `1px solid ${theme.border}`,
+    backgroundColor: "transparent",
+    color: theme.subtext,
+  };
+
+  const primaryBtnStyle: React.CSSProperties = {
+    padding: "7px 18px",
+    fontSize: 13,
+    fontWeight: 600,
+    borderRadius: 8,
+    cursor: "pointer",
+    border: "none",
+    backgroundColor: theme.primary,
+    color: theme.primaryText,
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    opacity: loading || bulkLoading ? 0.6 : 1,
+  };
+
+  // ── bulk table cell input style ───────────────────────────────────────────
+
+  const cellInputStyle = (invalid = false): React.CSSProperties => ({
+    width: "100%",
+    padding: "0 8px",
+    height: 32,
+    fontSize: 12,
+    borderRadius: 6,
+    border: `1px solid ${invalid ? theme.dangerBorder : theme.inputBorder}`,
+    backgroundColor: invalid ? theme.dangerBg : theme.inputBg,
+    color: theme.inputText,
+    outline: "none",
+    boxSizing: "border-box",
+  });
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: theme.overlay }}
+    >
       <div
-        className={`bg-white rounded-xl shadow-xl w-full overflow-y-auto p-6 transition-all
-          ${tab === "bulk" ? "max-w-5xl max-h-[95vh]" : "max-w-lg max-h-[90vh]"}`}
+        className="w-full flex flex-col"
+        style={{
+          backgroundColor: theme.surface,
+          borderRadius: 16,
+          maxHeight: "90vh",
+          width: tab === "bulk" ? "min(95vw, 1100px)" : "min(95vw, 520px)",
+          boxShadow: `0 20px 60px ${theme.shadow}`,
+          border: `1px solid ${theme.border}`,
+          transition: "width 0.2s ease",
+        }}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-xl font-semibold text-gray-800">Add Asset</h2>
-          <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold transition-colors">
-            ✕
-          </button>
-        </div>
+        {/* ── Header ── */}
+        <div
+          className="flex items-start justify-between px-5 pt-5 pb-4"
+          style={{ borderBottom: `1px solid ${theme.border}` }}
+        >
+          <div>
+            <h2 style={{ fontSize: 17, fontWeight: 600, color: theme.text, margin: 0 }}>
+              Add asset
+            </h2>
+            <p style={{ fontSize: 11, color: theme.subtext, marginTop: 2 }}>
+              Fill in the details below to register a new asset
+            </p>
+          </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 mb-5 bg-gray-100 p-1 rounded-lg w-fit">
-          {(["single", "bulk"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors capitalize
-                ${tab === t ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+          {/* Tab switcher — sits in header alongside title */}
+          <div className="flex items-center gap-3">
+            <div
+              style={{
+                display: "flex",
+                gap: 2,
+                backgroundColor: theme.inputBg,
+                border: `1px solid ${theme.border}`,
+                borderRadius: 8,
+                padding: 3,
+              }}
             >
-              {t === "bulk" ? "Bulk Add" : "Single"}
+              {(["single", "bulk"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  style={{
+                    padding: "4px 12px",
+                    fontSize: 12,
+                    fontWeight: 500,
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    border: "none",
+                    backgroundColor: tab === t ? theme.primary : "transparent",
+                    color: tab === t ? theme.primaryText : theme.subtext,
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {t === "single" ? "Single" : "Bulk add"}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={handleClose}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: theme.subtext,
+                fontSize: 20,
+                lineHeight: 1,
+                padding: 4,
+              }}
+            >
+              ×
             </button>
-          ))}
+          </div>
         </div>
 
-        {/* ── SINGLE TAB ── */}
+        {/* ════════════════════════════════════════════════════════════════════
+            SINGLE TAB
+        ════════════════════════════════════════════════════════════════════ */}
         {tab === "single" && (
           <>
-            {error && (
-              <p className="text-red-500 text-sm mb-4 bg-red-50 px-3 py-2 rounded-md">{error}</p>
-            )}
-            <div className="flex flex-col gap-3">
-              <input name="assetTag" placeholder="Asset Tag *" value={form.assetTag} onChange={handleChange} className={inputClass} />
-              <select name="company" value={form.company} onChange={handleChange} className={inputClass}>
-                <option value="">Select Company *</option>
-                <option value="OCG">OCG</option>
-                <option value="SDB">SDB</option>
-              </select>
-              <input name="serialNumber" placeholder="Serial Number" value={form.serialNumber} onChange={handleChange} className={inputClass} />
-              <input name="brand" placeholder="Brand *" value={form.brand} onChange={handleChange} className={inputClass} />
-              <input name="model" placeholder="Model" value={form.model} onChange={handleChange} className={inputClass} />
-              <select name="assigneeId" value={form.assigneeId} onChange={handleChange} className={inputClass}>
-                <option value="">Select Assignee</option>
-                {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-              </select>
-              <select name="status" value={form.status} onChange={handleChange} className={inputClass}>
-                <option value="Spare">Spare</option>
-                <option value="Deployed">Deployed</option>
-                <option value="Defective">Defective</option>
-              </select>
-              <select name="category" value={form.category} onChange={handleChange} className={inputClass}>
-                <option value="Laptop">Laptop</option>
-                <option value="Monitor">Monitor</option>
-                <option value="Desktop">Desktop</option>
-              </select>
-              <select name="location" value={form.location} onChange={handleChange} className={inputClass}>
-                <option value="Unit 1 & 2">Unit 1 & 2</option>
-                <option value="Unit 3">Unit 3</option>
-                <option value="BDO Makati">BDO Makati</option>
-                <option value="Triumph">Triumph</option>
-                <option value="WFH">WFH</option>
-              </select>
-              <input name="datePurchased" type="date" value={form.datePurchased} onChange={handleChange} className={inputClass} />
-              <textarea name="notes" placeholder="Notes" value={form.notes} onChange={handleChange} rows={3} className={`${inputClass} resize-none`} />
+            <div
+              className="overflow-y-auto flex-1 px-5 py-4"
+              style={{ display: "flex", flexDirection: "column", gap: 14 }}
+            >
+              {error && (
+                <div
+                  style={{
+                    backgroundColor: theme.dangerBg,
+                    border: `1px solid ${theme.dangerBorder}`,
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                  }}
+                >
+                  <p style={{ fontSize: 12, color: theme.dangerText, margin: 0 }}>
+                    ⚠ {error}
+                  </p>
+                </div>
+              )}
+
+              {/* Asset Tag — full width, prominent */}
+              <Field label="Asset tag *" icon={icons.tag}>
+                <ThemedInput
+                  name="assetTag"
+                  value={form.assetTag}
+                  onChange={handleChange}
+                  placeholder="e.g. OCG-DF-001"
+                />
+              </Field>
+
+              {/* Brand + Model */}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Brand *" icon={icons.brand}>
+                  <ThemedInput
+                    name="brand"
+                    value={form.brand}
+                    onChange={handleChange}
+                    placeholder="e.g. HP, Lenovo"
+                  />
+                </Field>
+                <Field label="Model" icon={icons.model}>
+                  <ThemedInput
+                    name="model"
+                    value={form.model}
+                    onChange={handleChange}
+                    placeholder="e.g. ProBook 440 G6"
+                  />
+                </Field>
+              </div>
+
+              {/* Serial + Date */}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Serial number" icon={icons.hash}>
+                  <ThemedInput
+                    name="serialNumber"
+                    value={form.serialNumber}
+                    onChange={handleChange}
+                    placeholder="Enter serial number"
+                  />
+                </Field>
+                <Field label="Date purchased" icon={icons.date}>
+                  <input
+                    name="datePurchased"
+                    type="date"
+                    value={form.datePurchased}
+                    onChange={handleChange}
+                    style={{
+                      width: "100%",
+                      padding: "0 10px",
+                      height: 38,
+                      fontSize: 13,
+                      borderRadius: 8,
+                      border: `1px solid ${theme.inputBorder}`,
+                      backgroundColor: theme.inputBg,
+                      color: theme.inputText,
+                      outline: "none",
+                      boxSizing: "border-box",
+                      colorScheme: theme.mode === "dark" ? "dark" : "light",
+                    }}
+                  />
+                </Field>
+              </div>
+
+              {/* Company + Category */}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Company *" icon={icons.company}>
+                  <BadgeSelect
+                    value={form.company}
+                    displayName={form.company}
+                    options={COMPANY_OPTIONS}
+                    placeholder="Select company"
+                    onChange={(val) => setForm((f) => ({ ...f, company: val }))}
+                    className="w-full"
+                  />
+                </Field>
+                <Field label="Category" icon={icons.category}>
+                  <BadgeSelect
+                    value={form.category}
+                    displayName={form.category}
+                    options={CATEGORY_OPTIONS}
+                    placeholder="Select category"
+                    onChange={(val) =>
+                      setForm((f) => ({
+                        ...f,
+                        category: val as ITInventory["category"],
+                      }))
+                    }
+                    className="w-full"
+                  />
+                </Field>
+              </div>
+
+              {/* Location + Status */}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Location" icon={icons.location}>
+                  <BadgeSelect
+                    value={form.location}
+                    displayName={form.location}
+                    options={LOCATION_OPTIONS}
+                    placeholder="Select location"
+                    onChange={(val) =>
+                      setForm((f) => ({
+                        ...f,
+                        location: val as ITInventory["location"],
+                      }))
+                    }
+                    className="w-full"
+                  />
+                </Field>
+                <Field label="Status" icon={icons.status}>
+                  <BadgeSelect
+                    value={form.status}
+                    displayName={form.status}
+                    options={STATUS_OPTIONS}
+                    placeholder="Select status"
+                    onChange={(val) =>
+                      setForm((f) => ({
+                        ...f,
+                        status: val as ITInventory["status"],
+                      }))
+                    }
+                    className="w-full"
+                  />
+                </Field>
+              </div>
+
+              {/* Assignee */}
+              <Field label="Assignee" icon={icons.assignee}>
+                <BadgeSelect
+                  value={form.assigneeId}
+                  displayName={form.assigneeName}
+                  options={employees.map((e) => ({ label: e.name, value: e.id }))}
+                  placeholder="Search assignee..."
+                  onChange={(id, name) =>
+                    setForm((f) => ({
+                      ...f,
+                      assigneeId: id,
+                      assigneeName: name === "—" ? "" : name,
+                    }))
+                  }
+                  className="w-full"
+                />
+              </Field>
+
+              {/* Notes */}
+              <Field label="Notes" icon={icons.notes}>
+                <ThemedTextarea
+                  name="notes"
+                  value={form.notes}
+                  onChange={handleChange}
+                  placeholder="Add any notes about this asset..."
+                  rows={3}
+                />
+              </Field>
             </div>
-            <div className="flex justify-end gap-3 mt-6">
-              <button onClick={handleClose} className={cancelBtn}>Cancel</button>
-              <button onClick={handleSingleSubmit} disabled={loading} className={primaryBtn}>
-                {loading ? "Saving..." : "Add Asset"}
+
+            {/* Footer */}
+            <div
+              className="flex items-center justify-end gap-2 px-5 py-3"
+              style={{ borderTop: `1px solid ${theme.border}` }}
+            >
+              <button onClick={handleClose} style={cancelBtnStyle}>
+                Cancel
+              </button>
+              <button
+                onClick={handleSingleSubmit}
+                disabled={loading}
+                style={primaryBtnStyle}
+              >
+                {icons.save}
+                {loading ? "Saving…" : "Add asset"}
               </button>
             </div>
           </>
         )}
 
-        {/* ── BULK TAB ── */}
+        {/* ════════════════════════════════════════════════════════════════════
+            BULK TAB
+        ════════════════════════════════════════════════════════════════════ */}
         {tab === "bulk" && (
           <>
-            {/* Upload strip */}
-            <div className="flex items-center gap-3 mb-4 flex-wrap">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
-              >
-                <span>📂</span> Upload Excel / CSV
-              </button>
-              <a
-                href="data:text/csv;charset=utf-8,Asset Tag,Company,Serial Number,Model,Brand,Category,Status,Assignee,Location,Date Purchased,Notes%0AOCG-001,OCG,SN12345,ThinkPad X1,Lenovo,Laptop,Deployed,John Doe,Unit 1 & 2,2024-01-15,In working condition"
-                download="it_inventory_template.csv"
-                className="text-xs text-blue-500 hover:text-blue-700 underline transition-colors"
-              >
-                Download template
-              </a>
-              <span className="text-xs text-gray-400 ml-auto">
-                Columns: Asset Tag, Company, Serial Number, Model, Brand, Category, Status, Assignee, Location, Date Purchased, Notes
-              </span>
+            <div className="px-5 pt-4 pb-3" style={{ borderBottom: `1px solid ${theme.border}` }}>
+              {/* Upload / template row */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "6px 14px",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    border: `1px solid ${theme.border}`,
+                    backgroundColor: theme.inputBg,
+                    color: theme.text,
+                  }}
+                >
+                  {icons.upload}
+                  Upload Excel / CSV
+                </button>
+                <a
+                  href="data:text/csv;charset=utf-8,Asset Tag,Company,Serial Number,Model,Brand,Category,Status,Assignee,Location,Date Purchased,Notes%0AOCG-001,OCG,SN12345,ThinkPad X1,Lenovo,Laptop,Deployed,John Doe,Unit 1 & 2,2024-01-15,In working condition"
+                  download="it_inventory_template.csv"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    fontSize: 12,
+                    color: theme.primary,
+                    textDecoration: "none",
+                  }}
+                >
+                  {icons.download}
+                  Download template
+                </a>
+                <span
+                  style={{ fontSize: 11, color: theme.subtext, marginLeft: "auto" }}
+                >
+                  {rows.length} row{rows.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+
+              {/* Warnings */}
+              {parseWarnings.length > 0 && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    backgroundColor: theme.dangerBg,
+                    border: `1px solid ${theme.dangerBorder}`,
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                  }}
+                >
+                  <p style={{ fontSize: 12, fontWeight: 600, color: theme.dangerText, margin: "0 0 4px" }}>
+                    ⚠ Import warnings
+                  </p>
+                  {parseWarnings.slice(0, 5).map((w, i) => (
+                    <p key={i} style={{ fontSize: 12, color: theme.dangerText, margin: 0 }}>
+                      {w}
+                    </p>
+                  ))}
+                  {parseWarnings.length > 5 && (
+                    <p style={{ fontSize: 12, color: theme.subtext, marginTop: 4 }}>
+                      …and {parseWarnings.length - 5} more
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {bulkError && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    backgroundColor: theme.dangerBg,
+                    border: `1px solid ${theme.dangerBorder}`,
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                  }}
+                >
+                  <p style={{ fontSize: 12, color: theme.dangerText, margin: 0 }}>⚠ {bulkError}</p>
+                </div>
+              )}
+
+              {bulkSuccess > 0 && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    backgroundColor: theme.successBg ?? "#f0fdf4",
+                    border: `1px solid ${theme.successBorder ?? "#bbf7d0"}`,
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                  }}
+                >
+                  <p style={{ fontSize: 12, color: theme.successText ?? "#16a34a", margin: 0 }}>
+                    ✓ {bulkSuccess} asset{bulkSuccess > 1 ? "s" : ""} saved successfully!
+                  </p>
+                </div>
+              )}
             </div>
 
-            {/* Parse warnings */}
-            {parseWarnings.length > 0 && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 mb-3">
-                <p className="text-xs font-semibold text-yellow-700 mb-1">⚠ Import warnings</p>
-                {parseWarnings.slice(0, 5).map((w, i) => (
-                  <p key={i} className="text-xs text-yellow-600">{w}</p>
-                ))}
-                {parseWarnings.length > 5 && (
-                  <p className="text-xs text-yellow-500 mt-1">…and {parseWarnings.length - 5} more</p>
-                )}
-              </div>
-            )}
-
-            {/* Errors / success */}
-            {bulkError && (
-              <p className="text-red-500 text-sm mb-3 bg-red-50 px-3 py-2 rounded-md">{bulkError}</p>
-            )}
-            {bulkSuccess > 0 && (
-              <p className="text-green-600 text-sm mb-3 bg-green-50 px-3 py-2 rounded-md">
-                ✓ {bulkSuccess} asset{bulkSuccess > 1 ? "s" : ""} saved successfully!
-              </p>
-            )}
-
             {/* Table */}
-            <div className="overflow-x-auto rounded-lg border border-gray-200 mb-4">
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50">
+            <div className="overflow-auto flex-1 px-5 py-3">
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
+                <thead>
                   <tr>
-                    {["#", "Asset Tag *", "Company *", "Serial #", "Model", "Brand *", "Category", "Status", "Assignee", "Location", "Date Purchased", "Notes", ""].map((h) => (
-                      <th key={h} className="px-2 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">
+                    {[
+                      "#", "Asset Tag *", "Company *", "Serial #",
+                      "Model", "Brand *", "Category", "Status",
+                      "Assignee", "Location", "Date", "Notes", "",
+                    ].map((h) => (
+                      <th
+                        key={h}
+                        style={{
+                          padding: "6px 8px",
+                          textAlign: "left",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: theme.subtext,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                          borderBottom: `1px solid ${theme.border}`,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         {h}
                       </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody>
                   {rows.map((row, i) => (
-                    <tr key={row.id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                      <td className="px-2 py-1.5 text-xs text-gray-400 w-8">{i + 1}</td>
-                      <td className="px-1 py-1"><input placeholder="e.g. OCG-001" value={row.assetTag} onChange={(e) => updateRow(row.id, "assetTag", e.target.value)} className={`${cellInput} w-20 ${!row.assetTag ? "border-red-200 bg-red-50" : ""}`} /></td>
-                      <td className="px-1 py-1"><select value={row.company} onChange={(e) => updateRow(row.id, "company", e.target.value)} className={`${cellInput} w-16 ${!row.company ? "border-red-200 bg-red-50" : ""}`}><option value="">—</option><option value="OCG">OCG</option><option value="SDB">SDB</option></select></td>
-                      <td className="px-1 py-1"><input placeholder="SN..." value={row.serialNumber} onChange={(e) => updateRow(row.id, "serialNumber", e.target.value)} className={`${cellInput} w-24`} /></td>
-                      <td className="px-1 py-1"><input placeholder="e.g. ThinkPad" value={row.model} onChange={(e) => updateRow(row.id, "model", e.target.value)} className={`${cellInput} w-20`} /></td>
-                      <td className="px-1 py-1"><input placeholder="e.g. Lenovo" value={row.brand} onChange={(e) => updateRow(row.id, "brand", e.target.value)} className={`${cellInput} w-20 ${!row.brand ? "border-red-200 bg-red-50" : ""}`} /></td>
-                      <td className="px-1 py-1"><select value={row.category} onChange={(e) => updateRow(row.id, "category", e.target.value)} className={`${cellInput} w-20`}><option value="Laptop">Laptop</option><option value="Monitor">Monitor</option><option value="Desktop">Desktop</option></select></td>
-                      <td className="px-1 py-1"><select value={row.status} onChange={(e) => updateRow(row.id, "status", e.target.value as ITInventory["status"])} className={`${cellInput} w-20`}><option value="Spare">Spare</option><option value="Deployed">Deployed</option><option value="Defective">Defective</option></select></td>
-                      <td className="px-1 py-1"><input placeholder="Name" value={row.assigneeName} onChange={(e) => updateRow(row.id, "assigneeName", e.target.value)} className={`${cellInput} w-24`} /></td>
-                      <td className="px-1 py-1"><select value={row.location} onChange={(e) => updateRow(row.id, "location", e.target.value as ITInventory["location"])} className={`${cellInput} w-24`}><option value="Unit 1 & 2">Unit 1 & 2</option><option value="Unit 3">Unit 3</option><option value="BDO Makati">BDO Makati</option><option value="Triumph">Triumph</option><option value="WFH">WFH</option></select></td>
-                      <td className="px-1 py-1"><input type="date" value={row.datePurchased} onChange={(e) => updateRow(row.id, "datePurchased", e.target.value)} className={`${cellInput} w-32`} /></td>
-                      <td className="px-1 py-1"><input placeholder="Notes..." value={row.notes} onChange={(e) => updateRow(row.id, "notes", e.target.value)} className={`${cellInput} w-32`} /></td>
-                      <td className="px-1 py-1.5 text-center">{rows.length > 1 && (<button onClick={() => removeRow(row.id)} className="text-gray-300 hover:text-red-400 transition-colors text-base font-bold">✕</button>)}</td>
+                    <tr
+                      key={row.id}
+                      style={{
+                        backgroundColor:
+                          i % 2 === 0 ? "transparent" : theme.inputBg,
+                      }}
+                    >
+                      <td style={{ padding: "4px 8px", fontSize: 11, color: theme.subtext, width: 28 }}>
+                        {i + 1}
+                      </td>
+                      <td style={{ padding: "4px 4px" }}>
+                        <input
+                          placeholder="OCG-001"
+                          value={row.assetTag}
+                          onChange={(e) => updateRow(row.id, "assetTag", e.target.value)}
+                          style={{ ...cellInputStyle(!row.assetTag), width: 90 }}
+                        />
+                      </td>
+                      <td style={{ padding: "4px 4px" }}>
+                        <ThemedSelect
+                          value={row.company}
+                          onChange={(e) => updateRow(row.id, "company", e.target.value)}
+                          style={{ width: 72, border: !row.company ? `1px solid ${theme.dangerBorder}` : undefined }}
+                        >
+                          <option value="">—</option>
+                          <option value="OCG">OCG</option>
+                          <option value="SDB">SDB</option>
+                        </ThemedSelect>
+                      </td>
+                      <td style={{ padding: "4px 4px" }}>
+                        <input
+                          placeholder="SN..."
+                          value={row.serialNumber}
+                          onChange={(e) => updateRow(row.id, "serialNumber", e.target.value)}
+                          style={{ ...cellInputStyle(), width: 90 }}
+                        />
+                      </td>
+                      <td style={{ padding: "4px 4px" }}>
+                        <input
+                          placeholder="Model"
+                          value={row.model}
+                          onChange={(e) => updateRow(row.id, "model", e.target.value)}
+                          style={{ ...cellInputStyle(), width: 90 }}
+                        />
+                      </td>
+                      <td style={{ padding: "4px 4px" }}>
+                        <input
+                          placeholder="Brand"
+                          value={row.brand}
+                          onChange={(e) => updateRow(row.id, "brand", e.target.value)}
+                          style={{ ...cellInputStyle(!row.brand), width: 80 }}
+                        />
+                      </td>
+                      <td style={{ padding: "4px 4px" }}>
+                        <ThemedSelect
+                          value={row.category}
+                          onChange={(e) => updateRow(row.id, "category", e.target.value)}
+                          style={{ width: 82 }}
+                        >
+                          <option value="Laptop">Laptop</option>
+                          <option value="Monitor">Monitor</option>
+                          <option value="Desktop">Desktop</option>
+                        </ThemedSelect>
+                      </td>
+                      <td style={{ padding: "4px 4px" }}>
+                        <ThemedSelect
+                          value={row.status}
+                          onChange={(e) => updateRow(row.id, "status", e.target.value as ITInventory["status"])}
+                          style={{ width: 88 }}
+                        >
+                          <option value="Spare">Spare</option>
+                          <option value="Deployed">Deployed</option>
+                          <option value="Defective">Defective</option>
+                        </ThemedSelect>
+                      </td>
+                      <td style={{ padding: "4px 4px" }}>
+                        <input
+                          placeholder="Name"
+                          value={row.assigneeName}
+                          onChange={(e) => updateRow(row.id, "assigneeName", e.target.value)}
+                          style={{ ...cellInputStyle(), width: 100 }}
+                        />
+                      </td>
+                      <td style={{ padding: "4px 4px" }}>
+                        <ThemedSelect
+                          value={row.location}
+                          onChange={(e) => updateRow(row.id, "location", e.target.value as ITInventory["location"])}
+                          style={{ width: 100 }}
+                        >
+                          <option value="Unit 1 & 2">Unit 1 & 2</option>
+                          <option value="Unit 3">Unit 3</option>
+                          <option value="BDO Makati">BDO Makati</option>
+                          <option value="Triumph">Triumph</option>
+                          <option value="WFH">WFH</option>
+                        </ThemedSelect>
+                      </td>
+                      <td style={{ padding: "4px 4px" }}>
+                        <input
+                          type="date"
+                          value={row.datePurchased}
+                          onChange={(e) => updateRow(row.id, "datePurchased", e.target.value)}
+                          style={{
+                            ...cellInputStyle(),
+                            width: 128,
+                            colorScheme: theme.mode === "dark" ? "dark" : "light",
+                          }}
+                        />
+                      </td>
+                      <td style={{ padding: "4px 4px" }}>
+                        <input
+                          placeholder="Notes..."
+                          value={row.notes}
+                          onChange={(e) => updateRow(row.id, "notes", e.target.value)}
+                          style={{ ...cellInputStyle(), width: 110 }}
+                        />
+                      </td>
+                      <td style={{ padding: "4px 8px", textAlign: "center" }}>
+                        {rows.length > 1 && (
+                          <button
+                            onClick={() => removeRow(row.id)}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              cursor: "pointer",
+                              color: theme.subtext,
+                              fontSize: 16,
+                              lineHeight: 1,
+                              padding: 2,
+                            }}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.color = theme.dangerText)
+                            }
+                            onMouseLeave={(e) =>
+                              (e.currentTarget.style.color = theme.subtext)
+                            }
+                          >
+                            ×
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+
+              {/* Add row */}
+              <button
+                onClick={addRow}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  marginTop: 10,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: theme.primary,
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "4px 0",
+                }}
+              >
+                {icons.plus}
+                Add row
+              </button>
             </div>
 
-            {/* Add row + footer */}
-            <button
-              onClick={addRow}
-              className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium mb-5 transition-colors"
+            {/* Footer */}
+            <div
+              className="flex items-center justify-between px-5 py-3"
+              style={{ borderTop: `1px solid ${theme.border}` }}
             >
-              <span className="text-lg leading-none">+</span> Add Row
-            </button>
-
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-gray-400">
-                {rows.length} row{rows.length !== 1 ? "s" : ""} · All fields per row · Blank cells will be empty
+              <p style={{ fontSize: 11, color: theme.subtext, margin: 0 }}>
+                {rows.length} row{rows.length !== 1 ? "s" : ""} · Required fields marked with *
               </p>
-              <div className="flex gap-3">
-                <button onClick={handleClose} className={cancelBtn}>Cancel</button>
-                <button onClick={handleBulkSubmit} disabled={bulkLoading} className={primaryBtn}>
-                  {bulkLoading ? "Saving..." : `Save ${rows.length} Asset${rows.length !== 1 ? "s" : ""}`}
+              <div className="flex gap-2">
+                <button onClick={handleClose} style={cancelBtnStyle}>
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBulkSubmit}
+                  disabled={bulkLoading}
+                  style={primaryBtnStyle}
+                >
+                  {icons.save}
+                  {bulkLoading ? "Saving…" : `Save ${rows.length} asset${rows.length !== 1 ? "s" : ""}`}
                 </button>
               </div>
             </div>
@@ -487,15 +1256,5 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
     </div>
   );
 };
-
-const inputClass =
-  "w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent";
-const cellInput =
-  "w-full px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white";
-const labelClass = "block text-xs font-medium text-gray-600 mb-1";
-const cancelBtn =
-  "px-5 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors";
-const primaryBtn =
-  "px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors";
 
 export default AddAssetModal;

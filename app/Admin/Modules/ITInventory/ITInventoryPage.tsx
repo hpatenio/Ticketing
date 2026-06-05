@@ -322,15 +322,24 @@ const SearchableSelect = ({
 
       {open && (
         <div
-          style={dropdownStyle}
-          className="bg-white border border-gray-200 rounded-lg shadow-lg"
+          style={{
+            ...dropdownStyle,
+            backgroundColor: theme.surface, // or theme.surfaceRaised
+            borderColor: theme.border,
+          }}
+          className="rounded-lg shadow-lg border"
         >
           <input
             autoFocus
             type="text"
             value={query}
             placeholder="Search..."
-            className="w-full px-3 py-2 text-xs border-b border-gray-100 focus:outline-none"
+            style={{
+              backgroundColor: theme.surface,
+              color: theme.text,
+              borderBottomColor: theme.border,
+            }}
+            className="w-full px-3 py-2 text-xs border-b focus:outline-none"
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Escape") {
@@ -342,7 +351,12 @@ const SearchableSelect = ({
 
           <ul className="max-h-44 overflow-y-auto">
             {filtered.length === 0 ? (
-              <li className="px-3 py-2 text-xs text-gray-400">No results</li>
+              <li
+                style={{ color: theme.subtext }}
+                className="px-3 py-2 text-xs"
+              >
+                No results
+              </li>
             ) : (
               filtered.map((o) => (
                 <li

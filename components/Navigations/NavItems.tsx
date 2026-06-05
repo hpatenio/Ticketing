@@ -225,7 +225,6 @@ export const MENU_BY_ROLE: Record<string, NavItem[]> = {
     { key: "tickets", label: "Tickets", icon: TicketsIcon },
     { key: "inventory", label: "IT Inventory", icon: InventoryIcon },
     { key: "consumables", label: "IT Consumables", icon: ConsumablesIcon },
-    { key: "reports", label: "Reports", icon: ReportsIcon },
   ],
   employee: [
     { key: "dashboard", label: "Dashboard", icon: DashboardIcon },

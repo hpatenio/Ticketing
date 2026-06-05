@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   useWindowDimensions,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ADUser } from "../../types";
 import Sidebar from "../../components/Navigations/Sidebar";
 import BottomNavBar from "../../components/Navigations/BottmNavBar";
@@ -17,6 +18,9 @@ import ConsumablesPage from "./Modules/Consumables/ConsumablesPage";
 import TicketsPage from "./Modules/Tickets/TicketsPage";
 import { useTheme } from "../../theme/ThemeContext";
 
+const ACTIVE_KEY_STORAGE = "admin_active_key";
+const JUST_LOGGED_IN_KEY = "just_logged_in";
+
 type Props = {
   user: ADUser;
   onLogout: () => void;
@@ -24,12 +28,42 @@ type Props = {
 
 export default function AdminDashboard({ user, onLogout }: Props) {
   const [activeKey, setActiveKey] = useState("dashboard");
+  const [hydrated, setHydrated] = useState(false);
   const [inventoryFilter, setInventoryFilter] =
     useState<InventoryFilter | null>(null);
   const { width } = useWindowDimensions();
   const { theme } = useTheme();
   const isMobile =
     Platform.OS === "android" || Platform.OS === "ios" || width < 768;
+
+  // On mount: if fresh login → go to dashboard; if refresh → restore last page
+  useEffect(() => {
+    const init = async () => {
+      const justLoggedIn = await AsyncStorage.getItem(JUST_LOGGED_IN_KEY);
+
+      if (justLoggedIn === "true") {
+        // Fresh login — reset to dashboard and clear the flag
+        await AsyncStorage.removeItem(JUST_LOGGED_IN_KEY);
+        await AsyncStorage.setItem(ACTIVE_KEY_STORAGE, "dashboard");
+        setActiveKey("dashboard");
+      } else {
+        // Page refresh — restore last visited page
+        const saved = await AsyncStorage.getItem(ACTIVE_KEY_STORAGE);
+        if (saved) setActiveKey(saved);
+      }
+
+      setHydrated(true);
+    };
+
+    init();
+  }, []);
+
+  // Save active page whenever it changes (only after hydration)
+  useEffect(() => {
+    if (hydrated) AsyncStorage.setItem(ACTIVE_KEY_STORAGE, activeKey);
+  }, [activeKey, hydrated]);
+
+  if (!hydrated) return null;
 
   const handleFilterNavigate = (filter: InventoryFilter | null) => {
     setInventoryFilter(filter);
@@ -43,7 +77,7 @@ export default function AdminDashboard({ user, onLogout }: Props) {
       case "consumables":
         return <ConsumablesPage />;
       case "tickets":
-        return <TicketsPage user={user} />;  // ← pass user here
+        return <TicketsPage user={user} />;
       case "dashboard":
       default:
         return (
