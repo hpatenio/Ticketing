@@ -1,4 +1,10 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  useMemo,
+} from "react";
 import { useEmployees, EmployeeOption } from "../../../../hooks/useEmployees";
 import { ADUser, ConcernTicket } from "../../../../types";
 import {
@@ -9,11 +15,16 @@ import EditAssetModal from "./EditAssetModal";
 import AddAssetModal from "./AddAssetModal";
 import BadgeSelect from "../../../../components/common/BadgeSelect";
 import { useTheme } from "../../../../theme/ThemeContext";
+import { getAllDropdownConfigs } from "../../../../Services/dropdownConfigs";
+import ManageColumnsModal, {
+  ColumnConfig,
+  DropdownOption,
+} from "../../../SuperAdmin/ManageColumnsModal";
 
+import { getDropdownOptions } from "../../../../Services/dropdownConfigs";
 // ─── Options ──────────────────────────────────────────────────────────────────
 
-const CATEGORY_OPTIONS = [
-  { label: "-", value: "" },
+const DEFAULT_CATEGORY_OPTIONS: DropdownOption[] = [
   {
     label: "CCTV",
     value: "CCTV",
@@ -76,8 +87,7 @@ const CATEGORY_OPTIONS = [
   },
 ];
 
-const PRIORITY_OPTIONS = [
-  { label: "-", value: "" },
+const DEFAULT_PRIORITY_OPTIONS: DropdownOption[] = [
   {
     label: "Low",
     value: "Low",
@@ -98,7 +108,7 @@ const PRIORITY_OPTIONS = [
   },
 ];
 
-const STATUS_OPTIONS = [
+const DEFAULT_STATUS_OPTIONS: DropdownOption[] = [
   {
     label: "Pending",
     value: "Pending",
@@ -217,6 +227,40 @@ const SearchableSelect = ({
   onChange,
 }: SearchableSelectProps) => {
   const { theme } = useTheme();
+
+  // Themed scrollbar
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.id = "inventory-scrollbar-style";
+    style.textContent = `
+      .inventory-scroll::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      .inventory-scroll::-webkit-scrollbar-track {
+        background: ${theme.background};
+      }
+      .inventory-scroll::-webkit-scrollbar-thumb {
+        background: ${theme.border};
+        border-radius: 999px;
+      }
+      .inventory-scroll::-webkit-scrollbar-thumb:hover {
+        background: ${theme.subtext};
+      }
+      .inventory-scroll::-webkit-scrollbar-corner {
+        background: ${theme.background};
+      }
+    `;
+
+    const existing = document.getElementById("inventory-scrollbar-style");
+    if (existing) existing.remove();
+    document.head.appendChild(style);
+
+    return () => {
+      document.getElementById("inventory-scrollbar-style")?.remove();
+    };
+  }, [theme]);
+
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -330,9 +374,12 @@ const SearchableSelect = ({
               }
             }}
           />
-          <ul className="max-h-44 overflow-y-auto">
+          <ul className="inventory-scroll max-h-44 overflow-y-auto">
             {filtered.length === 0 ? (
-              <li style={{ color: theme.subtext }} className="px-3 py-2 text-xs">
+              <li
+                style={{ color: theme.subtext }}
+                className="px-3 py-2 text-xs"
+              >
                 No results
               </li>
             ) : (
@@ -460,7 +507,9 @@ const StatusSection: React.FC<StatusSectionProps> = React.memo(
             onClick={() => onToggle(group.key)}
             className="w-full flex items-center gap-2 px-3 py-2 text-left select-none"
           >
-            <span style={{ color: group.headerText, fontSize: 13, fontWeight: 600 }}>
+            <span
+              style={{ color: group.headerText, fontSize: 13, fontWeight: 600 }}
+            >
               {isCollapsed ? "▶" : "▼"}
             </span>
             <span
@@ -536,9 +585,9 @@ const FilterTabDropdown: React.FC<FilterTabDropdownProps> = ({
 
   const options = [
     { label: "All statuses", value: "", dot: undefined },
-    { label: "Pending",     value: "Pending",     dot: "#eab308" },
+    { label: "Pending", value: "Pending", dot: "#eab308" },
     { label: "In Progress", value: "In Progress", dot: "#3b82f6" },
-    { label: "Resolved",    value: "Resolved",    dot: "#10b981" },
+    { label: "Resolved", value: "Resolved", dot: "#10b981" },
   ];
 
   const selected = options.find((o) => o.value === filterStatus) ?? options[0];
@@ -631,7 +680,9 @@ const FilterTabDropdown: React.FC<FilterTabDropdownProps> = ({
                 }}
                 className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left"
                 style={{
-                  backgroundColor: isSelected ? theme.surfaceRaised : "transparent",
+                  backgroundColor: isSelected
+                    ? theme.surfaceRaised
+                    : "transparent",
                   color: theme.text,
                 }}
                 onMouseEnter={(e) =>
@@ -668,6 +719,9 @@ type TicketRowProps = {
   ticket: ConcernTicket;
   index: number;
   assigneeOptions: { label: string; value: string }[];
+  categoryOptions: DropdownOption[]; // ← add
+  priorityOptions: DropdownOption[]; // ← add
+  statusOptions: DropdownOption[]; // ← add
   onUpdateField: (
     ticketNumber: string,
     field: string,
@@ -680,13 +734,18 @@ const TicketRow = ({
   ticket,
   index,
   assigneeOptions,
+  categoryOptions,
+  priorityOptions,
+  statusOptions,
   onUpdateField,
   onOpenDetails,
 }: TicketRowProps) => {
   const { theme } = useTheme();
   const [dueDate, setDueDate] = useState(toDateString(ticket.dueDate));
   const [clickCount, setClickCount] = useState(0);
-  const [clickTimer, setClickTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const [clickTimer, setClickTimer] = useState<ReturnType<
+    typeof setTimeout
+  > | null>(null);
 
   useEffect(() => {
     setDueDate(toDateString(ticket.dueDate));
@@ -792,7 +851,7 @@ const TicketRow = ({
         <BadgeSelect
           value={ticket.category}
           displayName={ticket.category || "—"}
-          options={CATEGORY_OPTIONS}
+          options={categoryOptions}
           placeholder="—"
           onChange={async (val) =>
             onUpdateField(ticket.ticketNumber, "category", val)
@@ -805,7 +864,7 @@ const TicketRow = ({
         <BadgeSelect
           value={ticket.priority}
           displayName={ticket.priority}
-          options={PRIORITY_OPTIONS}
+          options={priorityOptions}
           placeholder="—"
           onChange={async (val) =>
             onUpdateField(ticket.ticketNumber, "priority", val)
@@ -818,7 +877,7 @@ const TicketRow = ({
         <BadgeSelect
           value={ticket.status}
           displayName={ticket.status}
-          options={STATUS_OPTIONS}
+          options={statusOptions}
           placeholder="—"
           onChange={async (val) =>
             onUpdateField(ticket.ticketNumber, "status", val)
@@ -843,7 +902,7 @@ const TicketRow = ({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-type Props = { user?: ADUser };
+type Props = { user?: ADUser; isSuperAdmin?: boolean };
 
 const HEADERS: { label: string; key: SortKey }[] = [
   { label: "Summary", key: "summary" },
@@ -855,14 +914,16 @@ const HEADERS: { label: string; key: SortKey }[] = [
   { label: "Due Date", key: "dueDate" },
 ];
 
-export default function TicketsPage({ user }: Props) {
+export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
   const { theme } = useTheme();
   const [tickets, setTickets] = useState<ConcernTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editingTicket, setEditingTicket] = useState<ConcernTicket | null>(null);
+  const [editingTicket, setEditingTicket] = useState<ConcernTicket | null>(
+    null,
+  );
   const [mainTab, setMainTab] = useState<MainTab>("all");
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -871,7 +932,28 @@ export default function TicketsPage({ user }: Props) {
   const [sortDir, setSortDir] = useState<SortDir>("default");
 
   const { employees, currentUserId, currentUserName } = useEmployees();
-
+  const [manageColumnsVisible, setManageColumnsVisible] = useState(false);
+  const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
+    {
+      id: "ticket_category",
+      label: "Category",
+      editable: true,
+      options: DEFAULT_CATEGORY_OPTIONS,
+    },
+    {
+      id: "ticket_priority",
+      label: "Priority",
+      editable: true,
+      options: DEFAULT_PRIORITY_OPTIONS,
+    },
+    {
+      id: "ticket_status",
+      label: "Status",
+      editable: true,
+      options: DEFAULT_STATUS_OPTIONS,
+    },
+    { id: "assignee", label: "Assignee", editable: false, options: [] },
+  ]);
   const loadTickets = async () => {
     setLoading(true);
     try {
@@ -886,7 +968,33 @@ export default function TicketsPage({ user }: Props) {
   useEffect(() => {
     loadTickets().catch(console.error);
   }, []);
+  const [dropdownOptions, setDropdownOptions] = useState({
+    category: DEFAULT_CATEGORY_OPTIONS,
+    priority: DEFAULT_PRIORITY_OPTIONS,
+    status: DEFAULT_STATUS_OPTIONS,
+  });
 
+  useEffect(() => {
+    Promise.all([
+      getDropdownOptions("ticket_category", DEFAULT_CATEGORY_OPTIONS),
+      getDropdownOptions("ticket_priority", DEFAULT_PRIORITY_OPTIONS),
+      getDropdownOptions("ticket_status", DEFAULT_STATUS_OPTIONS),
+    ])
+      .then(([category, priority, status]) => {
+        setDropdownOptions({ category, priority, status });
+        setColumnConfigs((prev) =>
+          prev.map((col) => {
+            if (col.id === "ticket_category")
+              return { ...col, options: category };
+            if (col.id === "ticket_priority")
+              return { ...col, options: priority };
+            if (col.id === "ticket_status") return { ...col, options: status };
+            return col;
+          }),
+        );
+      })
+      .catch(console.error);
+  }, []);
   const handleSort = (key: SortKey) => {
     if (sortKey !== key) {
       setSortKey(key);
@@ -977,7 +1085,10 @@ export default function TicketsPage({ user }: Props) {
       await updateTicketField(ticketNumber, field, value);
       await loadTickets();
     } catch (err) {
-      console.error(`Unable to update ${field} for ticket ${ticketNumber}:`, err);
+      console.error(
+        `Unable to update ${field} for ticket ${ticketNumber}:`,
+        err,
+      );
     }
   };
 
@@ -1049,7 +1160,9 @@ export default function TicketsPage({ user }: Props) {
               }}
               className="px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap border-b cursor-pointer select-none transition-colors"
               onMouseEnter={(e) => (e.currentTarget.style.color = theme.text)}
-              onMouseLeave={(e) => (e.currentTarget.style.color = theme.subtext)}
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.color = theme.subtext)
+              }
             >
               <span className="inline-flex items-center gap-1">
                 {label}
@@ -1075,6 +1188,9 @@ export default function TicketsPage({ user }: Props) {
               ticket={ticket}
               index={index}
               assigneeOptions={assigneeOptions}
+              categoryOptions={dropdownOptions.category} // ← add
+              priorityOptions={dropdownOptions.priority} // ← add
+              statusOptions={dropdownOptions.status} // ← add
               onUpdateField={handleUpdateField}
               onOpenDetails={openEditModal}
             />
@@ -1094,7 +1210,7 @@ export default function TicketsPage({ user }: Props) {
           );
         }
       }),
-    [assigneeOptions, handleUpdateField, openEditModal, theme],
+    [assigneeOptions, dropdownOptions, handleUpdateField, openEditModal, theme],
   );
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -1116,19 +1232,43 @@ export default function TicketsPage({ user }: Props) {
               {filteredTickets.length} of {tickets.length} tickets
             </p>
           </div>
-          <button
-            onClick={() => setModalVisible(true)}
-            style={{ backgroundColor: theme.primary, color: theme.primaryText }}
-            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors"
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = theme.primaryHover)
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor = theme.primary)
-            }
-          >
-            + Add Ticket
-          </button>
+          <div className="flex items-center gap-3">
+            {isSuperAdmin && (
+              <button
+                onClick={() => setManageColumnsVisible(true)}
+                style={{
+                  backgroundColor: theme.surface,
+                  color: theme.text,
+                  borderColor: theme.border,
+                }}
+                className="px-3 py-2 text-sm font-semibold rounded-lg border whitespace-nowrap"
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = theme.bgHover)
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = theme.surface)
+                }
+              >
+                ⚙ Manage columns
+              </button>
+            )}
+            <button
+              onClick={() => setModalVisible(true)}
+              style={{
+                backgroundColor: theme.primary,
+                color: theme.primaryText,
+              }}
+              className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors"
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = theme.primaryHover)
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = theme.primary)
+              }
+            >
+              + Add Ticket
+            </button>
+          </div>
         </div>
 
         {/* Search */}
@@ -1216,7 +1356,7 @@ export default function TicketsPage({ user }: Props) {
         </div>
       ) : mainTab === "grouped" ? (
         /* ── By Status: collapsible sections ── */
-        <div className="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
+        <div className="inventory-scroll flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
           {STATUS_GROUPS.map((group) => (
             <StatusSection
               key={group.key}
@@ -1238,7 +1378,7 @@ export default function TicketsPage({ user }: Props) {
         </div>
       ) : (
         /* ── All / Filter: flat table ── */
-        <div className="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
+        <div className="inventory-scroll flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
           <div
             style={{ borderColor: theme.border }}
             className="rounded-lg border"
@@ -1275,6 +1415,26 @@ export default function TicketsPage({ user }: Props) {
         onSave={async (ticketNumber, updates) => {
           await handleSaveEditedTicket(ticketNumber, updates);
           setEditModalVisible(false);
+        }}
+      />
+
+      <ManageColumnsModal
+        visible={manageColumnsVisible}
+        onClose={() => setManageColumnsVisible(false)}
+        columns={columnConfigs}
+        onSave={(updated) => {
+          setColumnConfigs(updated);
+          // sync back into dropdownOptions so the table updates immediately
+          const cat =
+            updated.find((c) => c.id === "ticket_category")?.options ??
+            DEFAULT_CATEGORY_OPTIONS;
+          const pri =
+            updated.find((c) => c.id === "ticket_priority")?.options ??
+            DEFAULT_PRIORITY_OPTIONS;
+          const sta =
+            updated.find((c) => c.id === "ticket_status")?.options ??
+            DEFAULT_STATUS_OPTIONS;
+          setDropdownOptions({ category: cat, priority: pri, status: sta });
         }}
       />
     </div>

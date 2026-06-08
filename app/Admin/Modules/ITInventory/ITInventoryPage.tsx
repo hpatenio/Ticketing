@@ -17,117 +17,153 @@ import AddAssetModal from "./AddAssetModal";
 import EditAssetModal from "./EditAssetModal";
 import BadgeSelect from "../../../../components/common/BadgeSelect";
 import { useTheme } from "../../../../theme/ThemeContext";
+import ManageColumnsModal, {
+  ColumnConfig,
+  DropdownOption,
+} from "../../../SuperAdmin/ManageColumnsModal";
+import { getAllDropdownConfigs } from "../../../../Services/dropdownConfigs";
 
-// ─── Dropdown options ─────────────────────────────────────────────────────────
+// ─── Default dropdown options (Firestore seeding fallbacks only) ─────────────
+// On first run getDropdownOptions() seeds Firestore with these values.
+// After that, every client reads from Firestore — never from these constants.
 
-const LOCATION_OPTIONS = [
-  { label: "-", value: "" },
-  {
-    label: "Unit 1 & 2",
-    value: "Unit 1 & 2",
-    badgeClass:
-      "bg-pink-100   text-pink-800   inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
-  },
-  {
-    label: "Unit 3",
-    value: "Unit 3",
-    badgeClass:
-      "bg-purple-100 text-purple-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
-  },
-  {
-    label: "BDO Makati",
-    value: "BDO Makati",
-    badgeClass:
-      "bg-teal-100   text-teal-800   inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
-  },
-  {
-    label: "Triumph",
-    value: "Triumph",
-    badgeClass:
-      "bg-green-100  text-green-800  inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
-  },
-  {
-    label: "WFH",
-    value: "WFH",
-    badgeClass:
-      "bg-cyan-100   text-cyan-800   inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
-  },
-];
-
-const STATUS_OPTIONS = [
+const DEFAULT_STATUS_OPTIONS: DropdownOption[] = [
   {
     label: "Deployed",
     value: "Deployed",
     badgeClass:
       "bg-emerald-100 text-emerald-800 inline-flex justify-center min-w-[90px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#d1fae5",
+    textColor: "#065f46",
   },
   {
     label: "Spare",
     value: "Spare",
     badgeClass:
-      "bg-blue-100    text-blue-800    inline-flex justify-center min-w-[90px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-blue-100 text-blue-800 inline-flex justify-center min-w-[90px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#dbeafe",
+    textColor: "#1e40af",
   },
   {
     label: "Defective",
     value: "Defective",
     badgeClass:
-      "bg-red-100     text-red-800     inline-flex justify-center min-w-[90px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-red-100 text-red-800 inline-flex justify-center min-w-[90px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#fee2e2",
+    textColor: "#991b1b",
   },
 ];
 
-const CATEGORY_OPTIONS = [
-  { label: "-", value: "" },
+const DEFAULT_CATEGORY_OPTIONS: DropdownOption[] = [
   {
     label: "Laptop",
     value: "Laptop",
     badgeClass:
-      "bg-orange-100  text-orange-800  inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-orange-100 text-orange-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#ffedd5",
+    textColor: "#9a3412",
   },
   {
     label: "Monitor",
     value: "Monitor",
     badgeClass:
-      "bg-yellow-100  text-yellow-800  inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-yellow-100 text-yellow-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#fef9c3",
+    textColor: "#854d0e",
   },
   {
     label: "Desktop",
     value: "Desktop",
     badgeClass:
-      "bg-indigo-100  text-indigo-800  inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-indigo-100 text-indigo-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#e0e7ff",
+    textColor: "#3730a3",
   },
   {
     label: "UPS",
     value: "UPS",
     badgeClass:
-      "bg-cyan-100    text-cyan-800    inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-cyan-100 text-cyan-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#cffafe",
+    textColor: "#155e75",
   },
   {
     label: "Network Device",
     value: "Network Device",
     badgeClass:
       "bg-emerald-100 text-emerald-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#d1fae5",
+    textColor: "#065f46",
   },
   {
     label: "Server",
     value: "Server",
     badgeClass:
-      "bg-violet-100  text-violet-800  inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-violet-100 text-violet-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#ede9fe",
+    textColor: "#5b21b6",
   },
 ];
 
-const COMPANY_OPTIONS = [
-  { label: "-", value: "" },
+const DEFAULT_LOCATION_OPTIONS: DropdownOption[] = [
+  {
+    label: "Unit 1 & 2",
+    value: "Unit 1 & 2",
+    badgeClass:
+      "bg-pink-100 text-pink-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#fce7f3",
+    textColor: "#9d174d",
+  },
+  {
+    label: "Unit 3",
+    value: "Unit 3",
+    badgeClass:
+      "bg-purple-100 text-purple-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#f3e8ff",
+    textColor: "#6b21a8",
+  },
+  {
+    label: "BDO Makati",
+    value: "BDO Makati",
+    badgeClass:
+      "bg-teal-100 text-teal-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#ccfbf1",
+    textColor: "#115e59",
+  },
+  {
+    label: "Triumph",
+    value: "Triumph",
+    badgeClass:
+      "bg-green-100 text-green-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#dcfce7",
+    textColor: "#166534",
+  },
+  {
+    label: "WFH",
+    value: "WFH",
+    badgeClass:
+      "bg-cyan-100 text-cyan-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#cffafe",
+    textColor: "#155e75",
+  },
+];
+
+const DEFAULT_COMPANY_OPTIONS: DropdownOption[] = [
   {
     label: "OCG",
     value: "OCG",
     badgeClass:
-      "bg-blue-100   text-blue-800   inline-flex justify-center min-w-[60px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-blue-100 text-blue-800 inline-flex justify-center min-w-[60px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#dbeafe",
+    textColor: "#1e40af",
   },
   {
     label: "SDB",
     value: "SDB",
     badgeClass:
       "bg-violet-100 text-violet-800 inline-flex justify-center min-w-[60px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#ede9fe",
+    textColor: "#5b21b6",
   },
 ];
 
@@ -202,20 +238,21 @@ const SearchableSelect = ({
   onChange,
 }: SearchableSelectProps) => {
   const { theme } = useTheme();
+
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const wrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+
   const getInitials = (name: string) => {
     const parts = name.trim().split(" ").filter(Boolean);
     if (parts.length === 0) return "?";
-
     const first = parts[0]?.[0] ?? "";
     const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
-
     return (first + last).toUpperCase();
   };
+
   const allOptions = [{ label: "—", value: "" }, ...options];
 
   const filtered = query
@@ -230,18 +267,16 @@ const SearchableSelect = ({
       const spaceBelow = window.innerHeight - rect.bottom;
       const dropdownH = Math.min(220, filtered.length * 28 + 40);
       const showAbove = spaceBelow < dropdownH && rect.top > dropdownH;
-
       setDropdownStyle({
         position: "fixed",
         left: rect.left,
-        width: rect.width, // ✅ MATCH BUTTON WIDTH
+        width: rect.width,
         zIndex: 9999,
         ...(showAbove
           ? { bottom: window.innerHeight - rect.top + 4 }
           : { top: rect.bottom + 4 }),
       });
     }
-
     setQuery("");
     setOpen(true);
   };
@@ -253,7 +288,6 @@ const SearchableSelect = ({
         setQuery("");
       }
     };
-
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
@@ -274,7 +308,6 @@ const SearchableSelect = ({
             }}
             className="inline-flex items-center justify-center gap-2 rounded-full px-3 py-1 text-xs font-semibold max-w-full whitespace-nowrap"
           >
-            {/* INITIALS CIRCLE */}
             <span
               className="flex items-center justify-center rounded-full"
               style={{
@@ -289,11 +322,9 @@ const SearchableSelect = ({
             >
               {getInitials(displayName)}
             </span>
-
             {displayName}
           </span>
         ) : (
-          // ─── Unassigned state (ICON ONLY) ───
           <span
             style={{
               backgroundColor: theme.surfaceRaised,
@@ -302,7 +333,6 @@ const SearchableSelect = ({
             className="inline-flex items-center justify-center rounded-full p-2"
             title={placeholder}
           >
-            {/* OUTLINE ICON (unassigned) */}
             <svg
               className="w-4 h-4"
               viewBox="0 0 24 24"
@@ -324,7 +354,7 @@ const SearchableSelect = ({
         <div
           style={{
             ...dropdownStyle,
-            backgroundColor: theme.surface, // or theme.surfaceRaised
+            backgroundColor: theme.surface,
             borderColor: theme.border,
           }}
           className="rounded-lg shadow-lg border"
@@ -348,8 +378,7 @@ const SearchableSelect = ({
               }
             }}
           />
-
-          <ul className="max-h-44 overflow-y-auto">
+          <ul className="inventory-scroll max-h-44 overflow-y-auto">
             {filtered.length === 0 ? (
               <li
                 style={{ color: theme.subtext }}
@@ -391,6 +420,7 @@ const SearchableSelect = ({
     </div>
   );
 };
+
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
 const toDateString = (value: any) => {
@@ -419,7 +449,7 @@ const normalizeValue = (value: any) => {
   return String(value).toLowerCase();
 };
 
-// ─── StatusSection — outside ITInventoryPage so React never remounts it ───────
+// ─── StatusSection ────────────────────────────────────────────────────────────
 
 type StatusGroupDef = {
   key: "Deployed" | "Defective" | "Spare";
@@ -565,7 +595,7 @@ const STATUS_GROUPS: StatusGroupDef[] = [
   },
 ];
 
-// ─── Filter tab dropdown — opens immediately on click ─────────────────────────
+// ─── Filter tab dropdown ──────────────────────────────────────────────────────
 
 type FilterTabDropdownProps = {
   isActive: boolean;
@@ -721,9 +751,16 @@ const FilterTabDropdown: React.FC<FilterTabDropdownProps> = ({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-type Props = { initialFilter?: InventoryFilter | null };
+// ← isSuperAdmin added to Props
+type Props = {
+  initialFilter?: InventoryFilter | null;
+  isSuperAdmin?: boolean;
+};
 
-const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
+const ITInventoryPage: React.FC<Props> = ({
+  initialFilter = null,
+  isSuperAdmin = false, // ← default false so admin sees nothing
+}) => {
   const { theme } = useTheme();
   const [data, setData] = useState<ITInventory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -740,6 +777,56 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
   const [editVisible, setEditVisible] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<ITInventory | null>(null);
   const [editingNoteTag, setEditingNoteTag] = useState<string | null>(null);
+  const [manageColumnsVisible, setManageColumnsVisible] = useState(false); // ← added
+
+  // ── Column configs are loaded from Firestore; defaults seed the DB on first run
+  const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
+    { id: "status",   label: "Status",   editable: true,  options: DEFAULT_STATUS_OPTIONS },
+    { id: "category", label: "Category", editable: true,  options: DEFAULT_CATEGORY_OPTIONS },
+    { id: "location", label: "Location", editable: true,  options: DEFAULT_LOCATION_OPTIONS },
+    { id: "company",  label: "Company",  editable: true,  options: DEFAULT_COMPANY_OPTIONS },
+    { id: "assignee", label: "Assignee", editable: false, options: [] },
+  ]);
+
+  // Load dropdown options from Firestore on mount
+  useEffect(() => {
+    getAllDropdownConfigs({
+      status:   DEFAULT_STATUS_OPTIONS,
+      category: DEFAULT_CATEGORY_OPTIONS,
+      location: DEFAULT_LOCATION_OPTIONS,
+      company:  DEFAULT_COMPANY_OPTIONS,
+    }).then(({ status, category, location, company }) => {
+      setColumnConfigs((prev) =>
+        prev.map((col) => {
+          if (col.id === "status")   return { ...col, options: status };
+          if (col.id === "category") return { ...col, options: category };
+          if (col.id === "location") return { ...col, options: location };
+          if (col.id === "company")  return { ...col, options: company };
+          return col;
+        }),
+      );
+    }).catch((err) => {
+      console.error("Failed to load dropdown configs from Firestore:", err);
+    });
+  }, []);
+  // Themed scrollbar
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.id = "inventory-scrollbar-style";
+    style.textContent = `
+      .inventory-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+      .inventory-scroll::-webkit-scrollbar-track { background: ${theme.background}; }
+      .inventory-scroll::-webkit-scrollbar-thumb { background: ${theme.border}; border-radius: 999px; }
+      .inventory-scroll::-webkit-scrollbar-thumb:hover { background: ${theme.subtext}; }
+      .inventory-scroll::-webkit-scrollbar-corner { background: ${theme.background}; }
+    `;
+    const existing = document.getElementById("inventory-scrollbar-style");
+    if (existing) existing.remove();
+    document.head.appendChild(style);
+    return () => {
+      document.getElementById("inventory-scrollbar-style")?.remove();
+    };
+  }, [theme]);
 
   const { employees, currentUserId } = useEmployees();
 
@@ -748,8 +835,6 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
     value: e.id,
     isMe: e.id === currentUserId,
   }));
-
-  // ─── Data ──────────────────────────────────────────────────────────────────
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -825,8 +910,6 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
     [],
   );
 
-  // ─── Sort ──────────────────────────────────────────────────────────────────
-
   const handleSort = useCallback(
     (key: InventorySortKey) => {
       if (sortKey !== key) {
@@ -843,8 +926,6 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
 
   const dirFor = (key: InventorySortKey): SortDir =>
     sortKey === key ? sortDir : "default";
-
-  // ─── Filter + sort ─────────────────────────────────────────────────────────
 
   const q = search.toLowerCase().trim();
 
@@ -911,8 +992,6 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
     });
   }, [filtered, sortKey, sortDir, employees]);
 
-  // ─── Stable per-group arrays ───────────────────────────────────────────────
-
   const groupedDeployed = useMemo(
     () => sortedFiltered.filter((i) => i.status === "Deployed"),
     [sortedFiltered],
@@ -950,8 +1029,6 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
     Spare: groupedSpare.length,
   };
 
-  // ─── Table head ────────────────────────────────────────────────────────────
-
   const renderTableHead = useCallback(
     (stickyTop: number = 0) => (
       <thead>
@@ -986,8 +1063,6 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
     [theme, sortKey, sortDir, handleSort],
   );
 
-  // ─── Table body ────────────────────────────────────────────────────────────
-
   const renderTableBody = useCallback(
     (items: ITInventory[]) =>
       items.map((item, index) => (
@@ -998,7 +1073,6 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
             borderBottom: `1px solid ${theme.border}`,
           }}
         >
-          {/* Asset Tag */}
           <td className="px-3 py-1 min-w-[130px]">
             <button
               type="button"
@@ -1014,12 +1088,11 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
             </button>
           </td>
 
-          {/* Company */}
           <td className="text-sm px-3 py-1 min-w-[110px]">
             <BadgeSelect
               value={item.company}
               displayName={item.company || "—"}
-              options={COMPANY_OPTIONS}
+              options={columnConfigs.find((c) => c.id === "company")?.options ?? DEFAULT_COMPANY_OPTIONS}
               placeholder="—"
               onChange={(val) =>
                 handleFieldUpdate(item.assetTag, "company", val)
@@ -1027,33 +1100,29 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
             />
           </td>
 
-          {/* Serial Number */}
           <td className="px-3 py-1 min-w-[140px]">
             <span style={{ color: theme.text }} className="text-sm">
               {item.serialNumber || "—"}
             </span>
           </td>
 
-          {/* Model */}
           <td className="px-3 py-1 min-w-[110px]">
             <span style={{ color: theme.text }} className="text-sm">
               {item.model || "—"}
             </span>
           </td>
 
-          {/* Brand */}
           <td className="px-3 py-1 min-w-[110px]">
             <span style={{ color: theme.text }} className="text-sm">
               {item.brand || "—"}
             </span>
           </td>
 
-          {/* Category */}
           <td className="px-3 py-1 min-w-[160px]">
             <BadgeSelect
               value={item.category}
               displayName={item.category || "—"}
-              options={CATEGORY_OPTIONS}
+              options={columnConfigs.find((c) => c.id === "category")?.options ?? DEFAULT_CATEGORY_OPTIONS}
               placeholder="—"
               onChange={(val) =>
                 handleFieldUpdate(item.assetTag, "category", val)
@@ -1061,12 +1130,11 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
             />
           </td>
 
-          {/* Status */}
           <td className="px-3 py-1 min-w-[120px]">
             <BadgeSelect
               value={item.status}
               displayName={item.status || "—"}
-              options={STATUS_OPTIONS}
+              options={columnConfigs.find((c) => c.id === "status")?.options ?? DEFAULT_STATUS_OPTIONS}
               placeholder="—"
               onChange={(val) =>
                 handleFieldUpdate(item.assetTag, "status", val)
@@ -1074,7 +1142,6 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
             />
           </td>
 
-          {/* Assignee */}
           <td className="px-3 py-1 min-w-[140px]">
             <SearchableSelect
               value={item.assigneeId ?? ""}
@@ -1094,12 +1161,11 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
             />
           </td>
 
-          {/* Location */}
           <td className="px-3 py-1 min-w-[120px]">
             <BadgeSelect
               value={item.location}
               displayName={item.location || "—"}
-              options={LOCATION_OPTIONS}
+              options={columnConfigs.find((c) => c.id === "location")?.options ?? DEFAULT_LOCATION_OPTIONS}
               placeholder="—"
               onChange={(val) =>
                 handleFieldUpdate(item.assetTag, "location", val)
@@ -1107,7 +1173,6 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
             />
           </td>
 
-          {/* Date Purchased */}
           <td className="px-3 py-1 min-w-[130px]">
             <input
               type="date"
@@ -1125,7 +1190,6 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
             />
           </td>
 
-          {/* Notes */}
           <td className="px-3 py-1 min-w-[200px]">
             {editingNoteTag === item.assetTag ? (
               <input
@@ -1173,14 +1237,13 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
       employees,
       assigneeOptions,
       editingNoteTag,
+      columnConfigs,
       handleFieldUpdate,
       handleAssigneeChange,
       handleEdit,
       setEditingNoteTag,
     ],
   );
-
-  // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div
@@ -1189,7 +1252,6 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
     >
       {/* ── Fixed top bar ── */}
       <div className="flex-shrink-0 px-4 pt-4 pb-0">
-        {/* Header + Search */}
         <div className="flex items-center justify-between gap-4 mb-4">
           <div>
             <h1 style={{ color: theme.text }} className="text-xl font-bold">
@@ -1220,6 +1282,27 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
               }
             />
 
+            {/* ── Superadmin only button ── */}
+            {isSuperAdmin && (
+              <button
+                onClick={() => setManageColumnsVisible(true)}
+                style={{
+                  backgroundColor: theme.surface,
+                  color: theme.text,
+                  borderColor: theme.border,
+                }}
+                className="px-3 py-2 text-sm font-semibold rounded-lg border whitespace-nowrap"
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = theme.bgHover)
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = theme.surface)
+                }
+              >
+                ⚙ Manage columns
+              </button>
+            )}
+
             <button
               onClick={() => setAddVisible(true)}
               style={{
@@ -1239,7 +1322,6 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
           </div>
         </div>
 
-        {/* Active filter pill */}
         {activeFilter && (
           <div className="flex flex-wrap items-center gap-2 mb-3">
             <span style={{ color: theme.subtext }} className="text-xs">
@@ -1269,7 +1351,6 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
           </div>
         )}
 
-        {/* Tab bar */}
         <div className="flex items-center gap-2 mb-3">
           {(["all", "grouped"] as const).map((key) => {
             const isActive = mainTab === key;
@@ -1304,7 +1385,6 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
             );
           })}
 
-          {/* Filter tab — opens dropdown immediately on click */}
           <FilterTabDropdown
             isActive={mainTab === "filter"}
             filterStatus={filterStatus}
@@ -1334,8 +1414,7 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
           </p>
         </div>
       ) : mainTab === "grouped" ? (
-        /* ── By Status: collapsible sections ── */
-        <div className="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
+        <div className="inventory-scroll flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
           {STATUS_GROUPS.map((group) => (
             <StatusSection
               key={group.key}
@@ -1356,8 +1435,7 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
           </p>
         </div>
       ) : (
-        /* ── All / Filter: flat table ── */
-        <div className="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
+        <div className="inventory-scroll flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
           <div
             style={{ borderColor: theme.border }}
             className="rounded-lg border"
@@ -1389,6 +1467,13 @@ const ITInventoryPage: React.FC<Props> = ({ initialFilter = null }) => {
         selectedAsset={selectedAsset}
         onDelete={handleDelete}
         employees={employees}
+      />
+
+      <ManageColumnsModal
+        visible={manageColumnsVisible}
+        onClose={() => setManageColumnsVisible(false)}
+        columns={columnConfigs}
+        onSave={(updated) => setColumnConfigs(updated)}
       />
     </div>
   );

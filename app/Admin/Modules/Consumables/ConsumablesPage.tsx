@@ -15,62 +15,81 @@ import AddConsumableModal from "./AddAssetModal";
 import EditConsumableModal from "./EditAssetModal";
 import BadgeSelect from "../../../../components/common/BadgeSelect";
 import { useTheme } from "../../../../theme/ThemeContext";
+import ManageColumnsModal, {
+  ColumnConfig,
+  DropdownOption,
+} from "../../../SuperAdmin/ManageColumnsModal";
+import { getDropdownOptions } from "../../../../Services/dropdownConfigs";
 
 // ─── Options ──────────────────────────────────────────────────────────────────
 
-const LOCATION_OPTIONS = [
-  { label: "-", value: "" },
-  {
-    label: "Unit 1 & 2",
-    value: "Unit 1 & 2",
-    badgeClass:
-      "bg-pink-100   text-pink-800   inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
-  },
-  {
-    label: "Unit 3",
-    value: "Unit 3",
-    badgeClass:
-      "bg-purple-100 text-purple-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
-  },
-  {
-    label: "BDO Makati",
-    value: "BDO Makati",
-    badgeClass:
-      "bg-teal-100   text-teal-800   inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
-  },
-  {
-    label: "Triumph",
-    value: "Triumph",
-    badgeClass:
-      "bg-green-100  text-green-800  inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
-  },
-  {
-    label: "WFH",
-    value: "WFH",
-    badgeClass:
-      "bg-cyan-100   text-cyan-800   inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
-  },
-];
-
-const STATUS_OPTIONS = [
-  { label: "-", value: "" },
+const DEFAULT_STATUS_OPTIONS: DropdownOption[] = [
   {
     label: "Spare",
     value: "Spare",
     badgeClass:
-      "bg-sky-100     text-sky-800     inline-flex justify-center min-w-[80px] px-2 py-1 rounded-full text-sm font-semibold",
+      "bg-sky-100 text-sky-800 inline-flex justify-center min-w-[80px] px-2 py-1 rounded-full text-sm font-semibold",
+    bgColor: "#e0f2fe",
+    textColor: "#0369a1",
   },
   {
     label: "Deployed",
     value: "Deployed",
     badgeClass:
       "bg-emerald-100 text-emerald-800 inline-flex justify-center min-w-[80px] px-2 py-1 rounded-full text-sm font-semibold",
+    bgColor: "#d1fae5",
+    textColor: "#065f46",
   },
   {
     label: "Defective",
     value: "Defective",
     badgeClass:
-      "bg-red-100     text-red-800     inline-flex justify-center min-w-[80px] px-2 py-1 rounded-full text-sm font-semibold",
+      "bg-red-100 text-red-800 inline-flex justify-center min-w-[80px] px-2 py-1 rounded-full text-sm font-semibold",
+    bgColor: "#fee2e2",
+    textColor: "#991b1b",
+  },
+];
+
+const DEFAULT_LOCATION_OPTIONS: DropdownOption[] = [
+  {
+    label: "Unit 1 & 2",
+    value: "Unit 1 & 2",
+    badgeClass:
+      "bg-pink-100 text-pink-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#fce7f3",
+    textColor: "#9d174d",
+  },
+  {
+    label: "Unit 3",
+    value: "Unit 3",
+    badgeClass:
+      "bg-purple-100 text-purple-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#f3e8ff",
+    textColor: "#6b21a8",
+  },
+  {
+    label: "BDO Makati",
+    value: "BDO Makati",
+    badgeClass:
+      "bg-teal-100 text-teal-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#ccfbf1",
+    textColor: "#115e59",
+  },
+  {
+    label: "Triumph",
+    value: "Triumph",
+    badgeClass:
+      "bg-green-100 text-green-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#dcfce7",
+    textColor: "#166534",
+  },
+  {
+    label: "WFH",
+    value: "WFH",
+    badgeClass:
+      "bg-cyan-100 text-cyan-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+    bgColor: "#cffafe",
+    textColor: "#155e75",
   },
 ];
 
@@ -520,8 +539,42 @@ const FilterTabDropdown: React.FC<FilterTabDropdownProps> = ({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-const ConsumablesPage: React.FC = () => {
+type Props = { isSuperAdmin?: boolean };
+const ConsumablesPage: React.FC<Props> = ({ isSuperAdmin = false }) => {
   const { theme } = useTheme();
+
+  // Themed scrollbar
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.id = "inventory-scrollbar-style";
+    style.textContent = `
+      .inventory-scroll::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      .inventory-scroll::-webkit-scrollbar-track {
+        background: ${theme.background};
+      }
+      .inventory-scroll::-webkit-scrollbar-thumb {
+        background: ${theme.border};
+        border-radius: 999px;
+      }
+      .inventory-scroll::-webkit-scrollbar-thumb:hover {
+        background: ${theme.subtext};
+      }
+      .inventory-scroll::-webkit-scrollbar-corner {
+        background: ${theme.background};
+      }
+    `;
+
+    const existing = document.getElementById("inventory-scrollbar-style");
+    if (existing) existing.remove();
+    document.head.appendChild(style);
+
+    return () => {
+      document.getElementById("inventory-scrollbar-style")?.remove();
+    };
+  }, [theme]);
   const [data, setData] = useState<ITConsumable[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -533,6 +586,27 @@ const ConsumablesPage: React.FC = () => {
   const [addVisible, setAddVisible] = useState(false);
   const [editVisible, setEditVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ITConsumable | null>(null);
+  const [manageColumnsVisible, setManageColumnsVisible] = useState(false);
+
+  const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
+    {
+      id: "consumable_status",
+      label: "Status",
+      editable: true,
+      options: DEFAULT_STATUS_OPTIONS,
+    },
+    {
+      id: "consumable_location",
+      label: "Location",
+      editable: true,
+      options: DEFAULT_LOCATION_OPTIONS,
+    },
+  ]);
+
+  const [dropdownOptions, setDropdownOptions] = useState({
+    status: DEFAULT_STATUS_OPTIONS,
+    location: DEFAULT_LOCATION_OPTIONS,
+  });
 
   // ─── Data ──────────────────────────────────────────────────────────────────
 
@@ -545,6 +619,26 @@ const ConsumablesPage: React.FC = () => {
 
   useEffect(() => {
     fetchData();
+  }, []);
+
+  useEffect(() => {
+    Promise.all([
+      getDropdownOptions("consumable_status", DEFAULT_STATUS_OPTIONS),
+      getDropdownOptions("consumable_location", DEFAULT_LOCATION_OPTIONS),
+    ])
+      .then(([status, location]) => {
+        setDropdownOptions({ status, location });
+        setColumnConfigs((prev) =>
+          prev.map((col) => {
+            if (col.id === "consumable_status")
+              return { ...col, options: status };
+            if (col.id === "consumable_location")
+              return { ...col, options: location };
+            return col;
+          }),
+        );
+      })
+      .catch(console.error);
   }, []);
 
   const updateLocalField = useCallback(
@@ -761,7 +855,7 @@ const ConsumablesPage: React.FC = () => {
             <BadgeSelect
               value={item.status}
               displayName={item.status || "—"}
-              options={STATUS_OPTIONS}
+              options={dropdownOptions.status}
               placeholder="—"
               onChange={(val) => handleFieldUpdate(item.model, "status", val)}
             />
@@ -772,7 +866,7 @@ const ConsumablesPage: React.FC = () => {
             <BadgeSelect
               value={item.location}
               displayName={item.location || "—"}
-              options={LOCATION_OPTIONS}
+              options={dropdownOptions.location}
               placeholder="—"
               onChange={(val) => handleFieldUpdate(item.model, "location", val)}
             />
@@ -814,7 +908,7 @@ const ConsumablesPage: React.FC = () => {
           ))}
         </tr>
       )),
-    [theme, handleFieldUpdate, handleEdit],
+    [theme, handleFieldUpdate, handleEdit, dropdownOptions],
   );
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -857,6 +951,25 @@ const ConsumablesPage: React.FC = () => {
               }
             />
 
+            {isSuperAdmin && (
+              <button
+                onClick={() => setManageColumnsVisible(true)}
+                style={{
+                  backgroundColor: theme.surface,
+                  color: theme.text,
+                  borderColor: theme.border,
+                }}
+                className="px-3 py-2 text-sm font-semibold rounded-lg border whitespace-nowrap"
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = theme.bgHover)
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = theme.surface)
+                }
+              >
+                ⚙ Manage columns
+              </button>
+            )}
             <button
               onClick={() => setAddVisible(true)}
               style={{
@@ -943,7 +1056,7 @@ const ConsumablesPage: React.FC = () => {
         </div>
       ) : mainTab === "grouped" ? (
         /* ── By Status: collapsible sections ── */
-        <div className="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
+        <div className="inventory-scroll flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
           {STATUS_GROUPS.map((group) => (
             <StatusSection
               key={group.key}
@@ -965,7 +1078,7 @@ const ConsumablesPage: React.FC = () => {
         </div>
       ) : (
         /* ── All / Filter: flat table ── */
-        <div className="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
+        <div className="inventory-scroll flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
           <div
             style={{ borderColor: theme.border }}
             className="rounded-lg border"
@@ -996,6 +1109,21 @@ const ConsumablesPage: React.FC = () => {
         onSuccess={fetchData}
         selectedItem={selectedItem}
         onDelete={handleDelete}
+      />
+      <ManageColumnsModal
+        visible={manageColumnsVisible}
+        onClose={() => setManageColumnsVisible(false)}
+        columns={columnConfigs}
+        onSave={(updated) => {
+          setColumnConfigs(updated);
+          const sta =
+            updated.find((c) => c.id === "consumable_status")?.options ??
+            DEFAULT_STATUS_OPTIONS;
+          const loc =
+            updated.find((c) => c.id === "consumable_location")?.options ??
+            DEFAULT_LOCATION_OPTIONS;
+          setDropdownOptions({ status: sta, location: loc });
+        }}
       />
     </div>
   );
