@@ -25,42 +25,18 @@ import { useTheme } from "../../theme/ThemeContext";
 const BACKEND_URL = "http://10.10.10.98:3000";
 const STORAGE_KEY = "AD_USER_DATA";
 
-// ─── Derive role from AD department ───────────────────────────────────────────
-function getRoleFromDepartment(department: string): UserRole {
-  const dept = department.toLowerCase().trim();
-  console.log("Department from AD:", dept);
-  if (
-    dept.includes("information technology") ||
-    dept.includes(" it") ||
-    dept === "it"
-  )
-    return "superadmin";
-  if (dept.includes("admin")) return "admin";
-  return "employee";
-}
-
-// ─── Get Firestore collection based on role ────────────────────────────────────
-function getCollectionForRole(role: UserRole): string {
-  const map: Record<UserRole, string> = {
-    superadmin: "superadmin_users",
-    admin: "admin_users",
-    employee: "employee_users",
-  };
-  return map[role];
-}
-
-// ─── Role badge colors (semantic, not theme-dependent) ────────────────────────
+// ─── Role badge colors ─────────────────────────────────────────────────────────
 function getRoleStyle(role: UserRole): {
   bg: string;
   text: string;
   label: string;
 } {
-  const map: Record<UserRole, { bg: string; text: string; label: string }> = {
+  const map: Record<string, { bg: string; text: string; label: string }> = {
     superadmin: { bg: "#1e3a5f", text: "#93c5fd", label: "Super Admin" },
     admin: { bg: "#3b1f5e", text: "#d8b4fe", label: "Admin" },
     employee: { bg: "#2d3748", text: "#cbd5e0", label: "Employee" },
   };
-  return map[role];
+  return map[role] ?? { bg: "#2d3748", text: "#cbd5e0", label: "Employee" };
 }
 
 // ─── Step 1: Validate credentials against AD backend ──────────────────────────
@@ -73,12 +49,29 @@ async function validateWithAD(username: string, password: string) {
   return res.json();
 }
 
-// ─── Step 2: Save user to role-based Firestore collection ─────────────────────
+// ─── Step 2: Fetch role from Firestore employee_users ─────────────────────────
+// Role is ONLY set by the superadmin in Firestore, never derived from AD
+async function fetchRoleFromFirestore(username: string): Promise<UserRole> {
+  try {
+    const usersRef = collection(db, "employee_users");
+    const q = query(
+      usersRef,
+      where("username", "==", username.toLowerCase().trim()),
+    );
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return "employee";
+    const data = snapshot.docs[0].data();
+    return (data.role as UserRole) ?? "employee";
+  } catch (err) {
+    console.error("Firestore role fetch error:", err);
+    return "employee";
+  }
+}
+
+// ─── Step 3: Save user to Firestore employee_users if not yet saved ───────────
 async function saveUserToFirestore(user: ADUser): Promise<void> {
   try {
-    const collectionName = getCollectionForRole(user.role);
-    const usersRef = collection(db, collectionName);
-
+    const usersRef = collection(db, "employee_users");
     const q = query(
       usersRef,
       where("username", "==", user.username.toLowerCase().trim()),
@@ -86,61 +79,27 @@ async function saveUserToFirestore(user: ADUser): Promise<void> {
     const snapshot = await getDocs(q);
 
     if (!snapshot.empty) {
-      console.log("Firestore: doc already exists for:", snapshot.docs[0].id);
+      console.log("Firestore: user already exists:", snapshot.docs[0].id);
       return;
     }
 
-    const resolvedEmail = user.email || `${user.username}@ocgbim.com`;
-    const newDocRef = doc(db, collectionName, user.displayName);
+    const newDocRef = doc(
+      db,
+      "employee_users",
+      user.displayName || user.username,
+    );
     await setDoc(newDocRef, {
-      username: user.username,
-      email: resolvedEmail,
-      Department: user.department,
-      role: user.role,
+      username: user.username.toLowerCase().trim(),
+      displayName: user.displayName,
+      email: user.email || `${user.username}@ocgbim.com`,
+      department: user.department ?? "",
+      title: user.title ?? "",
+      phone: user.phone ?? "",
+      role: "employee", // always default to employee, superadmin promotes later
     });
-    console.log(`Firestore created in ${collectionName}:`, user.displayName);
+    console.log("Firestore: created employee_users doc for:", user.displayName);
   } catch (err) {
     console.error("Firestore save error:", err);
-  }
-}
-
-// ─── Step 3: Fetch profile from correct role collection ───────────────────────
-async function fetchProfileFromFirestore(
-  username: string,
-  role: UserRole,
-): Promise<ADUser | null> {
-  try {
-    const collectionName = getCollectionForRole(role);
-    const usersRef = collection(db, collectionName);
-
-    let q = query(usersRef, where("username", "==", username.trim()));
-    let snapshot = await getDocs(q);
-
-    if (snapshot.empty) {
-      q = query(
-        usersRef,
-        where("username", "==", username.toLowerCase().trim()),
-      );
-      snapshot = await getDocs(q);
-    }
-
-    if (snapshot.empty) return null;
-
-    const docSnap = snapshot.docs[0];
-    const data = docSnap.data();
-
-    return {
-      username: data.username ?? username,
-      displayName: docSnap.id,
-      email: data.email ?? `${username}@ocgbim.com`,
-      department: data.Department ?? data.department ?? "",
-      title: data.title ?? "",
-      phone: data.phone ?? "",
-      role: (data.role as UserRole) ?? "employee",
-    };
-  } catch (err) {
-    console.error("Firestore fetch error:", err);
-    return null;
   }
 }
 
@@ -160,6 +119,8 @@ async function handleSignIn(
   }
 
   const adUser = adResult.user;
+
+  // Build user with employee role by default
   const user: ADUser = {
     username: adUser?.username ?? username,
     displayName: adUser?.displayName ?? username,
@@ -167,18 +128,16 @@ async function handleSignIn(
     department: adUser?.department ?? "",
     title: adUser?.title ?? "",
     phone: adUser?.phone ?? "",
-    role: getRoleFromDepartment(adUser?.department ?? ""),
+    role: "employee", // always start as employee
   };
 
-  const firestoreProfile = await fetchProfileFromFirestore(username, user.role);
-  console.log("Firestore profile found:", firestoreProfile);
+  // Save to Firestore if first time (role stays "employee" until superadmin changes it)
+  await saveUserToFirestore(user);
 
-  if (firestoreProfile) {
-    user.role = firestoreProfile.role;
-    console.log("Firestore role used:", user.role);
-  } else {
-    saveUserToFirestore(user);
-  }
+  // Read the role back from Firestore (superadmin may have already set it)
+  const firestoreRole = await fetchRoleFromFirestore(username);
+  user.role = firestoreRole;
+  console.log("✅ Final role from Firestore:", user.role);
 
   return { success: true, user };
 }
@@ -191,7 +150,7 @@ type Props = {
 
 export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
   const { theme } = useTheme();
-
+  const [restoring, setRestoring] = useState(true);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -204,16 +163,19 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
         const saved = await AsyncStorage.getItem(STORAGE_KEY);
         if (saved) {
           const parsedUser = JSON.parse(saved);
+          const freshRole = await fetchRoleFromFirestore(parsedUser.username);
+          parsedUser.role = freshRole;
           setUser(parsedUser);
           onLoginSuccess(parsedUser);
         }
       } catch (err) {
         console.error("Restore auth error:", err);
+      } finally {
+        setRestoring(false);
       }
     };
     restoreUser();
   }, []);
-
   const handleLogin = async () => {
     setError("");
     if (!username.trim()) {
@@ -230,8 +192,7 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
       const response = await handleSignIn(username.trim(), password);
       if (response.success && response.user) {
         setUser(response.user);
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(response.user));
-        await AsyncStorage.setItem("just_logged_in", "true");
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(response.user)); // add back
         onLoginSuccess(response.user);
       } else {
         setError(response.message || "Login failed. Please try again.");
@@ -244,7 +205,6 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
   };
 
   const handleLogout = async () => {
-    await logout();
     setUser(null);
     setUsername("");
     setPassword("");
@@ -256,7 +216,20 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
       console.error("Logout storage clear error:", err);
     }
   };
-
+  if (restoring) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: theme.background,
+        }}
+      >
+        <ActivityIndicator color={theme.iconActive} size="large" />
+      </View>
+    );
+  }
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: theme.background }}
@@ -411,7 +384,7 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
               ))}
             </View>
 
-            {/* AD + Firestore indicator */}
+            {/* Status indicator */}
             <View
               style={{
                 backgroundColor: theme.bgActive,

@@ -47,11 +47,22 @@ export async function fetchAllADUsers(): Promise<ADUser[]> {
 
 async function syncADToFirestore(adUsers: ADUser[]): Promise<void> {
   const BATCH_SIZE = 400;
+
+  // ── Delete all existing docs first ──
+  const existing = await getDocs(collection(db, "employee_users"));
+  for (let i = 0; i < existing.docs.length; i += BATCH_SIZE) {
+    const batch = writeBatch(db);
+    existing.docs.slice(i, i + BATCH_SIZE).forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
+
+  // ── Re-add with displayName as doc ID ──
   for (let i = 0; i < adUsers.length; i += BATCH_SIZE) {
     const batch = writeBatch(db);
     const chunk = adUsers.slice(i, i + BATCH_SIZE);
     for (const u of chunk) {
-      const ref = doc(db, "employee_users", u.username.toLowerCase().trim());
+      const docId = (u.displayName || u.username).trim();
+      const ref = doc(db, "employee_users", docId);
       batch.set(ref, {
         username:    u.username.toLowerCase().trim(),
         displayName: u.displayName ?? u.username,
@@ -60,10 +71,11 @@ async function syncADToFirestore(adUsers: ADUser[]): Promise<void> {
         title:       u.title ?? "",
         phone:       u.phone ?? "",
         role:        u.role ?? "employee",
-      }, { merge: true });
+      });
     }
     await batch.commit();
   }
+
   await setDoc(doc(db, "meta", "ad_sync"), {
     lastSync: serverTimestamp(),
     count: adUsers.length,
@@ -112,4 +124,15 @@ export async function loadUsers(forceSync = false): Promise<{ users: ADUser[]; s
 
   const cached = await getUsersFromFirestore();
   return { users: cached, synced: false };
+}
+export async function clearEmployeeUsers(): Promise<void> {
+  const BATCH_SIZE = 400;
+  const existing = await getDocs(collection(db, "employee_users"));
+  for (let i = 0; i < existing.docs.length; i += BATCH_SIZE) {
+    const batch = writeBatch(db);
+    existing.docs.slice(i, i + BATCH_SIZE).forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
+  await setDoc(doc(db, "meta", "ad_sync"), { lastSync: null, count: 0 });
+  console.log("✅ employee_users cleared");
 }
