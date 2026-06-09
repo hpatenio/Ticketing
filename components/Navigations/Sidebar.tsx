@@ -152,7 +152,7 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
           </View>
           <Animated.Text
             style={{
-              fontFamily: "Raleway_600SemiBold",
+              fontFamily: "Outfit-SemiBold",
               fontSize: 16,
               color: C.textActive,
               letterSpacing: -0.3,
@@ -224,7 +224,7 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
                 <Animated.Text
                   numberOfLines={1}
                   style={{
-                    fontFamily: isActive ? "DMSans_600SemiBold" : "DMSans_400Regular",
+                    fontFamily: isActive ? "Outfit-SemiBold" : "Outfit",
                     fontSize: 15.5,
                     letterSpacing: -0.1,
                     color: isActive ? C.textActive : C.textInactive,
@@ -261,7 +261,7 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
           <Animated.Text
             numberOfLines={1}
             style={{
-              fontFamily: "DMSans_400Regular",
+              fontFamily: "Outfit",
               fontSize: 15.5,
               letterSpacing: -0.1,
               color: "#f87171",
@@ -311,7 +311,7 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
                   />
                   <Text
                     style={{
-                      fontFamily: isSelected ? "DMSans_600SemiBold" : "DMSans_400Regular",
+                      fontFamily: isSelected ? "Outfit-SemiBold" : "Outfit",
                       fontSize: 13.5,
                       color: isSelected ? theme.textActive : theme.textInactive,
                       flex: 1,
@@ -359,7 +359,7 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
               flexShrink: 0,
             }}
           >
-            <Text style={{ fontFamily: "DMSans_700Bold", color: "#fff", fontSize: 13 }}>
+            <Text style={{ fontFamily: "Outfit-Bold", color: "#fff", fontSize: 13 }}>
               {user.displayName?.charAt(0) ?? "U"}
             </Text>
           </View>
@@ -376,7 +376,7 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
             <Text
               numberOfLines={1}
               style={{
-                fontFamily: "DMSans_600SemiBold",
+                fontFamily: "Outfit-SemiBold",
                 fontSize: 12.5,
                 color: theme.textActive,
                 lineHeight: 17,
@@ -386,7 +386,7 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
             </Text>
             <Text
               style={{
-                fontFamily: "DMSans_400Regular",
+                fontFamily: "Outfit",
                 fontSize: 11,
                 color: theme.textInactive,
                 textTransform: "capitalize",

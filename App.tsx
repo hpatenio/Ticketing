@@ -19,17 +19,12 @@ SplashScreen.preventAutoHideAsync();
 export default function App() {
   const [user, setUser] = useState<ADUser | null>(null);
 
-  const [fontsLoaded] = useFonts({
-    DMSans_400Regular: require("./components/fonts/DMSans-Regular.ttf"),
-    DMSans_600SemiBold: require("./components/fonts/DMSans-SemiBold.ttf"),
-    DMSans_700Bold: require("./components/fonts/DMSans-Bold.ttf"),
-    Raleway_400Regular: require("./components/fonts/Raleway-Regular.ttf"),
-    Raleway_600SemiBold: require("./components/fonts/Raleway-SemiBold.ttf"),
-    Raleway_700Bold: require("./components/fonts/Raleway-Bold.ttf"),
-    Outfit_400Regular: require("./components/fonts/Outfit-Regular.ttf"),
-    Outfit_600SemiBold: require("./components/fonts/Outfit-SemiBold.ttf"),
-    Outfit_700Bold: require("./components/fonts/Outfit-Bold.ttf"),
-  });
+ const [fontsLoaded] = useFonts({
+  Outfit: require("./components/fonts/Outfit-Regular.ttf"),
+  "Outfit-Medium": require("./components/fonts/Outfit-Medium.ttf"),
+  "Outfit-SemiBold": require("./components/fonts/Outfit-SemiBold.ttf"),
+  "Outfit-Bold": require("./components/fonts/Outfit-Bold.ttf"),
+});
 
   useEffect(() => {
     if (fontsLoaded) SplashScreen.hideAsync();

@@ -14,10 +14,11 @@ type BadgeSelectProps = {
   placeholder?: string;
   onChange: (value: string, label: string) => void;
   className?: string;
+  badgeWidth?: number;
 };
 
 const defaultBadge =
-  "inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold";
+  "inline-flex items-center rounded-lg px-3 py-1 text-sm font-medium";
 
 export default function BadgeSelect({
   value,
@@ -26,6 +27,7 @@ export default function BadgeSelect({
   placeholder = "Select",
   onChange,
   className = "",
+  badgeWidth = 130,
 }: BadgeSelectProps) {
   const { theme } = useTheme();
   const [open, setOpen] = useState(false);
@@ -50,13 +52,22 @@ export default function BadgeSelect({
     <div ref={wrapRef} className={`relative min-w-[140px] ${className}`}>
       <button type="button" onClick={() => setOpen((prev) => !prev)}>
         {selectedOption ? (
-          <span className={selectedBadgeClass}>{selectedOption.label}</span>
+          <span
+            className={selectedBadgeClass}
+            style={{ borderRadius: "8px", width: `${badgeWidth}px`, fontWeight: 500 }}
+          >
+            <span className="flex items-center justify-between w-full">
+              <span>{selectedOption.label}</span>
+              <span style={{ opacity: 0.7, fontSize: "11px" }}>▾</span>
+            </span>
+          </span>
         ) : (
           <span
-            className="inline-flex items-center px-2 py-1 text-sm"
-            style={{ color: theme.subtext }}
+            className="inline-flex items-center justify-between px-3 py-1 text-sm"
+            style={{ color: theme.subtext, width: `${badgeWidth}px` }}
           >
-            —
+            <span>—</span>
+            <span style={{ opacity: 0.7, fontSize: "11px" }}>▾</span>
           </span>
         )}
       </button>
@@ -82,7 +93,7 @@ export default function BadgeSelect({
                   onChange(option.value, option.label);
                   setOpen(false);
                 }}
-                className="w-full px-4 py-1.5 flex items-center justify-center transition-colors"
+                className="w-full px-4 py-1.5 flex items-center transition-colors"
                 style={{ backgroundColor: "transparent" }}
                 onMouseEnter={(e) =>
                   (e.currentTarget.style.backgroundColor = theme.bgHover)
@@ -99,7 +110,15 @@ export default function BadgeSelect({
                     —
                   </span>
                 ) : (
-                  <span className={option.badgeClass ?? defaultBadge}>
+                  <span
+                    className={option.badgeClass ?? defaultBadge}
+                    style={{
+                      borderRadius: "8px",
+                      width: `${badgeWidth}px`,
+                      justifyContent: "flex-start",
+                      fontWeight: 500,
+                    }}
+                  >
                     {option.label}
                   </span>
                 )}

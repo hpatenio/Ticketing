@@ -22,13 +22,12 @@ import ManageColumnsModal, {
 import { getDropdownOptions } from "../../../../Services/dropdownConfigs";
 
 // ─── Options ──────────────────────────────────────────────────────────────────
-
 const DEFAULT_STATUS_OPTIONS: DropdownOption[] = [
   {
     label: "Spare",
     value: "Spare",
     badgeClass:
-      "bg-sky-100 text-sky-800 inline-flex justify-center min-w-[80px] px-2 py-1 rounded-full text-sm font-semibold",
+      "bg-sky-100 text-sky-800 inline-flex items-center px-3 py-1 text-sm font-semibold",
     bgColor: "#e0f2fe",
     textColor: "#0369a1",
   },
@@ -36,7 +35,7 @@ const DEFAULT_STATUS_OPTIONS: DropdownOption[] = [
     label: "Deployed",
     value: "Deployed",
     badgeClass:
-      "bg-emerald-100 text-emerald-800 inline-flex justify-center min-w-[80px] px-2 py-1 rounded-full text-sm font-semibold",
+      "bg-emerald-100 text-emerald-800 inline-flex items-center px-3 py-1 text-sm font-semibold",
     bgColor: "#d1fae5",
     textColor: "#065f46",
   },
@@ -44,7 +43,7 @@ const DEFAULT_STATUS_OPTIONS: DropdownOption[] = [
     label: "Defective",
     value: "Defective",
     badgeClass:
-      "bg-red-100 text-red-800 inline-flex justify-center min-w-[80px] px-2 py-1 rounded-full text-sm font-semibold",
+      "bg-red-100 text-red-800 inline-flex items-center px-3 py-1 text-sm font-semibold",
     bgColor: "#fee2e2",
     textColor: "#991b1b",
   },
@@ -55,7 +54,7 @@ const DEFAULT_LOCATION_OPTIONS: DropdownOption[] = [
     label: "Unit 1 & 2",
     value: "Unit 1 & 2",
     badgeClass:
-      "bg-pink-100 text-pink-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-pink-100 text-pink-800 inline-flex items-center px-3 py-1 text-sm font-semibold",
     bgColor: "#fce7f3",
     textColor: "#9d174d",
   },
@@ -63,7 +62,7 @@ const DEFAULT_LOCATION_OPTIONS: DropdownOption[] = [
     label: "Unit 3",
     value: "Unit 3",
     badgeClass:
-      "bg-purple-100 text-purple-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-purple-100 text-purple-800 inline-flex items-center px-3 py-1 text-sm font-semibold",
     bgColor: "#f3e8ff",
     textColor: "#6b21a8",
   },
@@ -71,7 +70,7 @@ const DEFAULT_LOCATION_OPTIONS: DropdownOption[] = [
     label: "BDO Makati",
     value: "BDO Makati",
     badgeClass:
-      "bg-teal-100 text-teal-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-teal-100 text-teal-800 inline-flex items-center px-3 py-1 text-sm font-semibold",
     bgColor: "#ccfbf1",
     textColor: "#115e59",
   },
@@ -79,7 +78,7 @@ const DEFAULT_LOCATION_OPTIONS: DropdownOption[] = [
     label: "Triumph",
     value: "Triumph",
     badgeClass:
-      "bg-green-100 text-green-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-green-100 text-green-800 inline-flex items-center px-3 py-1 text-sm font-semibold",
     bgColor: "#dcfce7",
     textColor: "#166534",
   },
@@ -87,7 +86,7 @@ const DEFAULT_LOCATION_OPTIONS: DropdownOption[] = [
     label: "WFH",
     value: "WFH",
     badgeClass:
-      "bg-cyan-100 text-cyan-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-cyan-100 text-cyan-800 inline-flex items-center px-3 py-1 text-sm font-semibold",
     bgColor: "#cffafe",
     textColor: "#155e75",
   },

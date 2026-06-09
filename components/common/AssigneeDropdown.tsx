@@ -115,7 +115,7 @@ const AssigneeChip: React.FC<{
           justifyContent: "center",
         }}
       >
-        <Text style={{ fontSize: 9, fontWeight: "700", color: "#fff" }}>
+        <Text style={{ fontSize: 9, fontWeight: "500", color: "#fff" }}>
           {getInitials(name)}
         </Text>
       </View>
@@ -170,7 +170,7 @@ const PersonRow: React.FC<{
           justifyContent: "center",
         }}
       >
-        <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>
+        <Text style={{ fontSize: 12, fontWeight: "500", color: "#fff" }}>
           {getInitials(option.label)}
         </Text>
       </View>
@@ -181,7 +181,7 @@ const PersonRow: React.FC<{
           style={{
             fontSize: 13,
             color: theme.text,
-            fontWeight: isSelected ? "600" : "400",
+            fontWeight: isSelected ? "500" : "300",
           }}
         >
           {option.label}
@@ -358,7 +358,7 @@ const AssigneeDropdown: React.FC<Props> = ({
                 <Text
                   style={{
                     fontSize: 10,
-                    fontWeight: "600",
+                    fontWeight: "500",
                     color: theme.subtext,
                     textTransform: "uppercase",
                     letterSpacing: 0.6,
@@ -387,7 +387,7 @@ const AssigneeDropdown: React.FC<Props> = ({
                 <Text
                   style={{
                     fontSize: 10,
-                    fontWeight: "600",
+                    fontWeight: "500",
                     color: theme.subtext,
                     textTransform: "uppercase",
                     letterSpacing: 0.6,

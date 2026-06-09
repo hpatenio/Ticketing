@@ -32,7 +32,7 @@ const DEFAULT_STATUS_OPTIONS: DropdownOption[] = [
     label: "Deployed",
     value: "Deployed",
     badgeClass:
-      "bg-emerald-100 text-emerald-800 inline-flex justify-center min-w-[90px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-emerald-100 text-emerald-800 inline-flex justify-center min-w-[90px] px-2 py-1 rounded-lg text-sm font-medium",
     bgColor: "#d1fae5",
     textColor: "#065f46",
   },
@@ -40,7 +40,7 @@ const DEFAULT_STATUS_OPTIONS: DropdownOption[] = [
     label: "Spare",
     value: "Spare",
     badgeClass:
-      "bg-blue-100 text-blue-800 inline-flex justify-center min-w-[90px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-blue-100 text-blue-800 inline-flex justify-center min-w-[90px] px-2 py-1 rounded-lg text-sm font-medium",
     bgColor: "#dbeafe",
     textColor: "#1e40af",
   },
@@ -48,7 +48,7 @@ const DEFAULT_STATUS_OPTIONS: DropdownOption[] = [
     label: "Defective",
     value: "Defective",
     badgeClass:
-      "bg-red-100 text-red-800 inline-flex justify-center min-w-[90px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-red-100 text-red-800 inline-flex justify-center min-w-[90px] px-2 py-1 rounded-lg text-sm font-medium",
     bgColor: "#fee2e2",
     textColor: "#991b1b",
   },
@@ -59,7 +59,7 @@ const DEFAULT_CATEGORY_OPTIONS: DropdownOption[] = [
     label: "Laptop",
     value: "Laptop",
     badgeClass:
-      "bg-orange-100 text-orange-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-orange-100 text-orange-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-medium",
     bgColor: "#ffedd5",
     textColor: "#9a3412",
   },
@@ -67,7 +67,7 @@ const DEFAULT_CATEGORY_OPTIONS: DropdownOption[] = [
     label: "Monitor",
     value: "Monitor",
     badgeClass:
-      "bg-yellow-100 text-yellow-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-yellow-100 text-yellow-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-medium",
     bgColor: "#fef9c3",
     textColor: "#854d0e",
   },
@@ -75,7 +75,7 @@ const DEFAULT_CATEGORY_OPTIONS: DropdownOption[] = [
     label: "Desktop",
     value: "Desktop",
     badgeClass:
-      "bg-indigo-100 text-indigo-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-indigo-100 text-indigo-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-medium",
     bgColor: "#e0e7ff",
     textColor: "#3730a3",
   },
@@ -83,7 +83,7 @@ const DEFAULT_CATEGORY_OPTIONS: DropdownOption[] = [
     label: "UPS",
     value: "UPS",
     badgeClass:
-      "bg-cyan-100 text-cyan-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-cyan-100 text-cyan-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-medium",
     bgColor: "#cffafe",
     textColor: "#155e75",
   },
@@ -91,7 +91,7 @@ const DEFAULT_CATEGORY_OPTIONS: DropdownOption[] = [
     label: "Network Device",
     value: "Network Device",
     badgeClass:
-      "bg-emerald-100 text-emerald-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-emerald-100 text-emerald-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-medium",
     bgColor: "#d1fae5",
     textColor: "#065f46",
   },
@@ -99,7 +99,7 @@ const DEFAULT_CATEGORY_OPTIONS: DropdownOption[] = [
     label: "Server",
     value: "Server",
     badgeClass:
-      "bg-violet-100 text-violet-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-violet-100 text-violet-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-medium",
     bgColor: "#ede9fe",
     textColor: "#5b21b6",
   },
@@ -110,7 +110,7 @@ const DEFAULT_LOCATION_OPTIONS: DropdownOption[] = [
     label: "Unit 1 & 2",
     value: "Unit 1 & 2",
     badgeClass:
-      "bg-pink-100 text-pink-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-pink-100 text-pink-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-medium",
     bgColor: "#fce7f3",
     textColor: "#9d174d",
   },
@@ -118,7 +118,7 @@ const DEFAULT_LOCATION_OPTIONS: DropdownOption[] = [
     label: "Unit 3",
     value: "Unit 3",
     badgeClass:
-      "bg-purple-100 text-purple-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-purple-100 text-purple-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-medium",
     bgColor: "#f3e8ff",
     textColor: "#6b21a8",
   },
@@ -126,7 +126,7 @@ const DEFAULT_LOCATION_OPTIONS: DropdownOption[] = [
     label: "BDO Makati",
     value: "BDO Makati",
     badgeClass:
-      "bg-teal-100 text-teal-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-teal-100 text-teal-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-medium",
     bgColor: "#ccfbf1",
     textColor: "#115e59",
   },
@@ -134,7 +134,7 @@ const DEFAULT_LOCATION_OPTIONS: DropdownOption[] = [
     label: "Triumph",
     value: "Triumph",
     badgeClass:
-      "bg-green-100 text-green-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-green-100 text-green-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-medium",
     bgColor: "#dcfce7",
     textColor: "#166534",
   },
@@ -142,7 +142,7 @@ const DEFAULT_LOCATION_OPTIONS: DropdownOption[] = [
     label: "WFH",
     value: "WFH",
     badgeClass:
-      "bg-cyan-100 text-cyan-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-cyan-100 text-cyan-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-medium",
     bgColor: "#cffafe",
     textColor: "#155e75",
   },
@@ -153,7 +153,7 @@ const DEFAULT_COMPANY_OPTIONS: DropdownOption[] = [
     label: "OCG",
     value: "OCG",
     badgeClass:
-      "bg-blue-100 text-blue-800 inline-flex justify-center min-w-[60px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-blue-100 text-blue-800 inline-flex justify-center min-w-[60px] px-2 py-1 rounded-lg text-sm font-medium",
     bgColor: "#dbeafe",
     textColor: "#1e40af",
   },
@@ -161,7 +161,7 @@ const DEFAULT_COMPANY_OPTIONS: DropdownOption[] = [
     label: "SDB",
     value: "SDB",
     badgeClass:
-      "bg-violet-100 text-violet-800 inline-flex justify-center min-w-[60px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-violet-100 text-violet-800 inline-flex justify-center min-w-[60px] px-2 py-1 rounded-lg text-sm font-medium",
     bgColor: "#ede9fe",
     textColor: "#5b21b6",
   },
@@ -306,7 +306,7 @@ const SearchableSelect = ({
               backgroundColor: theme.primarySubtle,
               color: theme.primarySubtleText,
             }}
-            className="inline-flex items-center justify-center gap-2 rounded-full px-3 py-1 text-xs font-semibold max-w-full whitespace-nowrap"
+            className="inline-flex items-center justify-center gap-2 rounded-full px-3 py-1 text-xs font-medium max-w-full whitespace-nowrap"
           >
             <span
               className="flex items-center justify-center rounded-full"
@@ -316,7 +316,7 @@ const SearchableSelect = ({
                 backgroundColor: theme.primary,
                 color: theme.primaryText,
                 fontSize: 10,
-                fontWeight: 700,
+                fontWeight: 500,
                 flexShrink: 0,
               }}
             >
@@ -401,7 +401,7 @@ const SearchableSelect = ({
                   }}
                   className={
                     "px-3 py-1.5 text-xs cursor-pointer " +
-                    (o.value === value ? "font-semibold" : "")
+                    (o.value === value ? "font-medium" : "")
                   }
                   onMouseEnter={(e) =>
                     (e.currentTarget.style.backgroundColor = theme.bgHover)
@@ -527,7 +527,7 @@ const StatusSection: React.FC<StatusSectionProps> = React.memo(
               {group.label}
             </span>
             <span
-              className="px-2 py-0.5 rounded-full text-xs font-semibold ml-1"
+              className="px-2 py-0.5 rounded-full text-xs font-medium ml-1"
               style={{ backgroundColor: group.badgeBg, color: group.badgeText }}
             >
               {items.length}
@@ -663,7 +663,7 @@ const FilterTabDropdown: React.FC<FilterTabDropdownProps> = ({
         ref={triggerRef}
         type="button"
         onClick={handleClick}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all"
         style={{
           backgroundColor: isActive ? theme.primary : theme.surface,
           color: isActive ? theme.primaryText : theme.subtext,
@@ -1045,7 +1045,7 @@ const ITInventoryPage: React.FC<Props> = ({
                 top: stickyTop,
                 zIndex: 10,
               }}
-              className="px-3 py-1 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap border-b cursor-pointer select-none transition-colors"
+              className="px-3 py-1 text-left text-xs font-medium uppercase tracking-wide whitespace-nowrap border-b cursor-pointer select-none transition-colors"
               onMouseEnter={(e) => (e.currentTarget.style.color = theme.text)}
               onMouseLeave={(e) =>
                 (e.currentTarget.style.color = theme.subtext)
@@ -1081,7 +1081,7 @@ const ITInventoryPage: React.FC<Props> = ({
             >
               <p
                 style={{ color: theme.text }}
-                className="text-sm font-semibold transition-opacity hover:opacity-70"
+                className="text-sm font-medium transition-opacity hover:opacity-70"
               >
                 {item.assetTag}
               </p>
@@ -1291,7 +1291,7 @@ const ITInventoryPage: React.FC<Props> = ({
                   color: theme.text,
                   borderColor: theme.border,
                 }}
-                className="px-3 py-2 text-sm font-semibold rounded-lg border whitespace-nowrap"
+                className="px-3 py-2 text-sm font-medium rounded-lg border whitespace-nowrap"
                 onMouseEnter={(e) =>
                   (e.currentTarget.style.backgroundColor = theme.bgHover)
                 }
@@ -1309,7 +1309,7 @@ const ITInventoryPage: React.FC<Props> = ({
                 backgroundColor: theme.primary,
                 color: theme.primaryText,
               }}
-              className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors whitespace-nowrap"
+              className="px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
               onMouseEnter={(e) =>
                 (e.currentTarget.style.backgroundColor = theme.primaryHover)
               }
@@ -1334,7 +1334,7 @@ const ITInventoryPage: React.FC<Props> = ({
               }}
               className="flex items-center gap-2 px-3 py-1 rounded-full"
             >
-              <span className="text-xs font-semibold">
+              <span className="text-xs font-medium">
                 {activeFilter.field}: {activeFilter.value}
               </span>
               <button
@@ -1360,7 +1360,7 @@ const ITInventoryPage: React.FC<Props> = ({
                 key={key}
                 type="button"
                 onClick={() => setMainTab(key)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all"
                 style={{
                   backgroundColor: isActive ? theme.primary : theme.surface,
                   color: isActive ? theme.primaryText : theme.subtext,

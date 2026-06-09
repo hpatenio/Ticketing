@@ -29,61 +29,61 @@ const DEFAULT_CATEGORY_OPTIONS: DropdownOption[] = [
     label: "CCTV",
     value: "CCTV",
     badgeClass:
-      "bg-blue-100    text-blue-800    inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-blue-100    text-blue-800    inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "Licenses Accounts",
     value: "Licenses Accounts",
     badgeClass:
-      "bg-indigo-100  text-indigo-800  inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-indigo-100  text-indigo-800  inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "Hardware",
     value: "Hardware",
     badgeClass:
-      "bg-slate-100   text-slate-800   inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-slate-100   text-slate-800   inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "Email",
     value: "Email",
     badgeClass:
-      "bg-cyan-100    text-cyan-800    inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-cyan-100    text-cyan-800    inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "Network",
     value: "Network",
     badgeClass:
-      "bg-teal-100    text-teal-800    inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-teal-100    text-teal-800    inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "Maintenance",
     value: "Maintenance",
     badgeClass:
-      "bg-amber-100   text-amber-800   inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-amber-100   text-amber-800   inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "Medicine",
     value: "Medicine",
     badgeClass:
-      "bg-emerald-100 text-emerald-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-emerald-100 text-emerald-800 inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "Office Supplies",
     value: "Office Supplies",
     badgeClass:
-      "bg-fuchsia-100 text-fuchsia-800 inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-fuchsia-100 text-fuchsia-800 inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "Software",
     value: "Software",
     badgeClass:
-      "bg-sky-100     text-sky-800     inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-sky-100     text-sky-800     inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "Other",
     value: "Other",
     badgeClass:
-      "bg-gray-100    text-gray-800    inline-flex justify-center min-w-[130px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-gray-100    text-gray-800    inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
   },
 ];
 
@@ -92,19 +92,19 @@ const DEFAULT_PRIORITY_OPTIONS: DropdownOption[] = [
     label: "Low",
     value: "Low",
     badgeClass:
-      "bg-emerald-100 text-emerald-800 inline-flex justify-center min-w-[80px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-emerald-100 text-emerald-800 inline-flex justify-center min-w-[80px] px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "Medium",
     value: "Medium",
     badgeClass:
-      "bg-yellow-100  text-yellow-800  inline-flex justify-center min-w-[80px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-yellow-100  text-yellow-800  inline-flex justify-center min-w-[80px] px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "High",
     value: "High",
     badgeClass:
-      "bg-red-100     text-red-800     inline-flex justify-center min-w-[80px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-red-100     text-red-800     inline-flex justify-center min-w-[80px] px-2 py-1 rounded-lg text-sm font-medium",
   },
 ];
 
@@ -113,19 +113,19 @@ const DEFAULT_STATUS_OPTIONS: DropdownOption[] = [
     label: "Pending",
     value: "Pending",
     badgeClass:
-      "bg-yellow-100 text-yellow-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-yellow-100 text-yellow-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "In Progress",
     value: "In Progress",
     badgeClass:
-      "bg-blue-100   text-blue-800   inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-blue-100   text-blue-800   inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "Resolved",
     value: "Resolved",
     badgeClass:
-      "bg-emerald-100 text-emerald-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-semibold",
+      "bg-emerald-100 text-emerald-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-medium",
   },
 ];
 
@@ -307,7 +307,7 @@ const SearchableSelect = ({
               backgroundColor: theme.primarySubtle,
               color: theme.primarySubtleText,
             }}
-            className="inline-flex items-center justify-center gap-2 rounded-full px-3 py-1 text-xs font-semibold max-w-full whitespace-nowrap"
+            className="inline-flex items-center justify-center gap-2 rounded-full px-3 py-1 text-xs font-medium max-w-full whitespace-nowrap"
           >
             <span
               className="flex items-center justify-center rounded-full"
@@ -317,7 +317,7 @@ const SearchableSelect = ({
                 backgroundColor: theme.primary,
                 color: theme.primaryText,
                 fontSize: 10,
-                fontWeight: 700,
+                fontWeight: 500,
                 flexShrink: 0,
               }}
             >
@@ -397,7 +397,7 @@ const SearchableSelect = ({
                   }}
                   className={
                     "px-3 py-1.5 text-xs cursor-pointer " +
-                    (o.value === value ? "font-semibold" : "")
+                    (o.value === value ? "font-medium" : "")
                   }
                   onMouseEnter={(e) =>
                     (e.currentTarget.style.backgroundColor = theme.bgHover)
@@ -516,14 +516,14 @@ const StatusSection: React.FC<StatusSectionProps> = React.memo(
               style={{
                 color: group.headerText,
                 fontSize: 12,
-                fontWeight: 700,
+                fontWeight: 500,
                 letterSpacing: "0.05em",
               }}
             >
               {group.label}
             </span>
             <span
-              className="px-2 py-0.5 rounded-full text-xs font-semibold ml-1"
+              className="px-2 py-0.5 rounded-full text-xs font-medium ml-1"
               style={{ backgroundColor: group.badgeBg, color: group.badgeText }}
             >
               {items.length}
@@ -627,7 +627,7 @@ const FilterTabDropdown: React.FC<FilterTabDropdownProps> = ({
         ref={triggerRef}
         type="button"
         onClick={handleClick}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all"
         style={{
           backgroundColor: isActive ? theme.primary : theme.surface,
           color: isActive ? theme.primaryText : theme.subtext,
@@ -808,7 +808,7 @@ const TicketRow = ({
         >
           <p
             style={{ color: theme.text }}
-            className="text-sm font-semibold group-hover:opacity-70 transition-opacity line-clamp-2"
+            className="text-sm font-medium group-hover:opacity-70 transition-opacity line-clamp-2"
           >
             {ticket.summary}
           </p>
@@ -853,6 +853,7 @@ const TicketRow = ({
           displayName={ticket.category || "—"}
           options={categoryOptions}
           placeholder="—"
+          badgeWidth={170}
           onChange={async (val) =>
             onUpdateField(ticket.ticketNumber, "category", val)
           }
@@ -1158,7 +1159,7 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
                 top: stickyTop,
                 zIndex: 10,
               }}
-              className="px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap border-b cursor-pointer select-none transition-colors"
+              className="px-3 py-1.5 text-left text-xs font-medium uppercase tracking-wide whitespace-nowrap border-b cursor-pointer select-none transition-colors"
               onMouseEnter={(e) => (e.currentTarget.style.color = theme.text)}
               onMouseLeave={(e) =>
                 (e.currentTarget.style.color = theme.subtext)
@@ -1241,7 +1242,7 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
                   color: theme.text,
                   borderColor: theme.border,
                 }}
-                className="px-3 py-2 text-sm font-semibold rounded-lg border whitespace-nowrap"
+                className="px-3 py-2 text-sm font-medium rounded-lg border whitespace-nowrap"
                 onMouseEnter={(e) =>
                   (e.currentTarget.style.backgroundColor = theme.bgHover)
                 }
@@ -1258,7 +1259,7 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
                 backgroundColor: theme.primary,
                 color: theme.primaryText,
               }}
-              className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors"
+              className="px-4 py-2 text-sm font-medium rounded-lg transition-colors"
               onMouseEnter={(e) =>
                 (e.currentTarget.style.backgroundColor = theme.primaryHover)
               }
@@ -1301,7 +1302,7 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
                 key={key}
                 type="button"
                 onClick={() => setMainTab(key)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all"
                 style={{
                   backgroundColor: isActive ? theme.primary : theme.surface,
                   color: isActive ? theme.primaryText : theme.subtext,

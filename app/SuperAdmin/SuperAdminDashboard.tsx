@@ -16,6 +16,7 @@ import ITInventorySummary, {
 } from "../Admin/Modules/ITInventory/ITInventorySummary";
 import ConsumablesPage from "../Admin/Modules/Consumables/ConsumablesPage";
 import TicketsPage from "../Admin/Modules/Tickets/TicketsPage";
+import UsersPage from "./UsersPage"; // 👈 add this
 import { useTheme } from "../../theme/ThemeContext";
 
 const ACTIVE_KEY_STORAGE = "superadmin_active_key";
@@ -69,13 +70,15 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
         return (
           <ITInventoryPage
             initialFilter={inventoryFilter}
-            isSuperAdmin={true}   // ← superadmin gets the manage columns button
+            isSuperAdmin={true}
           />
         );
       case "consumables":
         return <ConsumablesPage isSuperAdmin={true} />;
       case "tickets":
-       return <TicketsPage user={user} isSuperAdmin={true} />;
+        return <TicketsPage user={user} isSuperAdmin={true} />;
+      case "users":                        // 👈 new case
+        return <UsersPage currentUser={user} />;
       case "dashboard":
       default:
         return (
@@ -86,12 +89,16 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
 
   const getTitle = () => {
     switch (activeKey) {
-      case "inventory":  return "IT Inventory";
+      case "inventory":   return "IT Inventory";
       case "consumables": return "IT Consumables";
-      case "tickets":    return "Concern Tickets";
-      default:           return "Dashboard";
+      case "tickets":     return "Concern Tickets";
+      case "users":       return "User Accounts";  // 👈 new title
+      default:            return "Dashboard";
     }
   };
+
+  // Users page manages its own scroll internally, same pattern as tickets
+  const needsScroll = activeKey === "dashboard";
 
   return (
     <View style={{ flex: 1, flexDirection: "row", backgroundColor: theme.background }}>
@@ -108,7 +115,7 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
       )}
 
       <View style={{ flex: 1, flexDirection: "column", backgroundColor: theme.background }}>
-        {activeKey === "dashboard" ? (
+        {needsScroll ? (
           <ScrollView
             style={{ flex: 1, height: 0 }}
             contentContainerStyle={{ flexGrow: 1 }}
