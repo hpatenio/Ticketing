@@ -1,5 +1,5 @@
 // utils/adUsers.ts
-import { ADUser, UserRole } from "../../../types";
+import { ADUser, UserRole, UserPermissions } from "../../../types";
 import { db } from "../../../firebase";
 import {
   collection, doc, getDocs, setDoc, writeBatch, serverTimestamp, getDoc,
@@ -10,6 +10,12 @@ const INTERNAL_SECRET = "silverdab_internal_2024";
 const CACHE_MINUTES = 10;
 
 let _serviceToken: string | null = null;
+
+const DEFAULT_PERMISSIONS: UserPermissions = {
+  itInventory: false,
+  consumables: false,
+  tickets: false,
+};
 
 async function getServiceToken(): Promise<string> {
   if (_serviceToken) return _serviceToken;
@@ -37,7 +43,8 @@ export async function fetchAllADUsers(): Promise<ADUser[]> {
       department:  u.department  ?? "",
       title:       u.title       ?? "",
       phone:       u.phone       ?? "",
-      role:        (u.role as UserRole) ?? "employee",
+      role:        "employee",
+      permissions: DEFAULT_PERMISSIONS,
     }));
   } catch (err) {
     console.error("fetchAllADUsers error:", err);
@@ -48,29 +55,49 @@ export async function fetchAllADUsers(): Promise<ADUser[]> {
 async function syncADToFirestore(adUsers: ADUser[]): Promise<void> {
   const BATCH_SIZE = 400;
 
-  // ── Delete all existing docs first ──
+  // Get existing docs to preserve role AND permissions
   const existing = await getDocs(collection(db, "employee_users"));
+  const existingData = new Map<string, { role: string; permissions: UserPermissions }>();
+  existing.docs.forEach((d) => {
+    const username = d.data().username?.toLowerCase().trim();
+    if (username) {
+      existingData.set(username, {
+        role: d.data().role ?? "employee",
+        permissions: {
+          itInventory: d.data().permissions?.itInventory ?? false,
+          consumables: d.data().permissions?.consumables ?? false,
+          tickets:     d.data().permissions?.tickets     ?? false,
+        },
+      });
+    }
+  });
+
+  // Delete all existing docs
   for (let i = 0; i < existing.docs.length; i += BATCH_SIZE) {
     const batch = writeBatch(db);
     existing.docs.slice(i, i + BATCH_SIZE).forEach((d) => batch.delete(d.ref));
     await batch.commit();
   }
 
-  // ── Re-add with displayName as doc ID ──
+  // Re-add with displayName as doc ID, preserving role + permissions
   for (let i = 0; i < adUsers.length; i += BATCH_SIZE) {
     const batch = writeBatch(db);
     const chunk = adUsers.slice(i, i + BATCH_SIZE);
     for (const u of chunk) {
       const docId = (u.displayName || u.username).trim();
       const ref = doc(db, "employee_users", docId);
+      const usernameKey = u.username.toLowerCase().trim();
+      const preserved = existingData.get(usernameKey);
+
       batch.set(ref, {
-        username:    u.username.toLowerCase().trim(),
+        username:    usernameKey,
         displayName: u.displayName ?? u.username,
         email:       u.email || `${u.username}@ocgbim.com`,
         department:  u.department ?? "",
         title:       u.title ?? "",
         phone:       u.phone ?? "",
-        role:        u.role ?? "employee",
+        role:        preserved?.role ?? "employee",
+        permissions: preserved?.permissions ?? DEFAULT_PERMISSIONS,
       });
     }
     await batch.commit();
@@ -94,6 +121,11 @@ async function getUsersFromFirestore(): Promise<ADUser[]> {
       title:       data.title       ?? "",
       phone:       data.phone       ?? "",
       role:        (data.role as UserRole) ?? "employee",
+      permissions: {
+        itInventory: data.permissions?.itInventory ?? false,
+        consumables: data.permissions?.consumables ?? false,
+        tickets:     data.permissions?.tickets     ?? false,
+      },
     };
   });
 }
@@ -118,13 +150,16 @@ export async function loadUsers(forceSync = false): Promise<{ users: ADUser[]; s
     const adUsers = await fetchAllADUsers();
     if (adUsers.length > 0) {
       await syncADToFirestore(adUsers);
-      return { users: adUsers, synced: true };
+      // Return from Firestore after sync so permissions/roles are included
+      const synced = await getUsersFromFirestore();
+      return { users: synced, synced: true };
     }
   }
 
   const cached = await getUsersFromFirestore();
   return { users: cached, synced: false };
 }
+
 export async function clearEmployeeUsers(): Promise<void> {
   const BATCH_SIZE = 400;
   const existing = await getDocs(collection(db, "employee_users"));

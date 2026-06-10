@@ -30,33 +30,9 @@ export const DashboardIcon: React.FC<{ color: string; size?: number }> = ({
 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Rect x="3" y="3" width="8" height="8" rx="1.5" fill={color} />
-    <Rect
-      x="13"
-      y="3"
-      width="8"
-      height="8"
-      rx="1.5"
-      fill={color}
-      opacity="0.7"
-    />
-    <Rect
-      x="3"
-      y="13"
-      width="8"
-      height="8"
-      rx="1.5"
-      fill={color}
-      opacity="0.7"
-    />
-    <Rect
-      x="13"
-      y="13"
-      width="8"
-      height="8"
-      rx="1.5"
-      fill={color}
-      opacity="0.4"
-    />
+    <Rect x="13" y="3" width="8" height="8" rx="1.5" fill={color} opacity="0.7" />
+    <Rect x="3" y="13" width="8" height="8" rx="1.5" fill={color} opacity="0.7" />
+    <Rect x="13" y="13" width="8" height="8" rx="1.5" fill={color} opacity="0.4" />
   </Svg>
 );
 
@@ -71,21 +47,8 @@ export const TicketsIcon: React.FC<{ color: string; size?: number }> = ({
       strokeWidth="2"
       strokeLinecap="round"
     />
-    <Rect
-      x="9"
-      y="3"
-      width="6"
-      height="4"
-      rx="1"
-      stroke={color}
-      strokeWidth="2"
-    />
-    <Path
-      d="M9 12h6M9 16h4"
-      stroke={color}
-      strokeWidth="2"
-      strokeLinecap="round"
-    />
+    <Rect x="9" y="3" width="6" height="4" rx="1" stroke={color} strokeWidth="2" />
+    <Path d="M9 12h6M9 16h4" stroke={color} strokeWidth="2" strokeLinecap="round" />
   </Svg>
 );
 
@@ -99,17 +62,8 @@ export const InventoryIcon: React.FC<{ color: string; size?: number }> = ({
       stroke={color}
       strokeWidth="2"
     />
-    <Path
-      d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"
-      stroke={color}
-      strokeWidth="2"
-    />
-    <Path
-      d="M12 12v4M10 14h4"
-      stroke={color}
-      strokeWidth="2"
-      strokeLinecap="round"
-    />
+    <Path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" stroke={color} strokeWidth="2" />
+    <Path d="M12 12v4M10 14h4" stroke={color} strokeWidth="2" strokeLinecap="round" />
   </Svg>
 );
 
@@ -118,31 +72,19 @@ export const ConsumablesIcon: React.FC<{ color: string; size?: number }> = ({
   size = 20,
 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    {/* Printer body */}
-    <Rect
-      x="4"
-      y="8"
-      width="16"
-      height="9"
-      rx="1.5"
-      stroke={color}
-      strokeWidth="2"
-    />
-    {/* Paper tray top */}
+    <Rect x="4" y="8" width="16" height="9" rx="1.5" stroke={color} strokeWidth="2" />
     <Path
       d="M7 8V5a1 1 0 011-1h8a1 1 0 011 1v3"
       stroke={color}
       strokeWidth="2"
       strokeLinecap="round"
     />
-    {/* Paper output */}
     <Path
       d="M7 17v2a1 1 0 001 1h8a1 1 0 001-1v-2"
       stroke={color}
       strokeWidth="2"
       strokeLinecap="round"
     />
-    {/* Ink dot */}
     <Circle cx="17" cy="12.5" r="1.2" fill={color} />
   </Svg>
 );
@@ -207,28 +149,83 @@ export const SettingsIcon: React.FC<{ color: string; size?: number }> = ({
   </Svg>
 );
 
+// ─── Audit Trail icon ─────────────────────────────────────────────────────────
+
+export const AuditIcon: React.FC<{ color: string; size?: number }> = ({
+  color,
+  size = 20,
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    {/* Document body with folded corner */}
+    <Path
+      d="M16 22h2a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    {/* Fold corner */}
+    <Path
+      d="M14 2v4a2 2 0 0 0 2 2h4"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    {/* Clock face */}
+    <Circle cx="8" cy="16" r="6" stroke={color} strokeWidth="2" />
+    {/* Clock hands */}
+    <Path
+      d="M9.5 17.5 8 16.25V14"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
 // ─── Menu config ──────────────────────────────────────────────────────────────
 
 export const MENU_BY_ROLE: Record<string, NavItem[]> = {
   superadmin: [
-    { key: "dashboard", label: "Dashboard", icon: DashboardIcon },
-    { key: "tickets", label: "Tickets", icon: TicketsIcon },
-    { key: "inventory", label: "IT Inventory", icon: InventoryIcon },
+    { key: "dashboard",   label: "Dashboard",     icon: DashboardIcon   },
+    { key: "tickets",     label: "Tickets",        icon: TicketsIcon     },
+    { key: "inventory",   label: "IT Inventory",   icon: InventoryIcon   },
     { key: "consumables", label: "IT Consumables", icon: ConsumablesIcon },
-    //{ key: "analytics", label: "Analytics", icon: AnalyticsIcon },
-    //{ key: "reports", label: "Reports", icon: ReportsIcon },
-    { key: "users", label: "Users", icon: UsersIcon },
-    //{ key: "settings", label: "Settings", icon: SettingsIcon },
+    { key: "users",       label: "Users",          icon: UsersIcon       },
+    { key: "audit",       label: "Audit Trail",    icon: AuditIcon       },
   ],
   admin: [
-    { key: "dashboard", label: "Dashboard", icon: DashboardIcon },
-    { key: "tickets", label: "Tickets", icon: TicketsIcon },
-    { key: "inventory", label: "IT Inventory", icon: InventoryIcon },
+    { key: "dashboard",   label: "Dashboard",     icon: DashboardIcon   },
+    { key: "tickets",     label: "Tickets",        icon: TicketsIcon     },
+    { key: "inventory",   label: "IT Inventory",   icon: InventoryIcon   },
     { key: "consumables", label: "IT Consumables", icon: ConsumablesIcon },
   ],
   employee: [
     { key: "dashboard", label: "Dashboard", icon: DashboardIcon },
-    { key: "tickets", label: "Tickets", icon: TicketsIcon },
-    { key: "reports", label: "Reports", icon: ReportsIcon },
   ],
 };
+
+export function getNavItemsForUser(user: {
+  role: string;
+  permissions?: {
+    itInventory?: boolean;
+    consumables?: boolean;
+    tickets?: boolean;
+  };
+}): NavItem[] {
+  if (user.role === "superadmin") return MENU_BY_ROLE.superadmin;
+  if (user.role === "admin")      return MENU_BY_ROLE.admin;
+
+  // Employee: start with dashboard, add pages based on permissions
+  const items: NavItem[] = [
+    { key: "dashboard", label: "Dashboard", icon: DashboardIcon },
+  ];
+
+  if (user.permissions?.tickets)     items.push({ key: "tickets",     label: "Tickets",        icon: TicketsIcon     });
+  if (user.permissions?.itInventory) items.push({ key: "inventory",   label: "IT Inventory",   icon: InventoryIcon   });
+  if (user.permissions?.consumables) items.push({ key: "consumables", label: "IT Consumables", icon: ConsumablesIcon });
+
+  return items;
+}

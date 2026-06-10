@@ -8,10 +8,11 @@ import {
   TextInput,
 } from "react-native";
 import { loadUsers as loadADUsers, clearEmployeeUsers } from "./utils/adUsers";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, doc, getDocs, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import { ADUser } from "../../types";
 import { useTheme } from "../../theme/ThemeContext";
+import { UserPermissions } from "../../types";
 
 type EnrichedUser = ADUser & { hasLoggedIn: boolean };
 
@@ -53,6 +54,20 @@ export default function UsersPage({ currentUser }: Props) {
   const [search, setSearch] = useState("");
   const [lastSynced, setLastSynced] = useState<string>("");
   const [clearing, setClearing] = useState(false);
+  // Add this near the top with other state
+  const [permissionUser, setPermissionUser] = useState<EnrichedUser | null>(
+    null,
+  );
+  const [savingPermissions, setSavingPermissions] = useState(false);
+  const PERMISSION_LABELS: {
+    key: keyof EnrichedUser["permissions"];
+    label: string;
+  }[] = [
+    { key: "itInventory", label: "IT Inventory" },
+    { key: "consumables", label: "Consumables" },
+    { key: "tickets", label: "Tickets" },
+  ];
+
   async function handleClearAndResync() {
     setClearing(true);
     try {
@@ -88,7 +103,27 @@ export default function UsersPage({ currentUser }: Props) {
     }
     setFiltered(result);
   }, [search, roleFilter, users]);
-
+  async function savePermissions(
+    user: EnrichedUser,
+    permissions: UserPermissions,
+  ) {
+    setSavingPermissions(true);
+    try {
+      const docId = user.displayName || user.username;
+      await updateDoc(doc(db, "employee_users", docId), { permissions });
+      // Update local state so UI reflects change immediately
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.username === user.username ? { ...u, permissions } : u,
+        ),
+      );
+      setPermissionUser(null);
+    } catch (err) {
+      console.error("Failed to save permissions:", err);
+    } finally {
+      setSavingPermissions(false);
+    }
+  }
   async function fetchUsers(forceSync = false) {
     if (forceSync) {
       setSyncing(true);
@@ -247,7 +282,32 @@ export default function UsersPage({ currentUser }: Props) {
           </Text>
         </TouchableOpacity>
       </View>
-
+      {/* TEMP: remove after use */}
+      {/* <TouchableOpacity
+        onPress={handleClearAndResync}
+        disabled={clearing}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          backgroundColor: "#2e0f0f",
+          borderWidth: 1,
+          borderColor: "#7f1d1d",
+          borderRadius: 10,
+          paddingHorizontal: 12,
+          paddingVertical: 7,
+          marginLeft: 6,
+        }}
+      >
+        {clearing ? (
+          <ActivityIndicator size="small" color="#f87171" />
+        ) : (
+          <Text style={{ fontSize: 13 }}>🗑️</Text>
+        )}
+        <Text style={{ color: "#f87171", fontSize: 12, fontWeight: "600" }}>
+          {clearing ? "Clearing..." : "Clear & Resync"}
+        </Text>
+      </TouchableOpacity> */}
       {/* ── Stat Cards ── */}
       <View
         style={{
@@ -365,7 +425,9 @@ export default function UsersPage({ currentUser }: Props) {
           }}
           renderItem={({ item }) => {
             const role = getRoleStyle(item.role);
-            return (
+            const isSuperAdmin = currentUser.role === "superadmin";
+
+            const card = (
               <View
                 style={{
                   backgroundColor: theme.surface,
@@ -416,6 +478,43 @@ export default function UsersPage({ currentUser }: Props) {
                   >
                     {item.username} · {item.department || "No department"}
                   </Text>
+                  {/* Permission pills under name */}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      flexWrap: "wrap",
+                      gap: 4,
+                      marginTop: 6,
+                    }}
+                  >
+                    {PERMISSION_LABELS.map(({ key, label }) => {
+                      const granted = item.permissions?.[key] ?? false;
+                      return (
+                        <View
+                          key={key}
+                          style={{
+                            backgroundColor: granted
+                              ? "#052e16"
+                              : theme.bgActive,
+                            borderRadius: 99,
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: granted ? "#4ade80" : theme.subtext,
+                              fontSize: 10,
+                              fontWeight: "600",
+                            }}
+                          >
+                            {granted ? "✓ " : "✗ "}
+                            {label}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
                 </View>
 
                 {/* Badges */}
@@ -458,11 +557,217 @@ export default function UsersPage({ currentUser }: Props) {
                       {item.hasLoggedIn ? "Logged in" : "Never logged in"}
                     </Text>
                   </View>
+                  {isSuperAdmin && (
+                    <Text
+                      style={{
+                        color: theme.subtext,
+                        fontSize: 10,
+                        marginTop: 2,
+                      }}
+                    >
+                      Tap to edit →
+                    </Text>
+                  )}
                 </View>
               </View>
             );
+
+            if (!isSuperAdmin) return card;
+
+            return (
+              <TouchableOpacity
+                key={item.username}
+                onPress={() => setPermissionUser(item)}
+                activeOpacity={0.75}
+              >
+                {card}
+              </TouchableOpacity>
+            );
           }}
         />
+      )}
+      {/* ── Permission Modal ── */}
+      {permissionUser && (
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.6)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 24,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: theme.surface,
+              borderRadius: 20,
+              padding: 24,
+              width: "100%",
+              maxWidth: 400,
+              borderWidth: 1,
+              borderColor: theme.border,
+            }}
+          >
+            {/* Header */}
+            <Text
+              style={{
+                color: theme.text,
+                fontSize: 16,
+                fontWeight: "700",
+                marginBottom: 4,
+              }}
+            >
+              Edit Permissions
+            </Text>
+            <Text
+              style={{ color: theme.subtext, fontSize: 12, marginBottom: 20 }}
+            >
+              {permissionUser.displayName} · {permissionUser.username}
+            </Text>
+
+            {/* Toggles */}
+            {(["itInventory", "consumables", "tickets"] as const).map((key) => {
+              const labels: Record<
+                string,
+                { label: string; description: string }
+              > = {
+                itInventory: {
+                  label: "IT Inventory",
+                  description: "Access to IT inventory assets",
+                },
+                consumables: {
+                  label: "Consumables",
+                  description: "Access to printer consumables",
+                },
+                tickets: {
+                  label: "Tickets",
+                  description: "Access to concern tickets",
+                },
+              };
+              const granted = permissionUser.permissions?.[key] ?? false;
+              return (
+                <TouchableOpacity
+                  key={key}
+                  onPress={() =>
+                    setPermissionUser((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            permissions: {
+                              ...prev.permissions,
+                              [key]: !granted,
+                            },
+                          }
+                        : prev,
+                    )
+                  }
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    backgroundColor: theme.bgActive,
+                    borderRadius: 12,
+                    padding: 14,
+                    marginBottom: 10,
+                    borderWidth: 1,
+                    borderColor: granted ? "#4ade80" : theme.border,
+                  }}
+                >
+                  <View>
+                    <Text
+                      style={{
+                        color: theme.text,
+                        fontSize: 13,
+                        fontWeight: "600",
+                      }}
+                    >
+                      {labels[key].label}
+                    </Text>
+                    <Text
+                      style={{
+                        color: theme.subtext,
+                        fontSize: 11,
+                        marginTop: 2,
+                      }}
+                    >
+                      {labels[key].description}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      width: 44,
+                      height: 24,
+                      borderRadius: 12,
+                      backgroundColor: granted ? "#4ade80" : theme.border,
+                      justifyContent: "center",
+                      paddingHorizontal: 3,
+                      alignItems: granted ? "flex-end" : "flex-start",
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: 9,
+                        backgroundColor: "#fff",
+                      }}
+                    />
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+
+            {/* Buttons */}
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
+              <TouchableOpacity
+                onPress={() => setPermissionUser(null)}
+                style={{
+                  flex: 1,
+                  backgroundColor: theme.bgActive,
+                  borderRadius: 12,
+                  paddingVertical: 12,
+                  alignItems: "center",
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                }}
+              >
+                <Text
+                  style={{ color: theme.text, fontSize: 13, fontWeight: "600" }}
+                >
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() =>
+                  savePermissions(permissionUser, permissionUser.permissions)
+                }
+                disabled={savingPermissions}
+                style={{
+                  flex: 1,
+                  backgroundColor: theme.iconActive,
+                  borderRadius: 12,
+                  paddingVertical: 12,
+                  alignItems: "center",
+                }}
+              >
+                {savingPermissions ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text
+                    style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}
+                  >
+                    Save
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       )}
     </View>
   );

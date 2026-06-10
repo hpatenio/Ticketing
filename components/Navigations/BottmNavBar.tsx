@@ -1,6 +1,9 @@
 import { View, Text, TouchableOpacity, Modal, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { MENU_BY_ROLE, getNavColors } from "./NavItems";
+import {
+  getNavColors,
+  getNavItemsForUser,
+} from "./NavItems";
 import { ADUser } from "../../types";
 import { useTheme } from "../../theme/ThemeContext";
 import { Sun, Moon, Monitor, Settings } from "lucide-react-native";
@@ -22,7 +25,7 @@ export default function BottomNavBar({
   const C = getNavColors(theme);
   const [themePickerOpen, setThemePickerOpen] = useState(false);
 
-  const items = MENU_BY_ROLE[user.role] ?? MENU_BY_ROLE.employee;
+  const items = getNavItemsForUser(user);
   const visibleItems = items.slice(0, 4);
 
   const themeOptions = [

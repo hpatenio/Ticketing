@@ -19,7 +19,7 @@ import ManageColumnsModal, {
   ColumnConfig,
   DropdownOption,
 } from "../../../SuperAdmin/ManageColumnsModal";
-import { getDropdownOptions } from "../../../../Services/dropdownConfigs";
+import { getAllDropdownConfigs, getDropdownOptions } from "../../../../Services/dropdownConfigs";
 
 // ─── Options ──────────────────────────────────────────────────────────────────
 const DEFAULT_STATUS_OPTIONS: DropdownOption[] = [
@@ -590,21 +590,26 @@ const ConsumablesPage: React.FC<Props> = ({ isSuperAdmin = false }) => {
   const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
     {
       id: "consumable_status",
+      docId: "consumable_status",
       label: "Status",
       editable: true,
-      options: DEFAULT_STATUS_OPTIONS,
+      options: [],
     },
     {
       id: "consumable_location",
+      docId: "consumable_location",
       label: "Location",
       editable: true,
-      options: DEFAULT_LOCATION_OPTIONS,
+      options: [],
     },
   ]);
 
-  const [dropdownOptions, setDropdownOptions] = useState({
-    status: DEFAULT_STATUS_OPTIONS,
-    location: DEFAULT_LOCATION_OPTIONS,
+  const [dropdownOptions, setDropdownOptions] = useState<{
+    status: DropdownOption[];
+    location: DropdownOption[];
+  }>({
+    status: [],
+    location: [],
   });
 
   // ─── Data ──────────────────────────────────────────────────────────────────
@@ -615,29 +620,37 @@ const ConsumablesPage: React.FC<Props> = ({ isSuperAdmin = false }) => {
     setData(result);
     setLoading(false);
   }, []);
-
+  
   useEffect(() => {
-    fetchData();
-  }, []);
+    getAllDropdownConfigs({
+      inventory: { status: [], category: [], location: [], company: [] },
+      ticket: { status: [], category: [], priority: [] },
+      consumable: { status: [], location: [] },
+    })
+      .then((result) => {
+        const consumable = result.consumable;
+        if (!consumable) return;
 
-  useEffect(() => {
-    Promise.all([
-      getDropdownOptions("consumable_status", DEFAULT_STATUS_OPTIONS),
-      getDropdownOptions("consumable_location", DEFAULT_LOCATION_OPTIONS),
-    ])
-      .then(([status, location]) => {
-        setDropdownOptions({ status, location });
         setColumnConfigs((prev) =>
           prev.map((col) => {
             if (col.id === "consumable_status")
-              return { ...col, options: status };
+              return { ...col, options: consumable.status };
             if (col.id === "consumable_location")
-              return { ...col, options: location };
+              return { ...col, options: consumable.location };
             return col;
           }),
         );
+        setDropdownOptions({
+          status: consumable.status,
+          location: consumable.location,
+        });
       })
-      .catch(console.error);
+      .catch((err) =>
+        console.error("Failed to load consumable dropdown configs:", err),
+      );
+  }, []);
+  useEffect(() => {
+    fetchData();
   }, []);
 
   const updateLocalField = useCallback(

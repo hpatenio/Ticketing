@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ITInventory } from "../../../../types";
-import { updateAsset } from "../../../../Services/itInventory";
+import { updateAsset, updateAssetField } from "../../../../Services/itInventory";
 import { Timestamp } from "firebase/firestore";
 import { useTheme } from "../../../../theme/ThemeContext";
 import BadgeSelect from "../../../../components/common/BadgeSelect"; // adjust path
@@ -535,28 +535,57 @@ const EditAssetModal: React.FC<Props> = ({
   };
 
   const handleSubmit = async () => {
-    if (!form.company || !form.brand) {
-      setError("Company and Brand are required.");
-      return;
-    }
-    if (!selectedAsset) return;
-    setLoading(true);
-    setError("");
-    try {
-      await updateAsset(selectedAsset.assetTag, {
-        ...form,
-        datePurchased: form.datePurchased
-          ? Timestamp.fromDate(new Date(form.datePurchased))
-          : selectedAsset.datePurchased,
-      });
-      onSuccess();
-      onClose();
-    } catch {
-      setError("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (!form.company || !form.brand) {
+    setError("Company and Brand are required.");
+    return;
+  }
+  if (!selectedAsset) return;
+  setLoading(true);
+  setError("");
+  try {
+    // ── Build the fields that actually changed ──
+    const oldForm = {
+      company:      selectedAsset.company,
+      serialNumber: selectedAsset.serialNumber,
+      model:        selectedAsset.model,
+      brand:        selectedAsset.brand,
+      status:       selectedAsset.status,
+      assigneeId:   selectedAsset.assigneeId,
+      assigneeName: selectedAsset.assigneeName,
+      category:     selectedAsset.category,
+      location:     selectedAsset.location,
+      notes:        selectedAsset.notes,
+      datePurchased: selectedAsset.datePurchased
+        ? selectedAsset.datePurchased.toDate().toISOString().split("T")[0]
+        : "",
+    };
+
+    const changedFields = (Object.keys(form) as (keyof typeof form)[]).filter(
+      (key) => form[key] !== oldForm[key]
+    );
+
+    // ── Write each changed field with audit ──
+    await Promise.all(
+      changedFields.map((field) =>
+        updateAssetField(
+          selectedAsset.assetTag,
+          field,
+          field === "datePurchased" && form.datePurchased
+            ? Timestamp.fromDate(new Date(form.datePurchased)) as any
+            : form[field]
+        )
+        // changedBy/changedById auto-resolved from AsyncStorage inside updateAssetField
+      )
+    );
+
+    onSuccess();
+    onClose();
+  } catch {
+    setError("Something went wrong. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleDeleteClick = () => {
     if (!confirmDelete) {

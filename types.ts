@@ -10,8 +10,13 @@ export type ADUser = {
   title:       string;
   phone:       string;
   role:        UserRole;
+  permissions: UserPermissions;
 };
-
+export type UserPermissions = {
+  itInventory: boolean;
+  consumables: boolean;
+  tickets: boolean;
+};
 export interface ITInventory {
   id:           string;
   assetTag:     string;

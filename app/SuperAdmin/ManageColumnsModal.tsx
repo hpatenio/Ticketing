@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useTheme } from "../../theme/ThemeContext";
 import { saveDropdownOptions } from "../../Services/dropdownConfigs";
 
@@ -19,7 +19,8 @@ export type DropdownOption = {
 };
 
 export type ColumnConfig = {
-  id: string;
+  id: string; // short key: "status", "category", etc.
+  docId: string; // full Firestore doc ID: "inventory_status", "ticket_status", etc.
   label: string;
   editable: boolean;
   options: DropdownOption[];
@@ -35,24 +36,100 @@ type Props = {
 // ─── Tailwind color presets for badge options ─────────────────────────────────
 
 const COLOR_PRESETS = [
-  { bg: "bg-emerald-100", text: "text-emerald-800", bgHex: "#d1fae5", textHex: "#065f46", label: "Green" },
-  { bg: "bg-blue-100",    text: "text-blue-800",    bgHex: "#dbeafe", textHex: "#1e40af", label: "Blue" },
-  { bg: "bg-red-100",     text: "text-red-800",     bgHex: "#fee2e2", textHex: "#991b1b", label: "Red" },
-  { bg: "bg-orange-100",  text: "text-orange-800",  bgHex: "#ffedd5", textHex: "#9a3412", label: "Orange" },
-  { bg: "bg-yellow-100",  text: "text-yellow-800",  bgHex: "#fef9c3", textHex: "#854d0e", label: "Yellow" },
-  { bg: "bg-purple-100",  text: "text-purple-800",  bgHex: "#f3e8ff", textHex: "#6b21a8", label: "Purple" },
-  { bg: "bg-pink-100",    text: "text-pink-800",    bgHex: "#fce7f3", textHex: "#9d174d", label: "Pink" },
-  { bg: "bg-teal-100",    text: "text-teal-800",    bgHex: "#ccfbf1", textHex: "#115e59", label: "Teal" },
-  { bg: "bg-cyan-100",    text: "text-cyan-800",    bgHex: "#cffafe", textHex: "#155e75", label: "Cyan" },
-  { bg: "bg-indigo-100",  text: "text-indigo-800",  bgHex: "#e0e7ff", textHex: "#3730a3", label: "Indigo" },
-  { bg: "bg-violet-100",  text: "text-violet-800",  bgHex: "#ede9fe", textHex: "#5b21b6", label: "Violet" },
-  { bg: "bg-gray-100",    text: "text-gray-800",    bgHex: "#f3f4f6", textHex: "#1f2937", label: "Gray" },
+  {
+    bg: "bg-green-600",
+    text: "text-white",
+    bgHex: "#16a34a",
+    textHex: "#ffffff",
+    label: "Green",
+  },
+  {
+    bg: "bg-orange-600",
+    text: "text-white",
+    bgHex: "#ea580c",
+    textHex: "#ffffff",
+    label: "Orange",
+  },
+  {
+    bg: "bg-blue-600",
+    text: "text-white",
+    bgHex: "#2563eb",
+    textHex: "#ffffff",
+    label: "Blue",
+  },
+  {
+    bg: "bg-cyan-600",
+    text: "text-white",
+    bgHex: "#0891b2",
+    textHex: "#ffffff",
+    label: "Cyan",
+  },
+  {
+    bg: "bg-red-600",
+    text: "text-white",
+    bgHex: "#dc2626",
+    textHex: "#ffffff",
+    label: "Red",
+  },
+  {
+    bg: "bg-purple-600",
+    text: "text-white",
+    bgHex: "#9333ea",
+    textHex: "#ffffff",
+    label: "Purple",
+  },
+  {
+    bg: "bg-amber-600",
+    text: "text-white",
+    bgHex: "#d97706",
+    textHex: "#ffffff",
+    label: "Amber",
+  },
+  {
+    bg: "bg-teal-600",
+    text: "text-white",
+    bgHex: "#0d9488",
+    textHex: "#ffffff",
+    label: "Teal",
+  },
+  {
+    bg: "bg-pink-600",
+    text: "text-white",
+    bgHex: "#db2777",
+    textHex: "#ffffff",
+    label: "Pink",
+  },
+  {
+    bg: "bg-indigo-600",
+    text: "text-white",
+    bgHex: "#4f46e5",
+    textHex: "#ffffff",
+    label: "Indigo",
+  },
+  {
+    bg: "bg-violet-600",
+    text: "text-white",
+    bgHex: "#7c3aed",
+    textHex: "#ffffff",
+    label: "Violet",
+  },
+  {
+    bg: "bg-gray-500",
+    text: "text-white",
+    bgHex: "#6b7280",
+    textHex: "#ffffff",
+    label: "Gray",
+  },
 ];
 
 const BASE_BADGE =
-  "inline-flex justify-center px-2 py-1 rounded-lg text-sm font-semibold";
+  "inline-flex justify-center px-2 py-1 rounded-lg text-sm font-medium";
 
-function makeBadgeClass(bg: string, text: string, minW: string = "min-w-[90px]") {
+function makeBadgeClass(
+  bg: string,
+  text: string,
+  minW: string = "min-w-[90px]",
+) {
   return `${bg} ${text} ${BASE_BADGE} ${minW}`;
 }
 
@@ -75,6 +152,11 @@ const ManageColumnsModal: React.FC<Props> = ({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!visible) return;
+    setLocalCols(JSON.parse(JSON.stringify(columns)));
+    setActiveColId(columns.find((c) => c.editable)?.id ?? columns[0]?.id);
+  }, [visible, columns]);
   if (!visible) return null;
 
   const activeCol = localCols.find((c) => c.id === activeColId)!;
@@ -154,7 +236,7 @@ const ManageColumnsModal: React.FC<Props> = ({
       await Promise.all(
         synced
           .filter((col) => col.editable)
-          .map((col) => saveDropdownOptions(col.id, col.options)),
+          .map((col) => saveDropdownOptions(col.docId, col.options)),
       );
 
       onSave(synced);
@@ -208,12 +290,16 @@ const ManageColumnsModal: React.FC<Props> = ({
               Manage column dropdowns
             </h2>
             <p style={{ color: theme.subtext }} className="text-xs mt-0.5">
-              Changes are saved to Firestore and applied immediately to all users
+              Changes are saved to Firestore and applied immediately to all
+              users
             </p>
           </div>
           <button
             onClick={onClose}
-            style={{ color: theme.subtext, backgroundColor: theme.surfaceRaised }}
+            style={{
+              color: theme.subtext,
+              backgroundColor: theme.surfaceRaised,
+            }}
             className="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold hover:opacity-70"
           >
             ✕
@@ -222,15 +308,17 @@ const ManageColumnsModal: React.FC<Props> = ({
 
         {/* ── Body ── */}
         <div className="flex flex-1 overflow-hidden">
-
           {/* Sidebar */}
           <div
-            style={{ borderRightColor: theme.border, backgroundColor: theme.background }}
+            style={{
+              borderRightColor: theme.border,
+              backgroundColor: theme.background,
+            }}
             className="w-44 flex-shrink-0 border-r overflow-y-auto py-2"
           >
             <p
               style={{ color: theme.subtext }}
-              className="text-[10px] font-semibold uppercase tracking-widest px-4 pb-2"
+              className="text-[10px] font-medium uppercase tracking-widest px-4 pb-2"
             >
               Columns
             </p>
@@ -245,17 +333,23 @@ const ManageColumnsModal: React.FC<Props> = ({
                 className="w-full flex items-center justify-between px-4 py-2 text-xs text-left"
                 style={{
                   backgroundColor:
-                    col.id === activeColId ? theme.surfaceRaised : "transparent",
+                    col.id === activeColId
+                      ? theme.surfaceRaised
+                      : "transparent",
                   color: col.id === activeColId ? theme.text : theme.subtext,
                   fontWeight: col.id === activeColId ? 600 : 400,
                 }}
                 onMouseEnter={(e) =>
                   (e.currentTarget.style.backgroundColor =
-                    col.id === activeColId ? theme.surfaceRaised : theme.bgHover)
+                    col.id === activeColId
+                      ? theme.surfaceRaised
+                      : theme.bgHover)
                 }
                 onMouseLeave={(e) =>
                   (e.currentTarget.style.backgroundColor =
-                    col.id === activeColId ? theme.surfaceRaised : "transparent")
+                    col.id === activeColId
+                      ? theme.surfaceRaised
+                      : "transparent")
                 }
               >
                 <span>{col.label}</span>
@@ -265,13 +359,16 @@ const ManageColumnsModal: React.FC<Props> = ({
                       backgroundColor: theme.primarySubtle,
                       color: theme.primarySubtleText,
                     }}
-                    className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
+                    className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
                   >
                     {col.options.length}
                   </span>
                 ) : (
                   <span
-                    style={{ color: theme.subtext, backgroundColor: theme.surfaceRaised }}
+                    style={{
+                      color: theme.subtext,
+                      backgroundColor: theme.surfaceRaised,
+                    }}
                     className="text-[10px] px-1.5 py-0.5 rounded-full"
                   >
                     locked
@@ -292,24 +389,39 @@ const ManageColumnsModal: React.FC<Props> = ({
               </div>
             ) : (
               <>
-                <p style={{ color: theme.text }} className="text-sm font-semibold mb-1">
+                <p
+                  style={{ color: theme.text }}
+                  className="text-sm font-medium mb-1"
+                >
                   {activeCol.label} options
                 </p>
                 <p style={{ color: theme.subtext }} className="text-xs mb-4">
-                  Add, rename, or remove options. Click the color swatch to change badge color.
+                  Add, rename, or remove options. Click the color swatch to
+                  change badge color.
                 </p>
 
                 {/* Preview */}
                 <div
-                  style={{ backgroundColor: theme.background, borderColor: theme.border }}
+                  style={{
+                    backgroundColor: theme.background,
+                    borderColor: theme.border,
+                  }}
                   className="rounded-lg border px-4 py-3 mb-4"
                 >
-                  <p style={{ color: theme.subtext }} className="text-[10px] uppercase tracking-widest font-semibold mb-2">
+                  <p
+                    style={{ color: theme.subtext }}
+                    className="text-[10px] uppercase tracking-widest font-medium mb-2"
+                  >
                     Preview
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {activeCol.options.length === 0 ? (
-                      <span style={{ color: theme.subtext }} className="text-xs">No options yet</span>
+                      <span
+                        style={{ color: theme.subtext }}
+                        className="text-xs"
+                      >
+                        No options yet
+                      </span>
                     ) : (
                       activeCol.options.map((opt, i) => (
                         <span key={i} className={opt.badgeClass}>
@@ -325,12 +437,16 @@ const ManageColumnsModal: React.FC<Props> = ({
                   {activeCol.options.map((opt, idx) => {
                     const { bg, text } = getBadgeColors(opt.badgeClass);
                     const previewColor =
-                      COLOR_PRESETS.find((p) => p.bg === bg)?.bg ?? "bg-gray-100";
+                      COLOR_PRESETS.find((p) => p.bg === bg)?.bg ??
+                      "bg-gray-100";
 
                     return (
                       <div key={idx}>
                         <div
-                          style={{ borderColor: theme.border, backgroundColor: theme.surface }}
+                          style={{
+                            borderColor: theme.border,
+                            backgroundColor: theme.surface,
+                          }}
                           className="flex items-center gap-2 px-3 py-2 rounded-lg border"
                         >
                           {/* Color swatch */}
@@ -338,7 +454,9 @@ const ManageColumnsModal: React.FC<Props> = ({
                             type="button"
                             title="Change color"
                             onClick={() =>
-                              setColorPickerIdx(colorPickerIdx === idx ? null : idx)
+                              setColorPickerIdx(
+                                colorPickerIdx === idx ? null : idx,
+                              )
                             }
                             className={`w-5 h-5 rounded flex-shrink-0 border ${previewColor}`}
                             style={{ borderColor: theme.border }}
@@ -358,10 +476,12 @@ const ManageColumnsModal: React.FC<Props> = ({
                             }}
                             className="flex-1 text-xs outline-none border-b focus:border-b"
                             onFocus={(e) =>
-                              (e.currentTarget.style.borderColor = theme.primary)
+                              (e.currentTarget.style.borderColor =
+                                theme.primary)
                             }
                             onBlur={(e) =>
-                              (e.currentTarget.style.borderColor = "transparent")
+                              (e.currentTarget.style.borderColor =
+                                "transparent")
                             }
                           />
 
@@ -406,7 +526,9 @@ const ManageColumnsModal: React.FC<Props> = ({
                                 className={`w-5 h-5 rounded ${preset.bg} border`}
                                 style={{
                                   borderColor:
-                                    bg === preset.bg ? theme.primary : theme.border,
+                                    bg === preset.bg
+                                      ? theme.primary
+                                      : theme.border,
                                   outline:
                                     bg === preset.bg
                                       ? `2px solid ${theme.primary}`
@@ -468,13 +590,19 @@ const ManageColumnsModal: React.FC<Props> = ({
               type="button"
               onClick={handleSave}
               disabled={saving}
-              style={{ backgroundColor: theme.primary, color: theme.primaryText }}
-              className="px-4 py-1.5 text-xs font-semibold rounded-lg hover:opacity-90 disabled:opacity-60 flex items-center gap-2"
+              style={{
+                backgroundColor: theme.primary,
+                color: theme.primaryText,
+              }}
+              className="px-4 py-1.5 text-xs font-medium rounded-lg hover:opacity-90 disabled:opacity-60 flex items-center gap-2"
             >
               {saving && (
                 <span
                   className="w-3 h-3 border-2 border-t-transparent rounded-full animate-spin"
-                  style={{ borderColor: theme.primaryText, borderTopColor: "transparent" }}
+                  style={{
+                    borderColor: theme.primaryText,
+                    borderTopColor: "transparent",
+                  }}
                 />
               )}
               {saving ? "Saving…" : "Save changes"}

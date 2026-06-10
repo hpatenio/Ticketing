@@ -18,6 +18,7 @@ import ConsumablesPage from "../Admin/Modules/Consumables/ConsumablesPage";
 import TicketsPage from "../Admin/Modules/Tickets/TicketsPage";
 import UsersPage from "./UsersPage"; // 👈 add this
 import { useTheme } from "../../theme/ThemeContext";
+import AuditTrailPage from "./AuditTrailPage";
 
 const ACTIVE_KEY_STORAGE = "superadmin_active_key";
 const JUST_LOGGED_IN_KEY = "just_logged_in";
@@ -77,9 +78,11 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
         return <ConsumablesPage isSuperAdmin={true} />;
       case "tickets":
         return <TicketsPage user={user} isSuperAdmin={true} />;
-      case "users":                        // 👈 new case
+      case "users": // 👈 new case
         return <UsersPage currentUser={user} />;
       case "dashboard":
+      case "audit":
+        return <AuditTrailPage />;
       default:
         return (
           <DashboardHome user={user} onFilterNavigate={handleFilterNavigate} />
@@ -89,11 +92,18 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
 
   const getTitle = () => {
     switch (activeKey) {
-      case "inventory":   return "IT Inventory";
-      case "consumables": return "IT Consumables";
-      case "tickets":     return "Concern Tickets";
-      case "users":       return "User Accounts";  // 👈 new title
-      default:            return "Dashboard";
+      case "inventory":
+        return "IT Inventory";
+      case "consumables":
+        return "IT Consumables";
+      case "tickets":
+        return "Concern Tickets";
+      case "users":
+        return "User Accounts"; 
+      case "audit":
+        return "Audit Trail";
+      default:
+        return "Dashboard";
     }
   };
 
@@ -101,7 +111,13 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
   const needsScroll = activeKey === "dashboard";
 
   return (
-    <View style={{ flex: 1, flexDirection: "row", backgroundColor: theme.background }}>
+    <View
+      style={{
+        flex: 1,
+        flexDirection: "row",
+        backgroundColor: theme.background,
+      }}
+    >
       {!isMobile && (
         <Sidebar
           user={user}
@@ -114,7 +130,13 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
         />
       )}
 
-      <View style={{ flex: 1, flexDirection: "column", backgroundColor: theme.background }}>
+      <View
+        style={{
+          flex: 1,
+          flexDirection: "column",
+          backgroundColor: theme.background,
+        }}
+      >
         {needsScroll ? (
           <ScrollView
             style={{ flex: 1, height: 0 }}
@@ -152,10 +174,24 @@ function DashboardHome({
 
   return (
     <View style={{ flex: 1, padding: 24, backgroundColor: theme.background }}>
-      <Text style={{ fontFamily: "DMSans_700Bold", fontSize: 20, color: theme.text, marginBottom: 4 }}>
+      <Text
+        style={{
+          fontFamily: "DMSans_700Bold",
+          fontSize: 20,
+          color: theme.text,
+          marginBottom: 4,
+        }}
+      >
         Welcome, {user.username}!
       </Text>
-      <Text style={{ fontFamily: "DMSans_400Regular", fontSize: 14, color: theme.subtext, marginBottom: 24 }}>
+      <Text
+        style={{
+          fontFamily: "DMSans_400Regular",
+          fontSize: 14,
+          color: theme.subtext,
+          marginBottom: 24,
+        }}
+      >
         Here's your admin overview.
       </Text>
       <ITInventorySummary onFilterNavigate={onFilterNavigate} />

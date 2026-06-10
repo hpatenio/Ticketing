@@ -780,13 +780,13 @@ const ITInventoryPage: React.FC<Props> = ({
   const [manageColumnsVisible, setManageColumnsVisible] = useState(false); // ← added
 
   // ── Column configs are loaded from Firestore; defaults seed the DB on first run
-  const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
-    { id: "status",   label: "Status",   editable: true,  options: DEFAULT_STATUS_OPTIONS },
-    { id: "category", label: "Category", editable: true,  options: DEFAULT_CATEGORY_OPTIONS },
-    { id: "location", label: "Location", editable: true,  options: DEFAULT_LOCATION_OPTIONS },
-    { id: "company",  label: "Company",  editable: true,  options: DEFAULT_COMPANY_OPTIONS },
-    { id: "assignee", label: "Assignee", editable: false, options: [] },
-  ]);
+const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
+  { id: "status",   docId: "inventory_status",   label: "Status",   editable: true,  options: [] },
+  { id: "category", docId: "inventory_category", label: "Category", editable: true,  options: [] },
+  { id: "location", docId: "inventory_location", label: "Location", editable: true,  options: [] },
+  { id: "company",  docId: "inventory_company",  label: "Company",  editable: true,  options: [] },
+  { id: "assignee", docId: "",                   label: "Assignee", editable: false, options: [] },
+]);
 
   // Load dropdown options from Firestore on mount
   useEffect(() => {
@@ -1092,7 +1092,7 @@ const ITInventoryPage: React.FC<Props> = ({
             <BadgeSelect
               value={item.company}
               displayName={item.company || "—"}
-              options={columnConfigs.find((c) => c.id === "company")?.options ?? DEFAULT_COMPANY_OPTIONS}
+              options={columnConfigs.find((c) => c.id === "company")?.options ?? []}
               placeholder="—"
               onChange={(val) =>
                 handleFieldUpdate(item.assetTag, "company", val)

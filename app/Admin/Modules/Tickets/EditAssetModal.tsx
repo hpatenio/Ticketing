@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { ConcernTicket } from "../../../../types";
 import { useTheme } from "../../../../theme/ThemeContext";
 import BadgeSelect from "../../../../components/common/BadgeSelect";
+import { updateTicketField } from "../../../../Services/ticketService";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,35 +30,116 @@ interface Props {
 
 const CATEGORY_OPTIONS = [
   { label: "-", value: "" },
-  { label: "CCTV",             value: "CCTV",             badgeClass: "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-800" },
-  { label: "Licenses Accounts",value: "Licenses Accounts",badgeClass: "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-indigo-100 text-indigo-800" },
-  { label: "Hardware",         value: "Hardware",         badgeClass: "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-800" },
-  { label: "Email",            value: "Email",            badgeClass: "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-cyan-100 text-cyan-800" },
-  { label: "Network",          value: "Network",          badgeClass: "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-teal-100 text-teal-800" },
-  { label: "Maintenance",      value: "Maintenance",      badgeClass: "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-amber-100 text-amber-800" },
-  { label: "Medicine",         value: "Medicine",         badgeClass: "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-emerald-100 text-emerald-800" },
-  { label: "Office Supplies",  value: "Office Supplies",  badgeClass: "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-fuchsia-100 text-fuchsia-800" },
-  { label: "Software",         value: "Software",         badgeClass: "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-sky-100 text-sky-800" },
-  { label: "Other",            value: "Other",            badgeClass: "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-gray-100 text-gray-800" },
+  {
+    label: "CCTV",
+    value: "CCTV",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-800",
+  },
+  {
+    label: "Licenses Accounts",
+    value: "Licenses Accounts",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-indigo-100 text-indigo-800",
+  },
+  {
+    label: "Hardware",
+    value: "Hardware",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-800",
+  },
+  {
+    label: "Email",
+    value: "Email",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-cyan-100 text-cyan-800",
+  },
+  {
+    label: "Network",
+    value: "Network",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-teal-100 text-teal-800",
+  },
+  {
+    label: "Maintenance",
+    value: "Maintenance",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-amber-100 text-amber-800",
+  },
+  {
+    label: "Medicine",
+    value: "Medicine",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-emerald-100 text-emerald-800",
+  },
+  {
+    label: "Office Supplies",
+    value: "Office Supplies",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-fuchsia-100 text-fuchsia-800",
+  },
+  {
+    label: "Software",
+    value: "Software",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-sky-100 text-sky-800",
+  },
+  {
+    label: "Other",
+    value: "Other",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-gray-100 text-gray-800",
+  },
 ];
 
 const PRIORITY_OPTIONS = [
-  { label: "Low",    value: "Low",    badgeClass: "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-emerald-100 text-emerald-800" },
-  { label: "Medium", value: "Medium", badgeClass: "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-yellow-100 text-yellow-800" },
-  { label: "High",   value: "High",   badgeClass: "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-red-100 text-red-800" },
+  {
+    label: "Low",
+    value: "Low",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-emerald-100 text-emerald-800",
+  },
+  {
+    label: "Medium",
+    value: "Medium",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-yellow-100 text-yellow-800",
+  },
+  {
+    label: "High",
+    value: "High",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-red-100 text-red-800",
+  },
 ];
 
 const STATUS_OPTIONS = [
-  { label: "Pending",     value: "Pending",     badgeClass: "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-yellow-100 text-yellow-800" },
-  { label: "In Progress", value: "In Progress", badgeClass: "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-800" },
-  { label: "Resolved",    value: "Resolved",    badgeClass: "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-emerald-100 text-emerald-800" },
+  {
+    label: "Pending",
+    value: "Pending",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-yellow-100 text-yellow-800",
+  },
+  {
+    label: "In Progress",
+    value: "In Progress",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-800",
+  },
+  {
+    label: "Resolved",
+    value: "Resolved",
+    badgeClass:
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-emerald-100 text-emerald-800",
+  },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const parseDueDate = (raw: any): string => {
   if (!raw) return "";
-  if (typeof raw.toDate === "function") return raw.toDate().toISOString().split("T")[0];
+  if (typeof raw.toDate === "function")
+    return raw.toDate().toISOString().split("T")[0];
   if (raw instanceof Date) return raw.toISOString().split("T")[0];
   const d = new Date(raw);
   return isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
@@ -89,7 +171,9 @@ const SearchableSelect = ({
 
   const allOptions = [{ label: "—", value: "" }, ...options];
   const filtered = query
-    ? allOptions.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()))
+    ? allOptions.filter((o) =>
+        o.label.toLowerCase().includes(query.toLowerCase()),
+      )
     : allOptions;
 
   const openDropdown = () => {
@@ -146,31 +230,44 @@ const SearchableSelect = ({
           <>
             <span
               style={{
-                width: 22, height: 22,
+                width: 22,
+                height: 22,
                 borderRadius: "50%",
                 backgroundColor: theme.primary,
                 color: theme.primaryText,
-                fontSize: 10, fontWeight: 600,
+                fontSize: 10,
+                fontWeight: 600,
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
                 flexShrink: 0,
               }}
             >
-              {displayName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
+              {displayName
+                .split(" ")
+                .map((w) => w[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase()}
             </span>
             <span
               style={{
-                fontSize: 13, color: theme.text,
-                flex: 1, textAlign: "left",
-                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                fontSize: 13,
+                color: theme.text,
+                flex: 1,
+                textAlign: "left",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
               }}
             >
               {displayName}
             </span>
           </>
         ) : (
-          <span style={{ fontSize: 13, color: theme.inputPlaceholder }}>{placeholder}</span>
+          <span style={{ fontSize: 13, color: theme.inputPlaceholder }}>
+            {placeholder}
+          </span>
         )}
       </button>
 
@@ -190,7 +287,9 @@ const SearchableSelect = ({
             value={query}
             placeholder="Search..."
             style={{
-              width: "100%", padding: "8px 12px", fontSize: 12,
+              width: "100%",
+              padding: "8px 12px",
+              fontSize: 12,
               borderBottom: `1px solid ${theme.border}`,
               outline: "none",
               backgroundColor: theme.inputBg,
@@ -198,11 +297,32 @@ const SearchableSelect = ({
               boxSizing: "border-box",
             }}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Escape") { setOpen(false); setQuery(""); } }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setOpen(false);
+                setQuery("");
+              }
+            }}
           />
-          <ul style={{ maxHeight: 176, overflowY: "auto", margin: 0, padding: 0, listStyle: "none" }}>
+          <ul
+            style={{
+              maxHeight: 176,
+              overflowY: "auto",
+              margin: 0,
+              padding: 0,
+              listStyle: "none",
+            }}
+          >
             {filtered.length === 0 ? (
-              <li style={{ padding: "8px 12px", fontSize: 12, color: theme.subtext }}>No results</li>
+              <li
+                style={{
+                  padding: "8px 12px",
+                  fontSize: 12,
+                  color: theme.subtext,
+                }}
+              >
+                No results
+              </li>
             ) : (
               filtered.map((o) => (
                 <li
@@ -214,27 +334,45 @@ const SearchableSelect = ({
                     setQuery("");
                   }}
                   style={{
-                    padding: "8px 12px", fontSize: 13, cursor: "pointer",
+                    padding: "8px 12px",
+                    fontSize: 13,
+                    cursor: "pointer",
                     color: o.value === value ? theme.primary : theme.text,
                     fontWeight: o.value === value ? 600 : 400,
-                    display: "flex", alignItems: "center", gap: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
                     borderBottom: `1px solid ${theme.border}`,
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = theme.bgHover)}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.backgroundColor = theme.bgHover)
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.backgroundColor = "transparent")
+                  }
                 >
                   {o.value && (
                     <span
                       style={{
-                        width: 22, height: 22, borderRadius: "50%",
+                        width: 22,
+                        height: 22,
+                        borderRadius: "50%",
                         backgroundColor: theme.primarySubtle,
                         color: theme.primary,
-                        fontSize: 10, fontWeight: 600,
-                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 10,
+                        fontWeight: 600,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                         flexShrink: 0,
                       }}
                     >
-                      {o.label.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
+                      {o.label
+                        .split(" ")
+                        .map((w) => w[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase()}
                     </span>
                   )}
                   {o.label}
@@ -259,7 +397,16 @@ const Field: React.FC<{
   const { theme } = useTheme();
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
-      <label style={{ fontSize: 12, fontWeight: 500, color: theme.subtext, display: "flex", alignItems: "center", gap: 5 }}>
+      <label
+        style={{
+          fontSize: 12,
+          fontWeight: 500,
+          color: theme.subtext,
+          display: "flex",
+          alignItems: "center",
+          gap: 5,
+        }}
+      >
         <span style={{ opacity: 0.7 }}>{icon}</span>
         {label}
       </label>
@@ -287,11 +434,16 @@ const ThemedInput: React.FC<{
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       style={{
-        width: "100%", padding: "0 10px", height: 38, fontSize: 13,
+        width: "100%",
+        padding: "0 10px",
+        height: 38,
+        fontSize: 13,
         borderRadius: 8,
         border: `1px solid ${focused ? theme.inputBorderFocus : theme.inputBorder}`,
-        backgroundColor: theme.inputBg, color: theme.inputText,
-        outline: "none", boxSizing: "border-box",
+        backgroundColor: theme.inputBg,
+        color: theme.inputText,
+        outline: "none",
+        boxSizing: "border-box",
       }}
     />
   );
@@ -316,12 +468,17 @@ const ThemedTextarea: React.FC<{
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       style={{
-        width: "100%", padding: "8px 10px", fontSize: 13,
+        width: "100%",
+        padding: "8px 10px",
+        fontSize: 13,
         borderRadius: 8,
         border: `1px solid ${focused ? theme.inputBorderFocus : theme.inputBorder}`,
-        backgroundColor: theme.inputBg, color: theme.inputText,
-        outline: "none", resize: "none",
-        boxSizing: "border-box", fontFamily: "inherit",
+        backgroundColor: theme.inputBg,
+        color: theme.inputText,
+        outline: "none",
+        resize: "none",
+        boxSizing: "border-box",
+        fontFamily: "inherit",
       }}
     />
   );
@@ -331,39 +488,97 @@ const ThemedTextarea: React.FC<{
 
 const icons = {
   summary: (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+      />
     </svg>
   ),
   details: (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h10" />
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4 6h16M4 10h16M4 14h10"
+      />
     </svg>
   ),
   category: (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M11 3H5a2 2 0 00-2 2v6l9 9 7-7-9-9zm0 0" />
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M7 7h.01M11 3H5a2 2 0 00-2 2v6l9 9 7-7-9-9zm0 0"
+      />
     </svg>
   ),
   priority: (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h13M3 8h9M3 12h5m10-4l-4 4 4 4" />
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3 4h13M3 8h9M3 12h5m10-4l-4 4 4 4"
+      />
     </svg>
   ),
   status: (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <circle cx="12" cy="12" r="9" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4" />
     </svg>
   ),
   assignee: (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <circle cx="12" cy="8" r="4" />
       <path strokeLinecap="round" d="M4 20c0-4 3.582-7 8-7s8 3 8 7" />
     </svg>
   ),
   date: (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <rect x="3" y="4" width="18" height="18" rx="2" />
       <path strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18" />
     </svg>
@@ -382,52 +597,108 @@ const EditTicketModal: React.FC<Props> = ({
 }) => {
   const { theme } = useTheme();
 
-  const [summary, setSummary]           = useState("");
-  const [details, setDetails]           = useState("");
-  const [category, setCategory]         = useState("");
-  const [priority, setPriority]         = useState("");
-  const [status, setStatus]             = useState("");
-  const [assigneeId, setAssigneeId]     = useState("");
+  const [summary, setSummary] = useState("");
+  const [details, setDetails] = useState("");
+  const [category, setCategory] = useState("");
+  const [priority, setPriority] = useState("");
+  const [status, setStatus] = useState("");
+  const [assigneeId, setAssigneeId] = useState("");
   const [assigneeName, setAssigneeName] = useState("");
-  const [dueDate, setDueDate]           = useState("");
-  const [error, setError]               = useState("");
-  const [saving, setSaving]             = useState(false);
-  const [deleting, setDeleting]         = useState(false);
+  const [dueDate, setDueDate] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const oldValuesRef = useRef<TicketEditUpdates | null>(null);
 
   useEffect(() => {
     if (!selectedTicket) {
-      setSummary(""); setDetails(""); setCategory(""); setPriority("");
-      setStatus(""); setAssigneeId(""); setAssigneeName("");
-      setDueDate(""); setError(""); setConfirmDelete(false);
+      oldValuesRef.current = null;
+      setSummary("");
+      setDetails("");
+      setCategory("");
+      setPriority("");
+      setStatus("");
+      setAssigneeId("");
+      setAssigneeName("");
+      setDueDate("");
+      setError("");
+      setConfirmDelete(false);
       return;
     }
-    setSummary(selectedTicket.summary);
-    setDetails(selectedTicket.details || "");
-    setCategory(selectedTicket.category);
-    setPriority(selectedTicket.priority);
-    setStatus(selectedTicket.status);
-    setAssigneeId(selectedTicket.assigneeId || "");
-    setAssigneeName(selectedTicket.assigneeName || "");
-    setDueDate(parseDueDate(selectedTicket.dueDate));
+    const old: TicketEditUpdates = {
+      summary: selectedTicket.summary ?? "",
+      details: selectedTicket.details ?? "",
+      category: selectedTicket.category ?? "",
+      priority: selectedTicket.priority ?? "",
+      status: selectedTicket.status ?? "",
+      assigneeId: selectedTicket.assigneeId ?? "",
+      assigneeName: selectedTicket.assigneeName ?? "",
+      dueDate: parseDueDate(selectedTicket.dueDate),
+    };
+    oldValuesRef.current = old;
+    setSummary(old.summary);
+    setDetails(old.details);
+    setCategory(old.category);
+    setPriority(old.priority);
+    setStatus(old.status);
+    setAssigneeId(old.assigneeId);
+    setAssigneeName(old.assigneeName);
+    setDueDate(old.dueDate);
     setError("");
     setConfirmDelete(false);
-  }, [selectedTicket, visible]);
+  }, [selectedTicket?.ticketNumber]); // ← only re-run when ticket actually changes, not on every render
 
   const handleSave = async () => {
-    if (!selectedTicket) return;
+    if (!selectedTicket || !oldValuesRef.current) return;
     setError("");
-    if (!summary.trim()) { setError("Summary is required.");  return; }
-    if (!details.trim()) { setError("Details are required."); return; }
-    if (!dueDate)        { setError("Due date is required."); return; }
+    if (!summary.trim()) {
+      setError("Summary is required.");
+      return;
+    }
+    if (!details.trim()) {
+      setError("Details are required.");
+      return;
+    }
+    if (!dueDate) {
+      setError("Due date is required.");
+      return;
+    }
     setSaving(true);
     try {
-      await onSave(selectedTicket.ticketNumber, {
+      const oldValues = oldValuesRef.current;
+      const newValues: TicketEditUpdates = {
         summary: summary.trim(),
         details: details.trim(),
-        category, priority, status,
-        assigneeId, assigneeName, dueDate,
-      });
+        category,
+        priority,
+        status,
+        assigneeId: assigneeId ?? "",
+        assigneeName: assigneeName ?? "",
+        dueDate: parseDueDate(dueDate), // ← normalize whatever the input gave us
+      };
+      console.log("OLD VALUES:", JSON.stringify(oldValuesRef.current));
+      console.log("NEW VALUES:", JSON.stringify(newValues));
+      const changedFields = (
+        Object.keys(newValues) as (keyof TicketEditUpdates)[]
+      ).filter((key) => newValues[key] !== oldValues[key]);
+
+      if (changedFields.length === 0) {
+        onClose();
+        return;
+      }
+
+      await Promise.all(
+        changedFields.map((field) =>
+          updateTicketField(
+            selectedTicket.ticketNumber,
+            field,
+            newValues[field],
+          ),
+        ),
+      );
+
+      onSave(selectedTicket.ticketNumber, newValues);
       onClose();
     } catch (err) {
       console.error("Failed to save ticket:", err);
@@ -439,7 +710,10 @@ const EditTicketModal: React.FC<Props> = ({
 
   const handleDeletePress = async () => {
     if (!selectedTicket || !onDelete) return;
-    if (!confirmDelete) { setConfirmDelete(true); return; }
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
     setDeleting(true);
     try {
       await onDelete(selectedTicket.ticketNumber);
@@ -481,7 +755,14 @@ const EditTicketModal: React.FC<Props> = ({
           style={{ borderBottom: `1px solid ${theme.border}` }}
         >
           <div>
-            <h2 style={{ fontSize: 17, fontWeight: 600, color: theme.text, margin: 0 }}>
+            <h2
+              style={{
+                fontSize: 17,
+                fontWeight: 600,
+                color: theme.text,
+                margin: 0,
+              }}
+            >
               Ticket Details
             </h2>
             <p style={{ fontSize: 11, color: theme.subtext, marginTop: 2 }}>
@@ -491,8 +772,13 @@ const EditTicketModal: React.FC<Props> = ({
           <button
             onClick={handleClose}
             style={{
-              background: "none", border: "none", cursor: "pointer",
-              color: theme.subtext, fontSize: 20, lineHeight: 1, padding: 4,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: theme.subtext,
+              fontSize: 20,
+              lineHeight: 1,
+              padding: 4,
             }}
           >
             ×
@@ -513,7 +799,9 @@ const EditTicketModal: React.FC<Props> = ({
                 padding: "8px 12px",
               }}
             >
-              <p style={{ fontSize: 12, color: theme.dangerText, margin: 0 }}>⚠ {error}</p>
+              <p style={{ fontSize: 12, color: theme.dangerText, margin: 0 }}>
+                ⚠ {error}
+              </p>
             </div>
           )}
 
@@ -578,11 +866,16 @@ const EditTicketModal: React.FC<Props> = ({
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
                 style={{
-                  width: "100%", padding: "0 10px", height: 38, fontSize: 13,
+                  width: "100%",
+                  padding: "0 10px",
+                  height: 38,
+                  fontSize: 13,
                   borderRadius: 8,
                   border: `1px solid ${theme.inputBorder}`,
-                  backgroundColor: theme.inputBg, color: theme.inputText,
-                  outline: "none", boxSizing: "border-box",
+                  backgroundColor: theme.inputBg,
+                  color: theme.inputText,
+                  outline: "none",
+                  boxSizing: "border-box",
                   colorScheme: theme.mode === "dark" ? "dark" : "light",
                 }}
               />
@@ -615,19 +908,38 @@ const EditTicketModal: React.FC<Props> = ({
               onClick={handleDeletePress}
               disabled={deleting || saving}
               style={{
-                padding: "7px 14px", fontSize: 13, fontWeight: 500,
-                borderRadius: 8, cursor: "pointer",
+                padding: "7px 14px",
+                fontSize: 13,
+                fontWeight: 500,
+                borderRadius: 8,
+                cursor: "pointer",
                 border: `1px solid ${theme.dangerBorder}`,
                 backgroundColor: confirmDelete ? theme.dangerBg : "transparent",
                 color: theme.dangerText,
-                display: "flex", alignItems: "center", gap: 6,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
                 opacity: deleting || saving ? 0.6 : 1,
               }}
             >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+              <svg
+                className="w-3.5 h-3.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"
+                />
               </svg>
-              {deleting ? "Deleting…" : confirmDelete ? "Confirm delete" : "Delete ticket"}
+              {deleting
+                ? "Deleting…"
+                : confirmDelete
+                  ? "Confirm delete"
+                  : "Delete ticket"}
             </button>
           ) : (
             <div />
@@ -638,9 +950,13 @@ const EditTicketModal: React.FC<Props> = ({
               <button
                 onClick={() => setConfirmDelete(false)}
                 style={{
-                  padding: "7px 16px", fontSize: 13, borderRadius: 8, cursor: "pointer",
+                  padding: "7px 16px",
+                  fontSize: 13,
+                  borderRadius: 8,
+                  cursor: "pointer",
                   border: `1px solid ${theme.border}`,
-                  backgroundColor: "transparent", color: theme.subtext,
+                  backgroundColor: "transparent",
+                  color: theme.subtext,
                 }}
               >
                 Cancel
@@ -650,9 +966,13 @@ const EditTicketModal: React.FC<Props> = ({
                 <button
                   onClick={handleClose}
                   style={{
-                    padding: "7px 16px", fontSize: 13, borderRadius: 8, cursor: "pointer",
+                    padding: "7px 16px",
+                    fontSize: 13,
+                    borderRadius: 8,
+                    cursor: "pointer",
                     border: `1px solid ${theme.border}`,
-                    backgroundColor: "transparent", color: theme.subtext,
+                    backgroundColor: "transparent",
+                    color: theme.subtext,
                   }}
                 >
                   Cancel
@@ -661,15 +981,32 @@ const EditTicketModal: React.FC<Props> = ({
                   onClick={handleSave}
                   disabled={saving}
                   style={{
-                    padding: "7px 18px", fontSize: 13, fontWeight: 600,
-                    borderRadius: 8, cursor: "pointer", border: "none",
-                    backgroundColor: theme.primary, color: theme.primaryText,
-                    display: "flex", alignItems: "center", gap: 6,
+                    padding: "7px 18px",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    border: "none",
+                    backgroundColor: theme.primary,
+                    color: theme.primaryText,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
                     opacity: saving ? 0.6 : 1,
                   }}
                 >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                  <svg
+                    className="w-3.5 h-3.5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+                    />
                   </svg>
                   {saving ? "Saving…" : "Save changes"}
                 </button>

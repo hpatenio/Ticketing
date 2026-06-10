@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { ITConsumable } from "../../../../types";
-import { updateConsumable } from "../../../../Services/consumablesService";
+import { updateConsumable, updateConsumableField } from "../../../../Services/consumablesService";
 
 interface Props {
   visible: boolean;
@@ -72,20 +72,48 @@ const EditConsumableModal: React.FC<Props> = ({
   };
 
   const handleSubmit = async () => {
-    if (!form.name) { setError("Printer Name is required."); return; }
-    if (!selectedItem) return;
-    setLoading(true);
-    setError("");
-    try {
-      await updateConsumable(selectedItem.model, form);
-      onSuccess();
-      onClose();
-    } catch {
-      setError("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (!form.name) { setError("Printer Name is required."); return; }
+  if (!selectedItem) return;
+  setLoading(true);
+  setError("");
+  try {
+    const oldForm = {
+      name:           selectedItem.name,
+      status:         selectedItem.status ?? "Spare",
+      location:       selectedItem.location,
+      ipAddress:      selectedItem.ipAddress      ?? "",
+      macAddress:     selectedItem.macAddress     ?? "",
+      black:          selectedItem.black          ?? 0,
+      photoBlack:     selectedItem.photoBlack     ?? 0,
+      cyan:           selectedItem.cyan           ?? 0,
+      magenta:        selectedItem.magenta        ?? 0,
+      yellow:         selectedItem.yellow         ?? 0,
+      maintenanceBox: selectedItem.maintenanceBox ?? 0,
+    };
+
+    const changedFields = (Object.keys(form) as (keyof typeof form)[]).filter(
+      (key) => form[key] !== oldForm[key]
+    );
+
+    await Promise.all(
+      changedFields.map((field) =>
+        updateConsumableField(
+          selectedItem.model,
+          field,
+          form[field] as string | number
+          // changedBy/changedById auto-resolved from AsyncStorage
+        )
+      )
+    );
+
+    onSuccess();
+    onClose();
+  } catch {
+    setError("Something went wrong. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleDelete = async () => {
     if (!selectedItem) return;

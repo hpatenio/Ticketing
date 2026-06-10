@@ -20,8 +20,6 @@ import ManageColumnsModal, {
   ColumnConfig,
   DropdownOption,
 } from "../../../SuperAdmin/ManageColumnsModal";
-
-import { getDropdownOptions } from "../../../../Services/dropdownConfigs";
 // ─── Options ──────────────────────────────────────────────────────────────────
 
 const DEFAULT_CATEGORY_OPTIONS: DropdownOption[] = [
@@ -937,24 +935,34 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
   const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
     {
       id: "ticket_category",
+      docId: "ticket_category",
       label: "Category",
       editable: true,
-      options: DEFAULT_CATEGORY_OPTIONS,
+      options: [],
     },
     {
       id: "ticket_priority",
+      docId: "ticket_priority",
       label: "Priority",
       editable: true,
-      options: DEFAULT_PRIORITY_OPTIONS,
+      options: [],
     },
     {
       id: "ticket_status",
+      docId: "ticket_status",
       label: "Status",
       editable: true,
-      options: DEFAULT_STATUS_OPTIONS,
+      options: [],
     },
-    { id: "assignee", label: "Assignee", editable: false, options: [] },
+    {
+      id: "assignee",
+      docId: "",
+      label: "Assignee",
+      editable: false,
+      options: [],
+    },
   ]);
+
   const loadTickets = async () => {
     setLoading(true);
     try {
@@ -976,25 +984,35 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
   });
 
   useEffect(() => {
-    Promise.all([
-      getDropdownOptions("ticket_category", DEFAULT_CATEGORY_OPTIONS),
-      getDropdownOptions("ticket_priority", DEFAULT_PRIORITY_OPTIONS),
-      getDropdownOptions("ticket_status", DEFAULT_STATUS_OPTIONS),
-    ])
-      .then(([category, priority, status]) => {
-        setDropdownOptions({ category, priority, status });
+    getAllDropdownConfigs({
+      inventory: { status: [], category: [], location: [], company: [] },
+      ticket: { status: [], category: [], priority: [] },
+      consumable: { status: [], location: [] },
+    })
+      .then((result) => {
+        const ticket = result.ticket;
+        if (!ticket) return;
+
+        setDropdownOptions({
+          category: ticket.category,
+          priority: ticket.priority,
+          status: ticket.status,
+        });
         setColumnConfigs((prev) =>
           prev.map((col) => {
             if (col.id === "ticket_category")
-              return { ...col, options: category };
+              return { ...col, options: ticket.category };
             if (col.id === "ticket_priority")
-              return { ...col, options: priority };
-            if (col.id === "ticket_status") return { ...col, options: status };
+              return { ...col, options: ticket.priority };
+            if (col.id === "ticket_status")
+              return { ...col, options: ticket.status };
             return col;
           }),
         );
       })
-      .catch(console.error);
+      .catch((err) =>
+        console.error("Failed to load ticket dropdown configs:", err),
+      );
   }, []);
   const handleSort = (key: SortKey) => {
     if (sortKey !== key) {
@@ -1098,37 +1116,26 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
     setEditModalVisible(true);
   };
 
-  const handleSaveEditedTicket = async (
-    ticketNumber: string,
-    updates: {
-      summary: string;
-      details: string;
-      category: string;
-      priority: string;
-      status: string;
-      assigneeId: string;
-      assigneeName: string;
-      dueDate: string;
-    },
-  ) => {
-    try {
-      await Promise.all([
-        updateTicketField(ticketNumber, "summary", updates.summary.trim()),
-        updateTicketField(ticketNumber, "details", updates.details.trim()),
-        updateTicketField(ticketNumber, "category", updates.category),
-        updateTicketField(ticketNumber, "priority", updates.priority),
-        updateTicketField(ticketNumber, "status", updates.status),
-        updateTicketField(ticketNumber, "assigneeId", updates.assigneeId),
-        updateTicketField(ticketNumber, "assigneeName", updates.assigneeName),
-        updateTicketField(ticketNumber, "dueDate", new Date(updates.dueDate)),
-      ]);
-      await loadTickets();
-    } catch (err) {
-      console.error("Unable to save ticket details:", err);
-      throw err;
-    }
-  };
-
+const handleSaveEditedTicket = async (
+  ticketNumber: string,
+  updates: {
+    summary: string;
+    details: string;
+    category: string;
+    priority: string;
+    status: string;
+    assigneeId: string;
+    assigneeName: string;
+    dueDate: string;
+  },
+) => {
+  try {
+    await loadTickets(); // ← just refresh, writes already done in EditTicketModal
+  } catch (err) {
+    console.error("Unable to refresh tickets:", err);
+    throw err;
+  }
+};
   // Deduplicated assignee options
   const assigneeOptions = useMemo(() => {
     const seen = new Set<string>();
@@ -1406,7 +1413,7 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
         currentUserName={user?.username ?? currentUserName ?? ""}
         onClose={() => setModalVisible(false)}
         onSuccess={loadTickets}
-      />
+      />z
 
       <EditAssetModal
         visible={editModalVisible}
@@ -1425,16 +1432,12 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
         columns={columnConfigs}
         onSave={(updated) => {
           setColumnConfigs(updated);
-          // sync back into dropdownOptions so the table updates immediately
           const cat =
-            updated.find((c) => c.id === "ticket_category")?.options ??
-            DEFAULT_CATEGORY_OPTIONS;
+            updated.find((c) => c.id === "ticket_category")?.options ?? [];
           const pri =
-            updated.find((c) => c.id === "ticket_priority")?.options ??
-            DEFAULT_PRIORITY_OPTIONS;
+            updated.find((c) => c.id === "ticket_priority")?.options ?? [];
           const sta =
-            updated.find((c) => c.id === "ticket_status")?.options ??
-            DEFAULT_STATUS_OPTIONS;
+            updated.find((c) => c.id === "ticket_status")?.options ?? [];
           setDropdownOptions({ category: cat, priority: pri, status: sta });
         }}
       />

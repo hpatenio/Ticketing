@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import {
   getNavColors,
-  MENU_BY_ROLE,
+  getNavItemsForUser,
 } from "./NavItems";
 import { useTheme } from "../../theme/ThemeContext";
 import { ADUser } from "../../types";
@@ -38,7 +38,7 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
 
   const { theme, themeMode, setThemeMode } = useTheme();
   const C = getNavColors(theme);
-  const items = MENU_BY_ROLE[user.role] ?? MENU_BY_ROLE.employee;
+  const items = getNavItemsForUser(user);
 
   const animatedWidth = useRef(new Animated.Value(COLLAPSED_W)).current;
   const animatedExpand = useRef(new Animated.Value(0)).current;

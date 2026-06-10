@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -14,10 +14,17 @@ import { ADUser, ConcernTicket } from "../../types";
 import { clearUserSession, logout } from "../auth/Logout";
 import Sidebar from "../../components/Navigations/Sidebar";
 import BottomNavBar from "../../components/Navigations/BottmNavBar";
+import { getNavItemsForUser } from "../../components/Navigations/NavItems";
 import {
   addTicket,
   getTicketsByRequester,
 } from "../../Services/ticketService";
+import { useTheme } from "../../theme/ThemeContext";
+
+// ─── Shared page imports (same ones used in AdminDashboard) ──────────────────
+import ITInventoryPage from "../Admin/Modules/ITInventory/ITInventoryPage";
+import ConsumablesPage from "../Admin/Modules/Consumables/ConsumablesPage";
+import TicketsPage from "../Admin/Modules/Tickets/TicketsPage";
 
 const CATEGORY_OPTIONS = [
   "CCTV",
@@ -64,12 +71,21 @@ type Props = {
 };
 
 export default function EmployeeDashboard({ user, onLogout }: Props) {
-  const [activeTab, setActiveTab] = useState<"dashboard" | "tickets">("dashboard");
+  const { theme } = useTheme();
+  const { width } = useWindowDimensions();
+  const isMobile =
+    Platform.OS === "android" || Platform.OS === "ios" || width < 768;
+
+  // Derive nav items for this employee (respects their permissions)
+  const navItems = useMemo(() => getNavItemsForUser(user), [user]);
+  const defaultKey = navItems[0]?.key ?? "dashboard";
+  const [activeKey, setActiveKey] = useState(defaultKey);
+
+  // Dashboard-specific state
   const [tickets, setTickets] = useState<ConcernTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [addVisible, setAddVisible] = useState(false);
-  const { width } = useWindowDimensions();
-  const isMobile = Platform.OS === "android" || Platform.OS === "ios" || width < 768;
+
   type CategoryValue = (typeof CATEGORY_OPTIONS)[number];
   type PriorityValue = (typeof PRIORITY_OPTIONS)[number];
 
@@ -99,119 +115,13 @@ export default function EmployeeDashboard({ user, onLogout }: Props) {
 
   const handleLogout = async () => {
     const confirmed = await logout();
-    if (confirmed) {
-      onLogout();
-    }
+    if (confirmed) onLogout();
   };
 
   const handleSidebarLogout = async () => {
     await clearUserSession();
     onLogout();
   };
-
-  const renderContent = () => (
-    <View className="p-6">
-      <View className="bg-slate-800 rounded-2xl p-5 mb-4">
-        <Text className="text-white text-2xl font-bold">
-          Welcome, {user.displayName.split(" ")[0]}! 👋
-        </Text>
-        <Text className="text-slate-400 text-sm mt-1">
-          Submit an IT concern ticket for faster resolution.
-        </Text>
-      </View>
-
-      <View className="flex-row gap-3 mb-4">
-        {[
-          { key: "dashboard", label: "Dashboard" },
-          { key: "tickets", label: "My Tickets" },
-        ].map((tab) => (
-          <TouchableOpacity
-            key={tab.key}
-            onPress={() => setActiveTab(tab.key as "dashboard" | "tickets")}
-            className={`flex-1 rounded-2xl px-4 py-3 ${activeTab === tab.key ? "bg-blue-600" : "bg-slate-700"}`}
-          >
-            <Text className={`text-center text-sm font-semibold ${activeTab === tab.key ? "text-white" : "text-slate-300"}`}>
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {activeTab === "dashboard" ? (
-        <View className="space-y-4">
-          <View className="bg-slate-800 rounded-3xl p-5">
-            <Text className="text-slate-100 text-lg font-semibold mb-2">Create a new concern ticket</Text>
-            <Text className="text-slate-400 text-sm mb-4">
-              Use the form below to submit an issue, and the IT admin will be able to see it immediately.
-            </Text>
-            <TouchableOpacity
-              className="bg-blue-600 rounded-2xl px-4 py-3 items-center"
-              onPress={() => setAddVisible(true)}
-            >
-              <Text className="text-white font-semibold">Submit a Ticket</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View className="bg-slate-800 rounded-3xl p-5">
-            <Text className="text-slate-100 text-lg font-semibold mb-2">Latest ticket activity</Text>
-            <Text className="text-slate-400 text-sm">
-              You can review the tickets you submitted below.
-            </Text>
-          </View>
-        </View>
-      ) : (
-        <View>
-          <View className="flex-row items-center justify-between mb-4">
-            <View>
-              <Text className="text-white text-xl font-bold">My Tickets</Text>
-              <Text className="text-slate-400 text-sm">{tickets.length} tickets submitted</Text>
-            </View>
-            <TouchableOpacity
-              className="bg-blue-600 rounded-2xl px-4 py-3"
-              onPress={() => setAddVisible(true)}
-            >
-              <Text className="text-white font-semibold">Add Ticket</Text>
-            </TouchableOpacity>
-          </View>
-
-          {loading ? (
-            <View className="h-72 items-center justify-center">
-              <ActivityIndicator size="large" color="#3b82f6" />
-            </View>
-          ) : tickets.length === 0 ? (
-            <View className="rounded-3xl bg-slate-800 p-6 items-center">
-              <Text className="text-slate-200 font-semibold mb-2">No tickets yet</Text>
-              <Text className="text-slate-400 text-sm text-center">
-                Submit your first concern ticket and it will show up here.
-              </Text>
-            </View>
-          ) : (
-            <View className="space-y-3">
-              {tickets.map((ticket) => (
-                <View key={ticket.ticketNumber} className="rounded-3xl bg-slate-800 p-4">
-                  <Text className="text-white font-semibold text-base mb-1">{ticket.summary}</Text>
-                  <Text className="text-slate-400 text-sm mb-2">{ticket.details}</Text>
-                  <View className="flex-row flex-wrap gap-2">
-                    <Text className="text-slate-300 text-xs bg-slate-700 px-2 py-1 rounded-full">Category: {ticket.category}</Text>
-                    <Text className="text-slate-300 text-xs bg-slate-700 px-2 py-1 rounded-full">Priority: {ticket.priority}</Text>
-                    <Text className="text-slate-300 text-xs bg-slate-700 px-2 py-1 rounded-full">Status: {ticket.status}</Text>
-                    <Text className="text-slate-300 text-xs bg-slate-700 px-2 py-1 rounded-full">Due: {formatTimestamp(ticket.dueDate)}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
-      )}
-
-      <TouchableOpacity
-        className="bg-slate-700 rounded-xl py-3 items-center mt-6"
-        onPress={handleLogout}
-      >
-        <Text className="text-slate-200 text-sm font-semibold">Log out</Text>
-      </TouchableOpacity>
-    </View>
-  );
 
   const handleSubmitTicket = async () => {
     setError("");
@@ -235,7 +145,6 @@ export default function EmployeeDashboard({ user, onLogout }: Props) {
     }
 
     setSaving(true);
-
     try {
       await addTicket({
         ticketNumber: `CT-${Date.now()}`,
@@ -260,122 +169,533 @@ export default function EmployeeDashboard({ user, onLogout }: Props) {
       await loadTickets();
     } catch (err: any) {
       console.error("Ticket submit error:", err);
-      setError(err?.message ? `Unable to submit ticket: ${err.message}` : "Unable to submit ticket. Please try again.");
+      setError(
+        err?.message
+          ? `Unable to submit ticket: ${err.message}`
+          : "Unable to submit ticket. Please try again."
+      );
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ─── Dashboard home page ────────────────────────────────────────────────────
+  const renderDashboardHome = () => (
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
+      <View style={{ padding: 24 }}>
+        {/* Welcome card */}
+        <View
+          style={{
+            backgroundColor: theme.surface,
+            borderRadius: 16,
+            padding: 20,
+            marginBottom: 16,
+            borderWidth: 1,
+            borderColor: theme.border,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: "Outfit-Bold",
+              fontSize: 22,
+              color: theme.textActive,
+            }}
+          >
+            Welcome, {user.displayName.split(" ")[0]}! 👋
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Outfit",
+              fontSize: 13,
+              color: theme.subtext,
+              marginTop: 4,
+            }}
+          >
+            Submit an IT concern ticket for faster resolution.
+          </Text>
+        </View>
+
+        {/* Quick actions */}
+        <View
+          style={{
+            backgroundColor: theme.surface,
+            borderRadius: 16,
+            padding: 20,
+            marginBottom: 16,
+            borderWidth: 1,
+            borderColor: theme.border,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: "Outfit-SemiBold",
+              fontSize: 16,
+              color: theme.textActive,
+              marginBottom: 8,
+            }}
+          >
+            Create a new concern ticket
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Outfit",
+              fontSize: 13,
+              color: theme.subtext,
+              marginBottom: 16,
+            }}
+          >
+            Use the form below to submit an issue, and the IT admin will be able
+            to see it immediately.
+          </Text>
+          <TouchableOpacity
+            style={{
+              backgroundColor: theme.primary,
+              borderRadius: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              alignItems: "center",
+            }}
+            onPress={() => setAddVisible(true)}
+          >
+            <Text
+              style={{
+                fontFamily: "Outfit-SemiBold",
+                color: "#fff",
+                fontSize: 14,
+              }}
+            >
+              Submit a Ticket
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Recent tickets summary */}
+        <View
+          style={{
+            backgroundColor: theme.surface,
+            borderRadius: 16,
+            padding: 20,
+            borderWidth: 1,
+            borderColor: theme.border,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: "Outfit-SemiBold",
+              fontSize: 16,
+              color: theme.textActive,
+              marginBottom: 8,
+            }}
+          >
+            Latest ticket activity
+          </Text>
+          {loading ? (
+            <ActivityIndicator color={theme.primary} />
+          ) : tickets.length === 0 ? (
+            <Text
+              style={{
+                fontFamily: "Outfit",
+                fontSize: 13,
+                color: theme.subtext,
+              }}
+            >
+              No tickets submitted yet.
+            </Text>
+          ) : (
+            tickets.slice(0, 3).map((ticket) => (
+              <View
+                key={ticket.ticketNumber}
+                style={{
+                  borderTopWidth: 1,
+                  borderTopColor: theme.border,
+                  paddingTop: 10,
+                  marginTop: 10,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "Outfit-SemiBold",
+                    fontSize: 14,
+                    color: theme.textActive,
+                  }}
+                >
+                  {ticket.summary}
+                </Text>
+                <Text
+                  style={{
+                    fontFamily: "Outfit",
+                    fontSize: 12,
+                    color: theme.subtext,
+                    marginTop: 2,
+                  }}
+                >
+                  {ticket.status} · {ticket.category}
+                </Text>
+              </View>
+            ))
+          )}
+        </View>
+
+        {/* Logout */}
+        <TouchableOpacity
+          style={{
+            backgroundColor: theme.surface,
+            borderRadius: 12,
+            paddingVertical: 12,
+            alignItems: "center",
+            marginTop: 24,
+            borderWidth: 1,
+            borderColor: theme.border,
+          }}
+          onPress={handleLogout}
+        >
+          <Text
+            style={{
+              fontFamily: "Outfit-SemiBold",
+              fontSize: 13,
+              color: theme.subtext,
+            }}
+          >
+            Log out
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+
+  // ─── Page router — driven by navItems keys ──────────────────────────────────
+  const renderPage = () => {
+    switch (activeKey) {
+      case "dashboard":
+        return renderDashboardHome();
+
+      case "tickets":
+        // Employee sees TicketsPage scoped to their own tickets
+        return (
+          <TicketsPage
+            isSuperAdmin={false}
+            user={user}
+          />
+        );
+
+      case "inventory":
+        return (
+          <ITInventoryPage
+            isSuperAdmin={false}
+          />
+        );
+
+      case "consumables":
+        return (
+          <ConsumablesPage
+            isSuperAdmin={false}
+          />
+        );
+
+      default:
+        return renderDashboardHome();
     }
   };
 
   return (
     <View style={{ flex: 1 }}>
       <View style={{ flex: 1, flexDirection: "row" }}>
+        {/* Sidebar — web only */}
         {!isMobile && (
           <Sidebar
             user={user}
-            activeKey={activeTab}
-            onNavigate={(key) => setActiveTab(key as "dashboard" | "tickets")}
+            activeKey={activeKey}
+            onNavigate={setActiveKey}
             onLogout={handleSidebarLogout}
           />
         )}
 
-        <View style={{ flex: 1, flexDirection: "column", backgroundColor: "#0f172a" }}>
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
-            {renderContent()}
-          </ScrollView>
+        {/* Main content */}
+        <View
+          style={{
+            flex: 1,
+            flexDirection: "column",
+            backgroundColor: theme.background,
+          }}
+        >
+          {renderPage()}
 
+          {/* Bottom nav — mobile only */}
           {isMobile && (
             <BottomNavBar
               user={user}
-              activeKey={activeTab}
-              onNavigate={(key) => setActiveTab(key as "dashboard" | "tickets")}
+              activeKey={activeKey}
+              onNavigate={setActiveKey}
             />
           )}
         </View>
       </View>
 
+      {/* Submit ticket modal */}
       <Modal visible={addVisible} animationType="slide" transparent>
-        <View className="flex-1 bg-black/60 justify-end">
-          <View className="bg-slate-950 rounded-t-3xl p-6 max-h-[85%]">
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-white text-lg font-semibold">Submit IT Concern</Text>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.6)",
+            justifyContent: "flex-end",
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: theme.surface,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 24,
+              maxHeight: "85%",
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 16,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: "Outfit-SemiBold",
+                  fontSize: 17,
+                  color: theme.textActive,
+                }}
+              >
+                Submit IT Concern
+              </Text>
               <TouchableOpacity onPress={() => setAddVisible(false)}>
-                <Text className="text-slate-400">Cancel</Text>
+                <Text
+                  style={{ fontFamily: "Outfit", color: theme.subtext }}
+                >
+                  Cancel
+                </Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView className="space-y-4">
-              <View>
-                <Text className="text-slate-300 text-sm mb-1">Summary</Text>
-                <TextInput
-                  className="bg-slate-800 rounded-2xl px-4 py-3 text-white"
-                  placeholder="Short summary of the concern"
-                  placeholderTextColor="#94a3b8"
-                  value={summary}
-                  onChangeText={setSummary}
-                />
-              </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Summary */}
+              <Text
+                style={{
+                  fontFamily: "Outfit",
+                  fontSize: 13,
+                  color: theme.subtext,
+                  marginBottom: 4,
+                }}
+              >
+                Summary
+              </Text>
+              <TextInput
+                style={{
+                  backgroundColor: theme.background,
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  color: theme.textActive,
+                  fontFamily: "Outfit",
+                  marginBottom: 12,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                }}
+                placeholder="Short summary of the concern"
+                placeholderTextColor={theme.subtext}
+                value={summary}
+                onChangeText={setSummary}
+              />
 
-              <View>
-                <Text className="text-slate-300 text-sm mb-1">Details</Text>
-                <TextInput
-                  className="bg-slate-800 rounded-2xl px-4 py-3 text-white h-28"
-                  placeholder="Describe the issue in more detail"
-                  placeholderTextColor="#94a3b8"
-                  multiline
-                  value={details}
-                  onChangeText={setDetails}
-                />
-              </View>
+              {/* Details */}
+              <Text
+                style={{
+                  fontFamily: "Outfit",
+                  fontSize: 13,
+                  color: theme.subtext,
+                  marginBottom: 4,
+                }}
+              >
+                Details
+              </Text>
+              <TextInput
+                style={{
+                  backgroundColor: theme.background,
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  color: theme.textActive,
+                  fontFamily: "Outfit",
+                  height: 100,
+                  marginBottom: 12,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                }}
+                placeholder="Describe the issue in more detail"
+                placeholderTextColor={theme.subtext}
+                multiline
+                value={details}
+                onChangeText={setDetails}
+              />
 
-              <View>
-                <Text className="text-slate-300 text-sm mb-1">Category</Text>
-                <View className="bg-slate-800 rounded-2xl px-4 py-3">
-                  {CATEGORY_OPTIONS.map((item) => (
-                    <TouchableOpacity
-                      key={item}
-                      onPress={() => setCategory(item)}
-                      className={`rounded-2xl px-3 py-2 mb-2 ${category === item ? "bg-blue-600" : "bg-slate-900"}`}
+              {/* Category */}
+              <Text
+                style={{
+                  fontFamily: "Outfit",
+                  fontSize: 13,
+                  color: theme.subtext,
+                  marginBottom: 4,
+                }}
+              >
+                Category
+              </Text>
+              <View
+                style={{
+                  backgroundColor: theme.background,
+                  borderRadius: 12,
+                  padding: 10,
+                  marginBottom: 12,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                }}
+              >
+                {CATEGORY_OPTIONS.map((item) => (
+                  <TouchableOpacity
+                    key={item}
+                    onPress={() => setCategory(item)}
+                    style={{
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      marginBottom: 4,
+                      backgroundColor:
+                        category === item ? theme.primary : "transparent",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: "Outfit",
+                        color:
+                          category === item ? "#fff" : theme.textInactive,
+                        fontSize: 13,
+                      }}
                     >
-                      <Text className={`${category === item ? "text-white" : "text-slate-300"}`}>{item}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                      {item}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
 
-              <View>
-                <Text className="text-slate-300 text-sm mb-1">Priority</Text>
-                <View className="flex-row gap-2">
-                  {PRIORITY_OPTIONS.map((opt) => (
-                    <TouchableOpacity
-                      key={opt}
-                      onPress={() => setPriority(opt)}
-                      className={`flex-1 rounded-2xl px-4 py-3 ${priority === opt ? "bg-blue-600" : "bg-slate-800"}`}
+              {/* Priority */}
+              <Text
+                style={{
+                  fontFamily: "Outfit",
+                  fontSize: 13,
+                  color: theme.subtext,
+                  marginBottom: 4,
+                }}
+              >
+                Priority
+              </Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  gap: 8,
+                  marginBottom: 12,
+                }}
+              >
+                {PRIORITY_OPTIONS.map((opt) => (
+                  <TouchableOpacity
+                    key={opt}
+                    onPress={() => setPriority(opt)}
+                    style={{
+                      flex: 1,
+                      borderRadius: 10,
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      alignItems: "center",
+                      backgroundColor:
+                        priority === opt ? theme.primary : theme.background,
+                      borderWidth: 1,
+                      borderColor:
+                        priority === opt ? theme.primary : theme.border,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: "Outfit",
+                        color: priority === opt ? "#fff" : theme.textInactive,
+                        fontSize: 13,
+                      }}
                     >
-                      <Text className={`${priority === opt ? "text-white" : "text-slate-300"}`}>{opt}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                      {opt}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
 
-              <View>
-                <Text className="text-slate-300 text-sm mb-1">Due Date</Text>
-                <TextInput
-                  className="bg-slate-800 rounded-2xl px-4 py-3 text-white"
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#94a3b8"
-                  value={dueDate}
-                  onChangeText={setDueDate}
-                />
-              </View>
+              {/* Due date */}
+              <Text
+                style={{
+                  fontFamily: "Outfit",
+                  fontSize: 13,
+                  color: theme.subtext,
+                  marginBottom: 4,
+                }}
+              >
+                Due Date
+              </Text>
+              <TextInput
+                style={{
+                  backgroundColor: theme.background,
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  color: theme.textActive,
+                  fontFamily: "Outfit",
+                  marginBottom: 12,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                }}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={theme.subtext}
+                value={dueDate}
+                onChangeText={setDueDate}
+              />
 
-              {error ? <Text className="text-rose-400 text-sm">{error}</Text> : null}
+              {error ? (
+                <Text
+                  style={{
+                    fontFamily: "Outfit",
+                    color: "#f87171",
+                    fontSize: 13,
+                    marginBottom: 8,
+                  }}
+                >
+                  {error}
+                </Text>
+              ) : null}
 
               <TouchableOpacity
                 onPress={handleSubmitTicket}
-                className="bg-blue-600 rounded-2xl px-4 py-3 items-center"
                 disabled={saving}
+                style={{
+                  backgroundColor: theme.primary,
+                  borderRadius: 12,
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  alignItems: "center",
+                  marginBottom: 16,
+                  opacity: saving ? 0.6 : 1,
+                }}
               >
-                <Text className="text-white font-semibold">{saving ? "Submitting…" : "Submit Ticket"}</Text>
+                <Text
+                  style={{
+                    fontFamily: "Outfit-SemiBold",
+                    color: "#fff",
+                    fontSize: 14,
+                  }}
+                >
+                  {saving ? "Submitting…" : "Submit Ticket"}
+                </Text>
               </TouchableOpacity>
             </ScrollView>
           </View>

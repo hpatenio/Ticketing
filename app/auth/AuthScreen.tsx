@@ -19,7 +19,7 @@ import {
   where,
 } from "firebase/firestore";
 import { logout } from "./Logout";
-import { ADUser, UserRole } from "../../types";
+import { ADUser, UserPermissions, UserRole } from "../../types";
 import { useTheme } from "../../theme/ThemeContext";
 
 const BACKEND_URL = "http://10.10.10.98:3000";
@@ -50,21 +50,29 @@ async function validateWithAD(username: string, password: string) {
 }
 
 // ─── Step 2: Fetch role from Firestore employee_users ─────────────────────────
-// Role is ONLY set by the superadmin in Firestore, never derived from AD
-async function fetchRoleFromFirestore(username: string): Promise<UserRole> {
+async function fetchUserDataFromFirestore(username: string): Promise<{ role: UserRole; permissions: UserPermissions }> {
+  const DEFAULT_PERMISSIONS: UserPermissions = {
+    itInventory: false,
+    consumables: false,
+    tickets: false,
+  };
   try {
     const usersRef = collection(db, "employee_users");
-    const q = query(
-      usersRef,
-      where("username", "==", username.toLowerCase().trim()),
-    );
+    const q = query(usersRef, where("username", "==", username.toLowerCase().trim()));
     const snapshot = await getDocs(q);
-    if (snapshot.empty) return "employee";
+    if (snapshot.empty) return { role: "employee", permissions: DEFAULT_PERMISSIONS };
     const data = snapshot.docs[0].data();
-    return (data.role as UserRole) ?? "employee";
+    return {
+      role: (data.role as UserRole) ?? "employee",
+      permissions: {
+        itInventory: data.permissions?.itInventory ?? false,
+        consumables: data.permissions?.consumables ?? false,
+        tickets:     data.permissions?.tickets     ?? false,
+      },
+    };
   } catch (err) {
-    console.error("Firestore role fetch error:", err);
-    return "employee";
+    console.error("Firestore user data fetch error:", err);
+    return { role: "employee", permissions: DEFAULT_PERMISSIONS };
   }
 }
 
@@ -72,32 +80,25 @@ async function fetchRoleFromFirestore(username: string): Promise<UserRole> {
 async function saveUserToFirestore(user: ADUser): Promise<void> {
   try {
     const usersRef = collection(db, "employee_users");
-    const q = query(
-      usersRef,
-      where("username", "==", user.username.toLowerCase().trim()),
-    );
+    const q = query(usersRef, where("username", "==", user.username.toLowerCase().trim()));
     const snapshot = await getDocs(q);
+    if (!snapshot.empty) return; // already exists, don't overwrite role/permissions
 
-    if (!snapshot.empty) {
-      console.log("Firestore: user already exists:", snapshot.docs[0].id);
-      return;
-    }
-
-    const newDocRef = doc(
-      db,
-      "employee_users",
-      user.displayName || user.username,
-    );
+    const newDocRef = doc(db, "employee_users", user.displayName || user.username);
     await setDoc(newDocRef, {
-      username: user.username.toLowerCase().trim(),
+      username:    user.username.toLowerCase().trim(),
       displayName: user.displayName,
-      email: user.email || `${user.username}@ocgbim.com`,
-      department: user.department ?? "",
-      title: user.title ?? "",
-      phone: user.phone ?? "",
-      role: "employee", // always default to employee, superadmin promotes later
+      email:       user.email || `${user.username}@ocgbim.com`,
+      department:  user.department ?? "",
+      title:       user.title ?? "",
+      phone:       user.phone ?? "",
+      role:        "employee",
+      permissions: {
+        itInventory: false,
+        consumables: false,
+        tickets:     false,
+      },
     });
-    console.log("Firestore: created employee_users doc for:", user.displayName);
   } catch (err) {
     console.error("Firestore save error:", err);
   }
@@ -109,35 +110,29 @@ async function handleSignIn(
   password: string,
 ): Promise<{ success: boolean; user?: ADUser; message?: string }> {
   const adResult = await validateWithAD(username, password);
-  console.log("AD raw response:", JSON.stringify(adResult));
-
   if (!adResult.success) {
-    return {
-      success: false,
-      message: adResult.message || "Login failed. Please try again.",
-    };
+    return { success: false, message: adResult.message || "Login failed. Please try again." };
   }
 
   const adUser = adResult.user;
-
-  // Build user with employee role by default
   const user: ADUser = {
-    username: adUser?.username ?? username,
+    username:    adUser?.username    ?? username,
     displayName: adUser?.displayName ?? username,
-    email: adUser?.email ?? `${username}@ocgbim.com`,
-    department: adUser?.department ?? "",
-    title: adUser?.title ?? "",
-    phone: adUser?.phone ?? "",
-    role: "employee", // always start as employee
+    email:       adUser?.email       ?? `${username}@ocgbim.com`,
+    department:  adUser?.department  ?? "",
+    title:       adUser?.title       ?? "",
+    phone:       adUser?.phone       ?? "",
+    role:        "employee",
+    permissions: { itInventory: false, consumables: false, tickets: false },
   };
 
-  // Save to Firestore if first time (role stays "employee" until superadmin changes it)
+  // Save to Firestore only if first login (won't overwrite existing role/permissions)
   await saveUserToFirestore(user);
 
-  // Read the role back from Firestore (superadmin may have already set it)
-  const firestoreRole = await fetchRoleFromFirestore(username);
-  user.role = firestoreRole;
-  console.log("✅ Final role from Firestore:", user.role);
+  // Always read role + permissions back from Firestore
+  const { role, permissions } = await fetchUserDataFromFirestore(username);
+  user.role = role;
+  user.permissions = permissions;
 
   return { success: true, user };
 }
@@ -157,25 +152,27 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
   const [error, setError] = useState("");
   const [user, setUser] = useState<ADUser | null>(null);
 
-  useEffect(() => {
-    const restoreUser = async () => {
-      try {
-        const saved = await AsyncStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          const parsedUser = JSON.parse(saved);
-          const freshRole = await fetchRoleFromFirestore(parsedUser.username);
-          parsedUser.role = freshRole;
-          setUser(parsedUser);
-          onLoginSuccess(parsedUser);
-        }
-      } catch (err) {
-        console.error("Restore auth error:", err);
-      } finally {
-        setRestoring(false);
+useEffect(() => {
+  const restoreUser = async () => {
+    try {
+      const saved = await AsyncStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsedUser = JSON.parse(saved);
+        const { role, permissions } = await fetchUserDataFromFirestore(parsedUser.username);
+        parsedUser.role = role;
+        parsedUser.permissions = permissions;
+        setUser(parsedUser);
+        onLoginSuccess(parsedUser);
       }
-    };
-    restoreUser();
-  }, []);
+    } catch (err) {
+      console.error("Restore auth error:", err);
+    } finally {
+      setRestoring(false);
+    }
+  };
+  restoreUser();
+}, []);
+
   const handleLogin = async () => {
     setError("");
     if (!username.trim()) {

@@ -1,7 +1,8 @@
-﻿import { db } from "../firebase";
+import { db } from "../firebase";
 import {
   collection,
   getDocs,
+  getDoc,
   setDoc,
   updateDoc,
   doc,
@@ -11,9 +12,34 @@ import {
   where,
   Timestamp,
 } from "firebase/firestore";
-import { ConcernTicket } from "../types";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ConcernTicket, ADUser } from "../types";
+import { logAudit } from "./auditService";
 
 const COLLECTION = "concern_tickets";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const formatValue = (value: any): string => {
+  if (value === null || value === undefined) return "—";
+  if (value instanceof Timestamp) return value.toDate().toISOString().split("T")[0];
+  if (typeof value === "object" && typeof value.toDate === "function") {
+    return value.toDate().toISOString().split("T")[0];
+  }
+  return String(value);
+};
+const getCurrentUser = async (): Promise<{ name: string; id: string }> => {
+  try {
+    const saved = await AsyncStorage.getItem("AD_USER_DATA");
+    if (saved) {
+      const user: ADUser = JSON.parse(saved);
+      return { name: user.displayName, id: user.username };
+    }
+  } catch {}
+  return { name: "Unknown", id: "" };
+};
+
+// ─── CREATE ───────────────────────────────────────────────────────────────────
 
 export const addTicket = async (
   data: Omit<ConcernTicket, "id" | "dateCreated" | "dueDate"> & {
@@ -23,10 +49,15 @@ export const addTicket = async (
 ): Promise<void> => {
   await setDoc(doc(db, COLLECTION, data.ticketNumber), {
     ...data,
-    dueDate: data.dueDate instanceof Date ? Timestamp.fromDate(data.dueDate) : data.dueDate,
+    dueDate:
+      data.dueDate instanceof Date
+        ? Timestamp.fromDate(data.dueDate)
+        : data.dueDate,
     dateCreated: serverTimestamp(),
   });
 };
+
+// ─── READ ALL ─────────────────────────────────────────────────────────────────
 
 export const getAllTickets = async (): Promise<ConcernTicket[]> => {
   const q = query(collection(db, COLLECTION), orderBy("dateCreated", "desc"));
@@ -52,14 +83,34 @@ export const getTicketsByRequester = async (
   })) as ConcernTicket[];
 };
 
+// ─── UPDATE SINGLE FIELD (with audit) ────────────────────────────────────────
+
 export const updateTicketField = async (
   ticketNumber: string,
   field: string,
-  value: any
+  value: any,
+  changedBy?: string,
+  changedById?: string
 ): Promise<void> => {
-  let updateValue = value;
+  // Auto-resolve user from storage if not passed in
+  if (!changedBy) {
+    const user = await getCurrentUser();
+    changedBy = user.name;
+    changedById = user.id;
+  }
 
-  // Handle date conversions for dueDate field
+  // Fetch old value before writing
+  let oldValue = "—";
+  try {
+    const snap = await getDoc(doc(db, COLLECTION, ticketNumber));
+    if (snap.exists()) {
+      const data = snap.data();
+      oldValue = formatValue(data[field]);
+    }
+  } catch {}
+
+  // Normalise dueDate
+  let updateValue = value;
   if (field === "dueDate") {
     if (value instanceof Date) {
       updateValue = Timestamp.fromDate(value);
@@ -73,5 +124,16 @@ export const updateTicketField = async (
 
   await updateDoc(doc(db, COLLECTION, ticketNumber), {
     [field]: updateValue,
+  });
+
+  await logAudit({
+    table: "tickets",
+    recordId: ticketNumber,
+    recordLabel: ticketNumber,
+    field,
+    oldValue,
+    newValue: formatValue(value),
+    changedBy: changedBy ?? "Unknown",
+    changedById: changedById ?? "",
   });
 };
