@@ -36,92 +36,96 @@ type Props = {
 // ─── Tailwind color presets for badge options ─────────────────────────────────
 
 const COLOR_PRESETS = [
-  {
-    bg: "bg-green-600",
-    text: "text-white",
-    bgHex: "#16a34a",
-    textHex: "#ffffff",
-    label: "Green",
-  },
-  {
-    bg: "bg-orange-600",
-    text: "text-white",
-    bgHex: "#ea580c",
-    textHex: "#ffffff",
-    label: "Orange",
-  },
-  {
-    bg: "bg-blue-600",
-    text: "text-white",
-    bgHex: "#2563eb",
-    textHex: "#ffffff",
-    label: "Blue",
-  },
-  {
-    bg: "bg-cyan-600",
-    text: "text-white",
-    bgHex: "#0891b2",
-    textHex: "#ffffff",
-    label: "Cyan",
-  },
-  {
-    bg: "bg-red-600",
-    text: "text-white",
-    bgHex: "#dc2626",
-    textHex: "#ffffff",
-    label: "Red",
-  },
-  {
-    bg: "bg-purple-600",
-    text: "text-white",
-    bgHex: "#9333ea",
-    textHex: "#ffffff",
-    label: "Purple",
-  },
-  {
-    bg: "bg-amber-600",
-    text: "text-white",
-    bgHex: "#d97706",
-    textHex: "#ffffff",
-    label: "Amber",
-  },
-  {
-    bg: "bg-teal-600",
-    text: "text-white",
-    bgHex: "#0d9488",
-    textHex: "#ffffff",
-    label: "Teal",
-  },
-  {
-    bg: "bg-pink-600",
-    text: "text-white",
-    bgHex: "#db2777",
-    textHex: "#ffffff",
-    label: "Pink",
-  },
-  {
-    bg: "bg-indigo-600",
-    text: "text-white",
-    bgHex: "#4f46e5",
-    textHex: "#ffffff",
-    label: "Indigo",
-  },
-  {
-    bg: "bg-violet-600",
-    text: "text-white",
-    bgHex: "#7c3aed",
-    textHex: "#ffffff",
-    label: "Violet",
-  },
-  {
-    bg: "bg-gray-500",
-    text: "text-white",
-    bgHex: "#6b7280",
-    textHex: "#ffffff",
-    label: "Gray",
-  },
-];
+  // Green
+  { bg: "bg-green-600", text: "text-white", bgHex: "#16a34a", textHex: "#ffffff", label: "Green" },
+  { bg: "bg-green-700", text: "text-white", bgHex: "#15803d", textHex: "#ffffff", label: "Green 700" },
+  { bg: "bg-green-800", text: "text-white", bgHex: "#166534", textHex: "#ffffff", label: "Green 800" },
 
+  // Orange
+  { bg: "bg-orange-600", text: "text-white", bgHex: "#ea580c", textHex: "#ffffff", label: "Orange" },
+  { bg: "bg-orange-700", text: "text-white", bgHex: "#c2410c", textHex: "#ffffff", label: "Orange 700" },
+  { bg: "bg-orange-800", text: "text-white", bgHex: "#9a3412", textHex: "#ffffff", label: "Orange 800" },
+
+  // Blue
+  { bg: "bg-blue-600", text: "text-white", bgHex: "#2563eb", textHex: "#ffffff", label: "Blue" },
+  { bg: "bg-blue-700", text: "text-white", bgHex: "#1d4ed8", textHex: "#ffffff", label: "Blue 700" },
+  { bg: "bg-blue-800", text: "text-white", bgHex: "#1e40af", textHex: "#ffffff", label: "Blue 800" },
+  { bg: "bg-blue-900", text: "text-white", bgHex: "#1e3a8a", textHex: "#ffffff", label: "Blue 900" },
+
+  // Cyan
+  { bg: "bg-cyan-600", text: "text-white", bgHex: "#0891b2", textHex: "#ffffff", label: "Cyan" },
+  { bg: "bg-cyan-700", text: "text-white", bgHex: "#0e7490", textHex: "#ffffff", label: "Cyan 700" },
+  { bg: "bg-cyan-800", text: "text-white", bgHex: "#155e75", textHex: "#ffffff", label: "Cyan 800" },
+  { bg: "bg-cyan-900", text: "text-white", bgHex: "#164e63", textHex: "#ffffff", label: "Cyan 900" },
+
+  // Red
+  { bg: "bg-red-600", text: "text-white", bgHex: "#dc2626", textHex: "#ffffff", label: "Red" },
+  { bg: "bg-red-700", text: "text-white", bgHex: "#b91c1c", textHex: "#ffffff", label: "Red 700" },
+  { bg: "bg-red-800", text: "text-white", bgHex: "#991b1b", textHex: "#ffffff", label: "Red 800" },
+  { bg: "bg-red-900", text: "text-white", bgHex: "#7f1d1d", textHex: "#ffffff", label: "Red 900" },
+
+  // Purple
+  { bg: "bg-purple-600", text: "text-white", bgHex: "#9333ea", textHex: "#ffffff", label: "Purple" },
+  { bg: "bg-purple-700", text: "text-white", bgHex: "#7e22ce", textHex: "#ffffff", label: "Purple 700" },
+  { bg: "bg-purple-800", text: "text-white", bgHex: "#6b21a8", textHex: "#ffffff", label: "Purple 800" },
+  { bg: "bg-purple-900", text: "text-white", bgHex: "#581c87", textHex: "#ffffff", label: "Purple 900" },
+
+  // Amber
+  { bg: "bg-amber-700", text: "text-white", bgHex: "#b45309", textHex: "#ffffff", label: "Amber 700" },
+  { bg: "bg-amber-800", text: "text-white", bgHex: "#92400e", textHex: "#ffffff", label: "Amber 800" },
+  { bg: "bg-amber-900", text: "text-white", bgHex: "#78350f", textHex: "#ffffff", label: "Amber 900" },
+
+  // Teal
+  { bg: "bg-teal-600", text: "text-white", bgHex: "#0d9488", textHex: "#ffffff", label: "Teal" },
+  { bg: "bg-teal-700", text: "text-white", bgHex: "#0f766e", textHex: "#ffffff", label: "Teal 700" },
+  { bg: "bg-teal-800", text: "text-white", bgHex: "#115e59", textHex: "#ffffff", label: "Teal 800" },
+  { bg: "bg-teal-900", text: "text-white", bgHex: "#134e4a", textHex: "#ffffff", label: "Teal 900" },
+
+  // Pink
+  { bg: "bg-pink-600", text: "text-white", bgHex: "#db2777", textHex: "#ffffff", label: "Pink" },
+  { bg: "bg-pink-700", text: "text-white", bgHex: "#be185d", textHex: "#ffffff", label: "Pink 700" },
+  { bg: "bg-pink-800", text: "text-white", bgHex: "#9d174d", textHex: "#ffffff", label: "Pink 800" },
+  { bg: "bg-pink-900", text: "text-white", bgHex: "#831843", textHex: "#ffffff", label: "Pink 900" },
+
+  // Indigo
+  { bg: "bg-indigo-600", text: "text-white", bgHex: "#4f46e5", textHex: "#ffffff", label: "Indigo" },
+  { bg: "bg-indigo-700", text: "text-white", bgHex: "#4338ca", textHex: "#ffffff", label: "Indigo 700" },
+  { bg: "bg-indigo-800", text: "text-white", bgHex: "#3730a3", textHex: "#ffffff", label: "Indigo 800" },
+  { bg: "bg-indigo-900", text: "text-white", bgHex: "#312e81", textHex: "#ffffff", label: "Indigo 900" },
+
+  // Violet
+  { bg: "bg-violet-600", text: "text-white", bgHex: "#7c3aed", textHex: "#ffffff", label: "Violet" },
+  { bg: "bg-violet-700", text: "text-white", bgHex: "#6d28d9", textHex: "#ffffff", label: "Violet 700" },
+  { bg: "bg-violet-800", text: "text-white", bgHex: "#5b21b6", textHex: "#ffffff", label: "Violet 800" },
+  { bg: "bg-violet-900", text: "text-white", bgHex: "#4c1d95", textHex: "#ffffff", label: "Violet 900" },
+
+  // Gray
+  { bg: "bg-gray-500", text: "text-white", bgHex: "#6b7280", textHex: "#ffffff", label: "Gray" },
+  { bg: "bg-gray-600", text: "text-white", bgHex: "#4b5563", textHex: "#ffffff", label: "Gray 600" },
+  { bg: "bg-gray-700", text: "text-white", bgHex: "#374151", textHex: "#ffffff", label: "Gray 700" },
+  { bg: "bg-gray-800", text: "text-white", bgHex: "#1f2937", textHex: "#ffffff", label: "Gray 800" },
+
+  // New colors
+  { bg: "bg-rose-600", text: "text-white", bgHex: "#e11d48", textHex: "#ffffff", label: "Rose" },
+  { bg: "bg-rose-700", text: "text-white", bgHex: "#be123c", textHex: "#ffffff", label: "Rose 700" },
+  { bg: "bg-rose-800", text: "text-white", bgHex: "#9f1239", textHex: "#ffffff", label: "Rose 800" },
+
+  { bg: "bg-emerald-600", text: "text-white", bgHex: "#059669", textHex: "#ffffff", label: "Emerald" },
+  { bg: "bg-emerald-700", text: "text-white", bgHex: "#047857", textHex: "#ffffff", label: "Emerald 700" },
+  { bg: "bg-emerald-800", text: "text-white", bgHex: "#065f46", textHex: "#ffffff", label: "Emerald 800" },
+
+  { bg: "bg-sky-600", text: "text-white", bgHex: "#0284c7", textHex: "#ffffff", label: "Sky" },
+  { bg: "bg-sky-700", text: "text-white", bgHex: "#0369a1", textHex: "#ffffff", label: "Sky 700" },
+  { bg: "bg-sky-800", text: "text-white", bgHex: "#075985", textHex: "#ffffff", label: "Sky 800" },
+
+  { bg: "bg-fuchsia-600", text: "text-white", bgHex: "#c026d3", textHex: "#ffffff", label: "Fuchsia" },
+  { bg: "bg-fuchsia-700", text: "text-white", bgHex: "#a21caf", textHex: "#ffffff", label: "Fuchsia 700" },
+  { bg: "bg-fuchsia-800", text: "text-white", bgHex: "#86198f", textHex: "#ffffff", label: "Fuchsia 800" },
+
+  { bg: "bg-slate-600", text: "text-white", bgHex: "#475569", textHex: "#ffffff", label: "Slate" },
+  { bg: "bg-slate-700", text: "text-white", bgHex: "#334155", textHex: "#ffffff", label: "Slate 700" },
+  { bg: "bg-slate-800", text: "text-white", bgHex: "#1e293b", textHex: "#ffffff", label: "Slate 800" },
+];
 const BASE_BADGE =
   "inline-flex justify-center px-2 py-1 rounded-lg text-sm font-medium";
 

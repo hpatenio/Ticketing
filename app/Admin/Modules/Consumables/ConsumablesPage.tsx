@@ -19,6 +19,7 @@ import ManageColumnsModal, {
   ColumnConfig,
   DropdownOption,
 } from "../../../SuperAdmin/ManageColumnsModal";
+import AuditTrailModal from "../../../../components/common/AuditTrailModal";
 import { getAllDropdownConfigs, getDropdownOptions } from "../../../../Services/dropdownConfigs";
 
 // ─── Options ──────────────────────────────────────────────────────────────────
@@ -230,15 +231,6 @@ const INK_KEYS = [
   "maintenanceBox",
   "photoBlack",
 ] as const;
-
-// ─── Tab types ────────────────────────────────────────────────────────────────
-
-// 3 main tabs:
-//   "all"      → flat merged table (all statuses together)
-//   "grouped"  → collapsible sections per status
-//   "filter"   → flat table filtered by the status dropdown
-
-type MainTab = "all" | "grouped" | "filter";
 
 // ─── Status group definitions ─────────────────────────────────────────────────
 
@@ -579,13 +571,16 @@ const ConsumablesPage: React.FC<Props> = ({ isSuperAdmin = false }) => {
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<ConsumablesSortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("default");
-  const [mainTab, setMainTab] = useState<MainTab>("all");
-  const [filterStatus, setFilterStatus] = useState<string>(""); // for "filter" tab dropdown
+  const [filterStatus, setFilterStatus] = useState<string>("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [addVisible, setAddVisible] = useState(false);
   const [editVisible, setEditVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ITConsumable | null>(null);
   const [manageColumnsVisible, setManageColumnsVisible] = useState(false);
+  const [auditModal, setAuditModal] = useState<
+    | { recordId?: string; recordLabel?: string }
+    | null
+  >(null);
 
   const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
     {
@@ -773,7 +768,7 @@ const ConsumablesPage: React.FC<Props> = ({ isSuperAdmin = false }) => {
   );
 
   // Items shown in the "filter" tab — respects the status dropdown
-  const filterTabItems = useMemo(
+  const displayItems = useMemo(
     () =>
       filterStatus
         ? sortedFiltered.filter((i) => i.status === filterStatus)
@@ -932,37 +927,34 @@ const ConsumablesPage: React.FC<Props> = ({ isSuperAdmin = false }) => {
     >
       {/* ── Fixed top bar ── */}
       <div className="flex-shrink-0 px-4 pt-4 pb-0">
-        {/* Header + Search */}
-        <div className="flex items-center justify-between gap-4 mb-4">
+        <div className="flex items-center justify-between gap-4 mb-3">
           <div>
             <h1 style={{ color: theme.text }} className="text-xl font-bold">
               IT Consumables
             </h1>
             <p style={{ color: theme.subtext }} className="text-xs mt-0.5">
-              {sortedFiltered.length} of {data.length} printers
+              {displayItems.length} of {data.length} printers
             </p>
           </div>
 
           <div className="flex items-center gap-3">
-            <input
-              type="text"
-              placeholder="Search printer name, model, IP, location..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+            <button
+              onClick={() => setAuditModal({})}
               style={{
-                backgroundColor: theme.inputBg,
-                borderColor: theme.inputBorder,
-                color: theme.inputText,
+                backgroundColor: theme.surface,
+                color: theme.text,
+                borderColor: theme.border,
               }}
-              className="w-80 px-4 py-2.5 text-sm border rounded-lg focus:outline-none"
-              onFocus={(e) =>
-                (e.currentTarget.style.borderColor = theme.inputBorderFocus)
+              className="px-3 py-2 text-sm font-medium rounded-lg border whitespace-nowrap"
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = theme.bgHover)
               }
-              onBlur={(e) =>
-                (e.currentTarget.style.borderColor = theme.inputBorder)
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = theme.surface)
               }
-            />
-
+            >
+              Audit Trail
+            </button>
             {isSuperAdmin && (
               <button
                 onClick={() => setManageColumnsVisible(true)}
@@ -1001,55 +993,60 @@ const ConsumablesPage: React.FC<Props> = ({ isSuperAdmin = false }) => {
           </div>
         </div>
 
-        {/* Tab bar */}
         <div className="flex items-center gap-2 mb-3">
-          {/* All */}
-          {(["all", "grouped"] as const).map((key) => {
-            const isActive = mainTab === key;
-            const label = key === "all" ? "All" : "By Status";
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setMainTab(key)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all"
-                style={{
-                  backgroundColor: isActive ? theme.primary : theme.surface,
-                  color: isActive ? theme.primaryText : theme.subtext,
-                  borderColor: isActive ? theme.primary : theme.border,
-                }}
-              >
-                {key === "all" && <span>☰</span>}
-                {key === "grouped" && <span>▤</span>}
-                {label}
-                <span
-                  className="px-1.5 py-0.5 rounded-full"
-                  style={{
-                    backgroundColor: isActive
-                      ? "rgba(255,255,255,0.25)"
-                      : theme.surfaceRaised,
-                    color: isActive ? theme.primaryText : theme.subtext,
-                  }}
-                >
-                  {counts.all}
-                </span>
-              </button>
-            );
-          })}
-
-          {/* Filter tab — clicking it opens the dropdown immediately */}
+          <input
+            type="text"
+            placeholder="Search printer name, model, IP, location..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              backgroundColor: theme.inputBg,
+              borderColor: theme.inputBorder,
+              color: theme.inputText,
+            }}
+            className="flex-1 px-4 py-2.5 text-sm border rounded-lg focus:outline-none"
+            onFocus={(e) =>
+              (e.currentTarget.style.borderColor = theme.inputBorderFocus)
+            }
+            onBlur={(e) =>
+              (e.currentTarget.style.borderColor = theme.inputBorder)
+            }
+          />
           <FilterTabDropdown
-            isActive={mainTab === "filter"}
+            isActive={!!filterStatus}
             filterStatus={filterStatus}
             counts={counts}
             theme={theme}
-            onActivate={() => setMainTab("filter")}
-            onChange={(val) => {
-              setMainTab("filter");
-              setFilterStatus(val);
-            }}
+            onActivate={() => {}}
+            onChange={(val) => setFilterStatus(val)}
           />
         </div>
+
+        {filterStatus && (
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <span style={{ color: theme.subtext }} className="text-xs">
+              Filtered by:
+            </span>
+            <div
+              style={{
+                backgroundColor: theme.primarySubtle,
+                color: theme.primarySubtleText,
+              }}
+              className="flex items-center gap-2 px-3 py-1 rounded-full"
+            >
+              <span className="text-xs font-medium">
+                Status: {filterStatus}
+              </span>
+              <button
+                type="button"
+                onClick={() => setFilterStatus("")}
+                className="text-xs font-bold"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Scrollable content ── */}
@@ -1060,36 +1057,13 @@ const ConsumablesPage: React.FC<Props> = ({ isSuperAdmin = false }) => {
             className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin"
           />
         </div>
-      ) : sortedFiltered.length === 0 ? (
+      ) : displayItems.length === 0 ? (
         <div className="flex flex-1 items-center justify-center py-20">
           <p style={{ color: theme.subtext }} className="text-sm">
             No printers found.
           </p>
         </div>
-      ) : mainTab === "grouped" ? (
-        /* ── By Status: collapsible sections ── */
-        <div className="inventory-scroll flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
-          {STATUS_GROUPS.map((group) => (
-            <StatusSection
-              key={group.key}
-              group={group}
-              items={groupedItemsMap[group.key]}
-              isCollapsed={!!collapsed[group.key]}
-              theme={theme}
-              onToggle={toggleCollapsed}
-              renderTableHead={renderTableHead}
-              renderTableBody={renderTableBody}
-            />
-          ))}
-        </div>
-      ) : mainTab === "filter" && filterTabItems.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center py-20">
-          <p style={{ color: theme.subtext }} className="text-sm">
-            No {filterStatus || "printers"} found.
-          </p>
-        </div>
       ) : (
-        /* ── All / Filter: flat table ── */
         <div className="inventory-scroll flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
           <div
             style={{ borderColor: theme.border }}
@@ -1100,11 +1074,7 @@ const ConsumablesPage: React.FC<Props> = ({ isSuperAdmin = false }) => {
               style={{ borderCollapse: "collapse" }}
             >
               {renderTableHead(0)}
-              <tbody>
-                {renderTableBody(
-                  mainTab === "filter" ? filterTabItems : sortedFiltered,
-                )}
-              </tbody>
+              <tbody>{renderTableBody(displayItems)}</tbody>
             </table>
           </div>
         </div>
@@ -1136,6 +1106,13 @@ const ConsumablesPage: React.FC<Props> = ({ isSuperAdmin = false }) => {
             DEFAULT_LOCATION_OPTIONS;
           setDropdownOptions({ status: sta, location: loc });
         }}
+      />
+      <AuditTrailModal
+        visible={auditModal !== null}
+        onClose={() => setAuditModal(null)}
+        table="consumables"
+        recordId={auditModal?.recordId}
+        recordLabel={auditModal?.recordLabel}
       />
     </div>
   );

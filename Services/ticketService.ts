@@ -83,6 +83,25 @@ export const getTicketsByRequester = async (
   })) as ConcernTicket[];
 };
 
+// ─── UPDATE FULL TICKET (batch modal save) ─────────────────────────────────
+
+export const updateTicket = async (
+  ticketNumber: string,
+  data: Partial<Omit<ConcernTicket, "id" | "ticketNumber" | "dateCreated">>
+): Promise<void> => {
+  const payload: any = { ...data };
+  if (payload.dueDate && typeof payload.dueDate === "string") {
+    const dateObj = new Date(payload.dueDate);
+    if (!Number.isNaN(dateObj.getTime())) {
+      payload.dueDate = Timestamp.fromDate(dateObj);
+    }
+  }
+  await updateDoc(doc(db, COLLECTION, ticketNumber), {
+    ...payload,
+    updatedAt: serverTimestamp(),
+  });
+};
+
 // ─── UPDATE SINGLE FIELD (with audit) ────────────────────────────────────────
 
 export const updateTicketField = async (

@@ -1,4 +1,5 @@
-import { Modal, View, Text, TouchableOpacity, Platform } from "react-native";
+import { Modal, View, Text, TouchableOpacity } from "react-native";
+import { useTheme } from "../../theme/ThemeContext";
 
 type Props = {
   visible: boolean;
@@ -7,24 +8,26 @@ type Props = {
 };
 
 export default function LogoutModal({ visible, onConfirm, onCancel }: Props) {
+  const { theme } = useTheme();
+
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
       <View
         style={{
           flex: 1,
-          backgroundColor: "rgba(0,0,0,0.25)",
+          backgroundColor: theme.overlay,
           alignItems: "center",
           justifyContent: "center",
         }}
       >
         <View
           style={{
-            backgroundColor: "#fff",
+            backgroundColor: theme.surface,
             borderRadius: 16,
             padding: 28,
             width: 320,
-            shadowColor: "#000",
-            shadowOpacity: 0.12,
+            shadowColor: theme.shadow,
+            shadowOpacity: 1,
             shadowRadius: 16,
             shadowOffset: { width: 0, height: 4 },
             elevation: 8,
@@ -32,9 +35,10 @@ export default function LogoutModal({ visible, onConfirm, onCancel }: Props) {
         >
           <Text
             style={{
-              fontFamily: "DMSans_600SemiBold",
+              fontFamily: "Outfit",
+              fontWeight: "500",
               fontSize: 16,
-              color: "#1D4B5C",
+              color: theme.text,
               marginBottom: 8,
             }}
           >
@@ -42,9 +46,10 @@ export default function LogoutModal({ visible, onConfirm, onCancel }: Props) {
           </Text>
           <Text
             style={{
-              fontFamily: "DMSans_400Regular",
+              fontFamily: "Outfit",
+              fontWeight: "400",
               fontSize: 13.5,
-              color: "#669BAE",
+              color: theme.subtext,
               marginBottom: 24,
             }}
           >
@@ -59,15 +64,16 @@ export default function LogoutModal({ visible, onConfirm, onCancel }: Props) {
                 paddingVertical: 10,
                 borderRadius: 10,
                 borderWidth: 1,
-                borderColor: "#E8F4F8",
+                borderColor: theme.border,
                 alignItems: "center",
               }}
             >
               <Text
                 style={{
-                  fontFamily: "DMSans_600SemiBold",
+                  fontFamily: "Outfit",
+                  fontWeight: "500",
                   fontSize: 13.5,
-                  color: "#669BAE",
+                  color: theme.subtext,
                 }}
               >
                 Cancel
@@ -80,15 +86,16 @@ export default function LogoutModal({ visible, onConfirm, onCancel }: Props) {
                 flex: 1,
                 paddingVertical: 10,
                 borderRadius: 10,
-                backgroundColor: "#35A2CA",
+                backgroundColor: theme.primary,
                 alignItems: "center",
               }}
             >
               <Text
                 style={{
-                  fontFamily: "DMSans_600SemiBold",
+                  fontFamily: "Outfit",
+                  fontWeight: "500",
                   fontSize: 13.5,
-                  color: "#fff",
+                  color: theme.primaryText,
                 }}
               >
                 Log out

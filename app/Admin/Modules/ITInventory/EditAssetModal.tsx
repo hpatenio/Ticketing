@@ -1,9 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ITInventory } from "../../../../types";
-import { updateAsset, updateAssetField } from "../../../../Services/itInventory";
+import {
+  updateAsset,
+  updateAssetField,
+} from "../../../../Services/itInventory";
 import { Timestamp } from "firebase/firestore";
 import { useTheme } from "../../../../theme/ThemeContext";
 import BadgeSelect from "../../../../components/common/BadgeSelect"; // adjust path
+import { logAuditBatch } from "../../../../Services/auditService";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -535,58 +540,94 @@ const EditAssetModal: React.FC<Props> = ({
   };
 
   const handleSubmit = async () => {
-  if (!form.company || !form.brand) {
-    setError("Company and Brand are required.");
-    return;
-  }
-  if (!selectedAsset) return;
-  setLoading(true);
-  setError("");
-  try {
-    // ── Build the fields that actually changed ──
-    const oldForm = {
-      company:      selectedAsset.company,
-      serialNumber: selectedAsset.serialNumber,
-      model:        selectedAsset.model,
-      brand:        selectedAsset.brand,
-      status:       selectedAsset.status,
-      assigneeId:   selectedAsset.assigneeId,
-      assigneeName: selectedAsset.assigneeName,
-      category:     selectedAsset.category,
-      location:     selectedAsset.location,
-      notes:        selectedAsset.notes,
-      datePurchased: selectedAsset.datePurchased
-        ? selectedAsset.datePurchased.toDate().toISOString().split("T")[0]
-        : "",
-    };
+    if (!form.company || !form.brand) {
+      setError("Company and Brand are required.");
+      return;
+    }
+    if (!selectedAsset) return;
 
-    const changedFields = (Object.keys(form) as (keyof typeof form)[]).filter(
-      (key) => form[key] !== oldForm[key]
-    );
+    setLoading(true);
+    setError("");
 
-    // ── Write each changed field with audit ──
-    await Promise.all(
-      changedFields.map((field) =>
-        updateAssetField(
-          selectedAsset.assetTag,
+    try {
+      // ── 1. Resolve current user (same source as updateAssetField) ──────────
+      let changedBy = "Unknown";
+      let changedById = "";
+      try {
+        const saved = await AsyncStorage.getItem("AD_USER_DATA");
+        if (saved) {
+          const user = JSON.parse(saved);
+          changedBy = user.displayName ?? "Unknown";
+          changedById = user.username ?? "";
+        }
+      } catch {}
+
+      // ── 2. Build a map of the original values ──────────────────────────────
+      const original: Record<string, string> = {
+        company: selectedAsset.company ?? "",
+        serialNumber: selectedAsset.serialNumber ?? "",
+        model: selectedAsset.model ?? "",
+        brand: selectedAsset.brand ?? "",
+        status: selectedAsset.status ?? "",
+        assigneeId: selectedAsset.assigneeId ?? "",
+        assigneeName: selectedAsset.assigneeName ?? "",
+        category: selectedAsset.category ?? "",
+        location: selectedAsset.location ?? "",
+        notes: selectedAsset.notes ?? "",
+        datePurchased: selectedAsset.datePurchased
+          ? selectedAsset.datePurchased.toDate().toISOString().split("T")[0]
+          : "",
+      };
+
+      // ── 3. Collect only the fields that actually changed ───────────────────
+      const changedFields = (Object.keys(form) as (keyof typeof form)[]).filter(
+        (key) => (form[key] ?? "") !== (original[key] ?? ""),
+      );
+
+      if (changedFields.length === 0) {
+        onClose();
+        return;
+      }
+
+      // ── 4. Persist each changed field to Firestore ─────────────────────────
+      //    Pass changedBy/changedById so updateAssetField skips its own
+      //    AsyncStorage lookup — avoids a duplicate read per field.
+      await Promise.all(
+        changedFields.map((field) =>
+          updateAssetField(
+            selectedAsset.assetTag,
+            field,
+            field === "datePurchased" && form.datePurchased
+              ? (Timestamp.fromDate(new Date(form.datePurchased)) as any)
+              : form[field],
+            changedBy,
+            changedById,
+          ),
+        ),
+      );
+
+      // ── 5. Write ONE batch audit entry for all changed fields ──────────────
+      await logAuditBatch({
+        table: "inventory",
+        recordId: selectedAsset.assetTag,
+        recordLabel: selectedAsset.assetTag,
+        changedBy,
+        changedById,
+        changes: changedFields.map((field) => ({
           field,
-          field === "datePurchased" && form.datePurchased
-            ? Timestamp.fromDate(new Date(form.datePurchased)) as any
-            : form[field]
-        )
-        // changedBy/changedById auto-resolved from AsyncStorage inside updateAssetField
-      )
-    );
+          oldValue: original[field] ?? "",
+          newValue: (form[field] as string) ?? "",
+        })),
+      });
 
-    onSuccess();
-    onClose();
-  } catch {
-    setError("Something went wrong. Please try again.");
-  } finally {
-    setLoading(false);
-  }
-};
-
+      onSuccess();
+      onClose();
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
   const handleDeleteClick = () => {
     if (!confirmDelete) {
       setConfirmDelete(true);

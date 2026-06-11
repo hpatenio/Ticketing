@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ITConsumable } from "../../../../types";
-import { updateConsumable, updateConsumableField } from "../../../../Services/consumablesService";
+import { updateConsumable } from "../../../../Services/consumablesService";
+import { logAuditBatch } from "../../../../Services/auditService";
 
 interface Props {
   visible: boolean;
@@ -72,48 +74,77 @@ const EditConsumableModal: React.FC<Props> = ({
   };
 
   const handleSubmit = async () => {
-  if (!form.name) { setError("Printer Name is required."); return; }
-  if (!selectedItem) return;
-  setLoading(true);
-  setError("");
-  try {
-    const oldForm = {
-      name:           selectedItem.name,
-      status:         selectedItem.status ?? "Spare",
-      location:       selectedItem.location,
-      ipAddress:      selectedItem.ipAddress      ?? "",
-      macAddress:     selectedItem.macAddress     ?? "",
-      black:          selectedItem.black          ?? 0,
-      photoBlack:     selectedItem.photoBlack     ?? 0,
-      cyan:           selectedItem.cyan           ?? 0,
-      magenta:        selectedItem.magenta        ?? 0,
-      yellow:         selectedItem.yellow         ?? 0,
-      maintenanceBox: selectedItem.maintenanceBox ?? 0,
-    };
+    if (!form.name) {
+      setError("Printer Name is required.");
+      return;
+    }
+    if (!selectedItem) return;
+    setLoading(true);
+    setError("");
 
-    const changedFields = (Object.keys(form) as (keyof typeof form)[]).filter(
-      (key) => form[key] !== oldForm[key]
-    );
+    try {
+      let changedBy = "Unknown";
+      let changedById = "";
+      try {
+        const saved = await AsyncStorage.getItem("AD_USER_DATA");
+        if (saved) {
+          const user = JSON.parse(saved);
+          changedBy = user.displayName ?? "Unknown";
+          changedById = user.username ?? "";
+        }
+      } catch {}
 
-    await Promise.all(
-      changedFields.map((field) =>
-        updateConsumableField(
-          selectedItem.model,
+      const original: Record<keyof typeof form, string | number> = {
+        name:           selectedItem.name,
+        status:         selectedItem.status ?? "Spare",
+        location:       selectedItem.location,
+        ipAddress:      selectedItem.ipAddress ?? "",
+        macAddress:     selectedItem.macAddress ?? "",
+        black:          selectedItem.black ?? 0,
+        photoBlack:     selectedItem.photoBlack ?? 0,
+        cyan:           selectedItem.cyan ?? 0,
+        magenta:        selectedItem.magenta ?? 0,
+        yellow:         selectedItem.yellow ?? 0,
+        maintenanceBox: selectedItem.maintenanceBox ?? 0,
+      };
+
+      const changedFields = (Object.keys(form) as (keyof typeof form)[]).filter(
+        (key) => form[key] !== original[key]
+      );
+
+      if (changedFields.length === 0) {
+        onClose();
+        return;
+      }
+
+      const payload: Partial<typeof form> = {};
+      changedFields.forEach((field) => {
+        payload[field] = form[field] as any;
+      });
+
+      await updateConsumable(selectedItem.model, payload);
+
+      await logAuditBatch({
+        table: "consumables",
+        recordId: selectedItem.model,
+        recordLabel: selectedItem.name || selectedItem.model,
+        changedBy,
+        changedById,
+        changes: changedFields.map((field) => ({
           field,
-          form[field] as string | number
-          // changedBy/changedById auto-resolved from AsyncStorage
-        )
-      )
-    );
+          oldValue: String(original[field] ?? ""),
+          newValue: String(form[field] ?? ""),
+        })),
+      });
 
-    onSuccess();
-    onClose();
-  } catch {
-    setError("Something went wrong. Please try again.");
-  } finally {
-    setLoading(false);
-  }
-};
+      onSuccess();
+      onClose();
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!selectedItem) return;

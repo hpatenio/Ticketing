@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ConcernTicket } from "../../../../types";
 import { useTheme } from "../../../../theme/ThemeContext";
 import BadgeSelect from "../../../../components/common/BadgeSelect";
-import { updateTicketField } from "../../../../Services/ticketService";
+import { updateTicket } from "../../../../Services/ticketService";
+import { logAuditBatch } from "../../../../Services/auditService";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -677,8 +679,6 @@ const EditTicketModal: React.FC<Props> = ({
         assigneeName: assigneeName ?? "",
         dueDate: parseDueDate(dueDate), // ← normalize whatever the input gave us
       };
-      console.log("OLD VALUES:", JSON.stringify(oldValuesRef.current));
-      console.log("NEW VALUES:", JSON.stringify(newValues));
       const changedFields = (
         Object.keys(newValues) as (keyof TicketEditUpdates)[]
       ).filter((key) => newValues[key] !== oldValues[key]);
@@ -688,15 +688,35 @@ const EditTicketModal: React.FC<Props> = ({
         return;
       }
 
-      await Promise.all(
-        changedFields.map((field) =>
-          updateTicketField(
-            selectedTicket.ticketNumber,
-            field,
-            newValues[field],
-          ),
-        ),
-      );
+      const payload: Partial<TicketEditUpdates> = {};
+      changedFields.forEach((field) => {
+        payload[field] = newValues[field];
+      });
+
+      let changedBy = "Unknown";
+      let changedById = "";
+      try {
+        const saved = await AsyncStorage.getItem("AD_USER_DATA");
+        if (saved) {
+          const user = JSON.parse(saved);
+          changedBy = user.displayName ?? "Unknown";
+          changedById = user.username ?? "";
+        }
+      } catch {}
+
+      await updateTicket(selectedTicket.ticketNumber, payload as any);
+      await logAuditBatch({
+        table: "tickets",
+        recordId: selectedTicket.ticketNumber,
+        recordLabel: selectedTicket.ticketNumber,
+        changedBy,
+        changedById,
+        changes: changedFields.map((field) => ({
+          field,
+          oldValue: String(oldValues[field] ?? ""),
+          newValue: String(newValues[field] ?? ""),
+        })),
+      });
 
       onSave(selectedTicket.ticketNumber, newValues);
       onClose();

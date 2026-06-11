@@ -22,10 +22,9 @@ import ManageColumnsModal, {
   DropdownOption,
 } from "../../../SuperAdmin/ManageColumnsModal";
 import { getAllDropdownConfigs } from "../../../../Services/dropdownConfigs";
+import AuditTrailModal from "../../../../components/common/AuditTrailModal";
 
 // ─── Default dropdown options (Firestore seeding fallbacks only) ─────────────
-// On first run getDropdownOptions() seeds Firestore with these values.
-// After that, every client reads from Firestore — never from these constants.
 
 const DEFAULT_STATUS_OPTIONS: DropdownOption[] = [
   {
@@ -216,9 +215,261 @@ const SortIcon = ({ dir }: { dir: SortDir }) => {
   return <span className="ml-1 text-gray-300">▲▼</span>;
 };
 
-// ─── Tab types ────────────────────────────────────────────────────────────────
+// ─── Filter panel state ───────────────────────────────────────────────────────
 
-type MainTab = "all" | "grouped" | "filter";
+type FilterState = {
+  categories: string[];
+  statuses: string[];
+  companies: string[];
+  locations: string[];
+  dateFrom: string;
+  dateTo: string;
+};
+
+const EMPTY_FILTER: FilterState = {
+  categories: [],
+  statuses: [],
+  companies: [],
+  locations: [],
+  dateFrom: "",
+  dateTo: "",
+};
+
+const hasActiveFilters = (f: FilterState) =>
+  f.categories.length > 0 ||
+  f.statuses.length > 0 ||
+  f.companies.length > 0 ||
+  f.locations.length > 0 ||
+  !!f.dateFrom ||
+  !!f.dateTo;
+
+// ─── FilterPanel ──────────────────────────────────────────────────────────────
+
+type FilterPanelProps = {
+  visible: boolean;
+  filters: FilterState;
+  pendingFilters: FilterState;
+  setPendingFilters: React.Dispatch<React.SetStateAction<FilterState>>;
+  onFilterChange: (updated: FilterState) => void;
+  onClear: () => void;
+  onClose: () => void;
+  categoryOptions: DropdownOption[];
+  statusOptions: DropdownOption[];
+  companyOptions: DropdownOption[];
+  locationOptions: DropdownOption[];
+  theme: ReturnType<typeof useTheme>["theme"];
+  panelPos: React.CSSProperties;
+};
+
+const FilterPanel: React.FC<FilterPanelProps> = ({
+  visible,
+  filters,
+  pendingFilters,
+  setPendingFilters,
+  onFilterChange,
+  onClear,
+  onClose,
+  categoryOptions,
+  statusOptions,
+  companyOptions,
+  locationOptions,
+  theme,
+  panelPos,
+}) => {
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!visible) return;
+    const handler = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    // slight delay so the button click that opened it doesn't immediately close it
+    const t = setTimeout(
+      () => document.addEventListener("mousedown", handler),
+      50,
+    );
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("mousedown", handler);
+    };
+  }, [visible, onClose]);
+
+  if (!visible) return null;
+
+  const toggleChip = (
+    key: keyof Pick<
+      FilterState,
+      "categories" | "statuses" | "companies" | "locations"
+    >,
+    value: string,
+  ) => {
+    setPendingFilters((prev) => {
+      const arr = prev[key];
+      const exists = arr.includes(value);
+      const updated = {
+        ...prev,
+        [key]: exists ? arr.filter((v) => v !== value) : [...arr, value],
+      };
+      onFilterChange(updated);
+      return updated;
+    });
+  };
+
+  const SectionLabel = ({ label }: { label: string }) => (
+    <p
+      style={{ color: theme.subtext }}
+      className="text-xs font-semibold uppercase tracking-wider mb-2"
+    >
+      {label}
+    </p>
+  );
+
+  const ChipGroup = ({
+    options,
+    selected,
+    onToggle,
+  }: {
+    options: DropdownOption[];
+    selected: string[];
+    onToggle: (val: string) => void;
+  }) => (
+    <div className="flex flex-wrap gap-1.5 mb-4">
+      {options.map((opt) => {
+        const isActive = selected.includes(opt.value);
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onToggle(opt.value)}
+            className="px-3 py-1 rounded-full text-xs font-medium border transition-all"
+            style={
+              isActive
+                ? {
+                    backgroundColor: opt.bgColor,
+                    color: opt.textColor,
+                    borderColor: opt.textColor + "55",
+                  }
+                : {
+                    backgroundColor: theme.surface,
+                    color: theme.subtext,
+                    borderColor: theme.border,
+                  }
+            }
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <div
+      ref={panelRef}
+      style={{
+        ...panelPos,
+        backgroundColor: theme.surface,
+        borderColor: theme.border,
+        boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+        zIndex: 9999,
+        width: 280,
+      }}
+      className="fixed rounded-xl border overflow-hidden"
+    >
+      {/* Header */}
+      <div
+        style={{ borderBottomColor: theme.border }}
+        className="flex items-center justify-between px-4 py-3 border-b"
+      >
+        <div className="flex items-center gap-2">
+          <span style={{ color: theme.text }} className="text-sm font-semibold">
+            ⊟ Filters
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={onClear}
+          style={{ color: theme.subtext }}
+          className="text-xs hover:underline"
+        >
+          Clear all
+        </button>
+      </div>
+
+      {/* Body */}
+      <div className="px-4 pt-3 pb-2 max-h-[70vh] overflow-y-auto inventory-scroll">
+        <SectionLabel label="Category" />
+        <ChipGroup
+          options={categoryOptions}
+          selected={pendingFilters.categories}
+          onToggle={(v) => toggleChip("categories", v)}
+        />
+
+        <SectionLabel label="Status" />
+        <ChipGroup
+          options={statusOptions}
+          selected={pendingFilters.statuses}
+          onToggle={(v) => toggleChip("statuses", v)}
+        />
+
+        <SectionLabel label="Company" />
+        <ChipGroup
+          options={companyOptions}
+          selected={pendingFilters.companies}
+          onToggle={(v) => toggleChip("companies", v)}
+        />
+
+        <SectionLabel label="Location" />
+        <ChipGroup
+          options={locationOptions}
+          selected={pendingFilters.locations}
+          onToggle={(v) => toggleChip("locations", v)}
+        />
+
+        <SectionLabel label="Date Purchased" />
+        <div className="flex items-center gap-2 mb-4">
+          <input
+            type="date"
+            value={pendingFilters.dateFrom}
+            onChange={(e) => {
+              const updated = { ...pendingFilters, dateFrom: e.target.value };
+              setPendingFilters(updated);
+              onFilterChange(updated);
+            }}
+            style={{
+              backgroundColor: theme.inputBg,
+              borderColor: theme.inputBorder,
+              color: theme.inputText,
+              colorScheme: theme.mode,
+            }}
+            className="flex-1 text-xs px-2 py-1.5 border rounded-lg focus:outline-none"
+          />
+          <span style={{ color: theme.subtext }} className="text-xs">
+            —
+          </span>
+          <input
+            type="date"
+            value={pendingFilters.dateTo}
+            onChange={(e) => {
+              const updated = { ...pendingFilters, dateTo: e.target.value };
+              setPendingFilters(updated);
+              onFilterChange(updated);
+            }}
+            style={{
+              backgroundColor: theme.inputBg,
+              borderColor: theme.inputBorder,
+              color: theme.inputText,
+              colorScheme: theme.mode,
+            }}
+            className="flex-1 text-xs px-2 py-1.5 border rounded-lg focus:outline-none"
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ─── SearchableSelect ─────────────────────────────────────────────────────────
 
@@ -449,309 +700,8 @@ const normalizeValue = (value: any) => {
   return String(value).toLowerCase();
 };
 
-// ─── StatusSection ────────────────────────────────────────────────────────────
-
-type StatusGroupDef = {
-  key: "Deployed" | "Defective" | "Spare";
-  label: string;
-  icon: string;
-  headerBg: string;
-  headerText: string;
-  badgeBg: string;
-  badgeText: string;
-};
-
-type StatusSectionProps = {
-  group: StatusGroupDef;
-  items: ITInventory[];
-  isCollapsed: boolean;
-  theme: ReturnType<typeof useTheme>["theme"];
-  onToggle: (key: string) => void;
-  renderTableHead: (stickyTop: number) => React.ReactNode;
-  renderTableBody: (items: ITInventory[]) => React.ReactNode;
-};
-
-const StatusSection: React.FC<StatusSectionProps> = React.memo(
-  ({
-    group,
-    items,
-    isCollapsed,
-    theme,
-    onToggle,
-    renderTableHead,
-    renderTableBody,
-  }) => {
-    const headerRef = useRef<HTMLDivElement>(null);
-    const measuredRef = useRef(false);
-    const [headerHeight, setHeaderHeight] = useState(37);
-
-    useEffect(() => {
-      if (measuredRef.current) return;
-      if (headerRef.current) {
-        measuredRef.current = true;
-        setHeaderHeight(headerRef.current.getBoundingClientRect().height);
-      }
-    }, []);
-
-    return (
-      <div className="mb-3">
-        <div
-          ref={headerRef}
-          style={{
-            backgroundColor: group.headerBg,
-            position: "sticky",
-            top: 0,
-            zIndex: 20,
-            borderRadius: isCollapsed ? 8 : "8px 8px 0 0",
-            border: `0.5px solid ${theme.border}`,
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => onToggle(group.key)}
-            className="w-full flex items-center gap-2 px-3 py-2 text-left select-none"
-          >
-            <span
-              style={{ color: group.headerText, fontSize: 13, fontWeight: 600 }}
-            >
-              {isCollapsed ? "▶" : "▼"}
-            </span>
-            <span
-              style={{
-                color: group.headerText,
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: "0.05em",
-              }}
-            >
-              {group.label}
-            </span>
-            <span
-              className="px-2 py-0.5 rounded-full text-xs font-medium ml-1"
-              style={{ backgroundColor: group.badgeBg, color: group.badgeText }}
-            >
-              {items.length}
-            </span>
-          </button>
-        </div>
-
-        {!isCollapsed && (
-          <div
-            style={{
-              border: `0.5px solid ${theme.border}`,
-              borderTop: "none",
-              borderRadius: "0 0 8px 8px",
-            }}
-          >
-            {items.length === 0 ? (
-              <p style={{ color: theme.subtext }} className="text-sm px-4 py-3">
-                No {group.key.toLowerCase()} assets.
-              </p>
-            ) : (
-              <table
-                className="min-w-full text-sm"
-                style={{ borderCollapse: "collapse" }}
-              >
-                {renderTableHead(headerHeight)}
-                <tbody>{renderTableBody(items)}</tbody>
-              </table>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  },
-);
-
-// ─── Status group definitions ─────────────────────────────────────────────────
-
-const STATUS_GROUPS: StatusGroupDef[] = [
-  {
-    key: "Deployed",
-    label: "DEPLOYED",
-    icon: "✓",
-    headerBg: "#d1fae5",
-    headerText: "#065f46",
-    badgeBg: "#a7f3d0",
-    badgeText: "#065f46",
-  },
-  {
-    key: "Defective",
-    label: "DEFECTIVE",
-    icon: "!",
-    headerBg: "#fee2e2",
-    headerText: "#991b1b",
-    badgeBg: "#fecaca",
-    badgeText: "#991b1b",
-  },
-  {
-    key: "Spare",
-    label: "SPARE",
-    icon: "◎",
-    headerBg: "#ede9fe",
-    headerText: "#4c1d95",
-    badgeBg: "#ddd6fe",
-    badgeText: "#4c1d95",
-  },
-];
-
-// ─── Filter tab dropdown ──────────────────────────────────────────────────────
-
-type FilterTabDropdownProps = {
-  isActive: boolean;
-  filterStatus: string;
-  counts: Record<string, number>;
-  theme: ReturnType<typeof useTheme>["theme"];
-  onActivate: () => void;
-  onChange: (val: string) => void;
-};
-
-const FilterTabDropdown: React.FC<FilterTabDropdownProps> = ({
-  isActive,
-  filterStatus,
-  counts,
-  theme,
-  onActivate,
-  onChange,
-}) => {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<React.CSSProperties>({});
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  const options = [
-    { label: "All statuses", value: "", dot: undefined },
-    { label: "Deployed", value: "Deployed", dot: "#10b981" },
-    { label: "Defective", value: "Defective", dot: "#ef4444" },
-    { label: "Spare", value: "Spare", dot: "#8b5cf6" },
-  ];
-
-  const selected = options.find((o) => o.value === filterStatus) ?? options[0];
-
-  const handleClick = () => {
-    onActivate();
-    if (!triggerRef.current) return;
-    const r = triggerRef.current.getBoundingClientRect();
-    setPos({
-      position: "fixed",
-      top: r.bottom + 4,
-      left: r.left,
-      minWidth: r.width,
-      zIndex: 9999,
-    });
-    setOpen((prev) => !prev);
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    const h = (e: MouseEvent) => {
-      if (
-        !triggerRef.current?.contains(e.target as Node) &&
-        !dropdownRef.current?.contains(e.target as Node)
-      )
-        setOpen(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [open]);
-
-  const displayCount = filterStatus ? (counts[filterStatus] ?? 0) : counts.all;
-
-  return (
-    <>
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={handleClick}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all"
-        style={{
-          backgroundColor: isActive ? theme.primary : theme.surface,
-          color: isActive ? theme.primaryText : theme.subtext,
-          borderColor: isActive ? theme.primary : theme.border,
-        }}
-      >
-        <span>⊟</span>
-        {isActive && filterStatus ? selected.label : "Filter"}
-        {isActive && selected.dot && (
-          <span
-            className="w-2 h-2 rounded-full"
-            style={{ backgroundColor: selected.dot }}
-          />
-        )}
-        <span
-          className="px-1.5 py-0.5 rounded-full"
-          style={{
-            backgroundColor: isActive
-              ? "rgba(255,255,255,0.25)"
-              : theme.surfaceRaised,
-            color: isActive ? theme.primaryText : theme.subtext,
-          }}
-        >
-          {displayCount}
-        </span>
-        <span style={{ opacity: 0.7 }}>▾</span>
-      </button>
-
-      {open && (
-        <div
-          ref={dropdownRef}
-          style={{
-            ...pos,
-            backgroundColor: theme.surface,
-            border: `1px solid ${theme.border}`,
-          }}
-          className="rounded-lg shadow-lg overflow-hidden"
-        >
-          {options.map((opt) => {
-            const isSelected = opt.value === filterStatus;
-            const cnt = opt.value ? (counts[opt.value] ?? 0) : counts.all;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  onChange(opt.value);
-                  setOpen(false);
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left"
-                style={{
-                  backgroundColor: isSelected
-                    ? theme.surfaceRaised
-                    : "transparent",
-                  color: theme.text,
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.backgroundColor = theme.surfaceRaised)
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.backgroundColor = isSelected
-                    ? theme.surfaceRaised
-                    : "transparent")
-                }
-              >
-                {opt.dot ? (
-                  <span
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: opt.dot }}
-                  />
-                ) : (
-                  <span className="w-2 h-2 flex-shrink-0" />
-                )}
-                <span className="flex-1">{opt.label}</span>
-                <span style={{ color: theme.subtext }}>{cnt}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </>
-  );
-};
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-// ← isSuperAdmin added to Props
 type Props = {
   initialFilter?: InventoryFilter | null;
   isSuperAdmin?: boolean;
@@ -759,7 +709,7 @@ type Props = {
 
 const ITInventoryPage: React.FC<Props> = ({
   initialFilter = null,
-  isSuperAdmin = false, // ← default false so admin sees nothing
+  isSuperAdmin = false,
 }) => {
   const { theme } = useTheme();
   const [data, setData] = useState<ITInventory[]>([]);
@@ -770,45 +720,86 @@ const ITInventoryPage: React.FC<Props> = ({
   );
   const [sortKey, setSortKey] = useState<InventorySortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("default");
-  const [mainTab, setMainTab] = useState<MainTab>("all");
-  const [filterStatus, setFilterStatus] = useState<string>("");
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [addVisible, setAddVisible] = useState(false);
   const [editVisible, setEditVisible] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<ITInventory | null>(null);
   const [editingNoteTag, setEditingNoteTag] = useState<string | null>(null);
-  const [manageColumnsVisible, setManageColumnsVisible] = useState(false); // ← added
+  const [manageColumnsVisible, setManageColumnsVisible] = useState(false);
 
-  // ── Column configs are loaded from Firestore; defaults seed the DB on first run
-const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
-  { id: "status",   docId: "inventory_status",   label: "Status",   editable: true,  options: [] },
-  { id: "category", docId: "inventory_category", label: "Category", editable: true,  options: [] },
-  { id: "location", docId: "inventory_location", label: "Location", editable: true,  options: [] },
-  { id: "company",  docId: "inventory_company",  label: "Company",  editable: true,  options: [] },
-  { id: "assignee", docId: "",                   label: "Assignee", editable: false, options: [] },
-]);
+  // Filter panel state
+  const [filterPanelVisible, setFilterPanelVisible] = useState(false);
+  const [pendingFilters, setPendingFilters] =
+    useState<FilterState>(EMPTY_FILTER);
+  const [appliedFilters, setAppliedFilters] =
+    useState<FilterState>(EMPTY_FILTER);
+  const [filterPanelPos, setFilterPanelPos] = useState<React.CSSProperties>({});
+  const filterBtnRef = useRef<HTMLButtonElement>(null);
 
-  // Load dropdown options from Firestore on mount
+  // Column configs from Firestore
+  const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
+    {
+      id: "status",
+      docId: "inventory_status",
+      label: "Status",
+      editable: true,
+      options: [],
+    },
+    {
+      id: "category",
+      docId: "inventory_category",
+      label: "Category",
+      editable: true,
+      options: [],
+    },
+    {
+      id: "location",
+      docId: "inventory_location",
+      label: "Location",
+      editable: true,
+      options: [],
+    },
+    {
+      id: "company",
+      docId: "inventory_company",
+      label: "Company",
+      editable: true,
+      options: [],
+    },
+    {
+      id: "assignee",
+      docId: "",
+      label: "Assignee",
+      editable: false,
+      options: [],
+    },
+  ]);
+  const [auditModal, setAuditModal] = useState<{
+    recordId?: string;
+    recordLabel?: string;
+  } | null>(null);
   useEffect(() => {
     getAllDropdownConfigs({
-      status:   DEFAULT_STATUS_OPTIONS,
+      status: DEFAULT_STATUS_OPTIONS,
       category: DEFAULT_CATEGORY_OPTIONS,
       location: DEFAULT_LOCATION_OPTIONS,
-      company:  DEFAULT_COMPANY_OPTIONS,
-    }).then(({ status, category, location, company }) => {
-      setColumnConfigs((prev) =>
-        prev.map((col) => {
-          if (col.id === "status")   return { ...col, options: status };
-          if (col.id === "category") return { ...col, options: category };
-          if (col.id === "location") return { ...col, options: location };
-          if (col.id === "company")  return { ...col, options: company };
-          return col;
-        }),
-      );
-    }).catch((err) => {
-      console.error("Failed to load dropdown configs from Firestore:", err);
-    });
+      company: DEFAULT_COMPANY_OPTIONS,
+    })
+      .then(({ status, category, location, company }) => {
+        setColumnConfigs((prev) =>
+          prev.map((col) => {
+            if (col.id === "status") return { ...col, options: status };
+            if (col.id === "category") return { ...col, options: category };
+            if (col.id === "location") return { ...col, options: location };
+            if (col.id === "company") return { ...col, options: company };
+            return col;
+          }),
+        );
+      })
+      .catch((err) => {
+        console.error("Failed to load dropdown configs from Firestore:", err);
+      });
   }, []);
+
   // Themed scrollbar
   useEffect(() => {
     const style = document.createElement("style");
@@ -905,11 +896,6 @@ const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
     setEditVisible(true);
   }, []);
 
-  const toggleCollapsed = useCallback(
-    (key: string) => setCollapsed((prev) => ({ ...prev, [key]: !prev[key] })),
-    [],
-  );
-
   const handleSort = useCallback(
     (key: InventorySortKey) => {
       if (sortKey !== key) {
@@ -927,16 +913,68 @@ const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
   const dirFor = (key: InventorySortKey): SortDir =>
     sortKey === key ? sortDir : "default";
 
+  // ── Filter button click → calculate panel position ────────────────────────
+  const handleFilterButtonClick = () => {
+    if (filterPanelVisible) {
+      setFilterPanelVisible(false);
+      return;
+    }
+    if (filterBtnRef.current) {
+      const rect = filterBtnRef.current.getBoundingClientRect();
+      const panelWidth = 280;
+      // Anchor to right edge of button
+      const left = Math.min(
+        rect.right - panelWidth,
+        window.innerWidth - panelWidth - 8,
+      );
+      setFilterPanelPos({
+        top: rect.bottom + 6,
+        left: Math.max(8, left),
+      });
+    }
+    // Sync pending with currently applied
+    setPendingFilters(appliedFilters);
+    setFilterPanelVisible(true);
+  };
+
+  const handleFilterChange = (updated: FilterState) => {
+    setAppliedFilters(updated);
+  };
+
+  const handleClearFilters = () => {
+    setPendingFilters(EMPTY_FILTER);
+    setAppliedFilters(EMPTY_FILTER);
+    setFilterPanelVisible(false);
+  };
+
   const q = search.toLowerCase().trim();
 
   const filtered = useMemo(() => {
-    const filterApplied = activeFilter
+    let result = activeFilter
       ? data.filter(
           (item) => (item[activeFilter.field] ?? "") === activeFilter.value,
         )
       : data;
-    if (!q) return filterApplied;
-    return filterApplied.filter((item) => {
+
+    // Apply filter panel filters
+    const af = appliedFilters;
+    if (af.categories.length)
+      result = result.filter((i) => af.categories.includes(i.category));
+    if (af.statuses.length)
+      result = result.filter((i) => af.statuses.includes(i.status));
+    if (af.companies.length)
+      result = result.filter((i) => af.companies.includes(i.company));
+    if (af.locations.length)
+      result = result.filter((i) => af.locations.includes(i.location));
+    if (af.dateFrom)
+      result = result.filter(
+        (i) => toDateString(i.datePurchased) >= af.dateFrom,
+      );
+    if (af.dateTo)
+      result = result.filter((i) => toDateString(i.datePurchased) <= af.dateTo);
+
+    if (!q) return result;
+    return result.filter((item) => {
       const assigneeName =
         employees.find((e) => e.id === item.assigneeId)?.name ??
         item.assigneeName ??
@@ -957,7 +995,7 @@ const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
         .map((v) => (v ?? "").toString().toLowerCase())
         .some((v) => v.includes(q));
     });
-  }, [data, activeFilter, q, employees]);
+  }, [data, activeFilter, appliedFilters, q, employees]);
 
   const sortedFiltered = useMemo(() => {
     if (!sortKey || sortDir === "default") return filtered;
@@ -992,42 +1030,26 @@ const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
     });
   }, [filtered, sortKey, sortDir, employees]);
 
-  const groupedDeployed = useMemo(
-    () => sortedFiltered.filter((i) => i.status === "Deployed"),
-    [sortedFiltered],
-  );
-  const groupedDefective = useMemo(
-    () => sortedFiltered.filter((i) => i.status === "Defective"),
-    [sortedFiltered],
-  );
-  const groupedSpare = useMemo(
-    () => sortedFiltered.filter((i) => i.status === "Spare"),
-    [sortedFiltered],
-  );
+  const categoryOptions =
+    columnConfigs.find((c) => c.id === "category")?.options ??
+    DEFAULT_CATEGORY_OPTIONS;
+  const statusOptions =
+    columnConfigs.find((c) => c.id === "status")?.options ??
+    DEFAULT_STATUS_OPTIONS;
+  const companyOptions =
+    columnConfigs.find((c) => c.id === "company")?.options ??
+    DEFAULT_COMPANY_OPTIONS;
+  const locationOptions =
+    columnConfigs.find((c) => c.id === "location")?.options ??
+    DEFAULT_LOCATION_OPTIONS;
 
-  const groupedItemsMap = useMemo(
-    () => ({
-      Deployed: groupedDeployed,
-      Defective: groupedDefective,
-      Spare: groupedSpare,
-    }),
-    [groupedDeployed, groupedDefective, groupedSpare],
-  );
-
-  const filterTabItems = useMemo(
-    () =>
-      filterStatus
-        ? sortedFiltered.filter((i) => i.status === filterStatus)
-        : sortedFiltered,
-    [sortedFiltered, filterStatus],
-  );
-
-  const counts = {
-    all: sortedFiltered.length,
-    Deployed: groupedDeployed.length,
-    Defective: groupedDefective.length,
-    Spare: groupedSpare.length,
-  };
+  const activeFilterCount = [
+    appliedFilters.categories.length > 0,
+    appliedFilters.statuses.length > 0,
+    appliedFilters.companies.length > 0,
+    appliedFilters.locations.length > 0,
+    !!appliedFilters.dateFrom || !!appliedFilters.dateTo,
+  ].filter(Boolean).length;
 
   const renderTableHead = useCallback(
     (stickyTop: number = 0) => (
@@ -1092,7 +1114,7 @@ const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
             <BadgeSelect
               value={item.company}
               displayName={item.company || "—"}
-              options={columnConfigs.find((c) => c.id === "company")?.options ?? []}
+              options={companyOptions}
               placeholder="—"
               onChange={(val) =>
                 handleFieldUpdate(item.assetTag, "company", val)
@@ -1122,7 +1144,7 @@ const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
             <BadgeSelect
               value={item.category}
               displayName={item.category || "—"}
-              options={columnConfigs.find((c) => c.id === "category")?.options ?? DEFAULT_CATEGORY_OPTIONS}
+              options={categoryOptions}
               placeholder="—"
               onChange={(val) =>
                 handleFieldUpdate(item.assetTag, "category", val)
@@ -1134,7 +1156,7 @@ const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
             <BadgeSelect
               value={item.status}
               displayName={item.status || "—"}
-              options={columnConfigs.find((c) => c.id === "status")?.options ?? DEFAULT_STATUS_OPTIONS}
+              options={statusOptions}
               placeholder="—"
               onChange={(val) =>
                 handleFieldUpdate(item.assetTag, "status", val)
@@ -1165,7 +1187,7 @@ const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
             <BadgeSelect
               value={item.location}
               displayName={item.location || "—"}
-              options={columnConfigs.find((c) => c.id === "location")?.options ?? DEFAULT_LOCATION_OPTIONS}
+              options={locationOptions}
               placeholder="—"
               onChange={(val) =>
                 handleFieldUpdate(item.assetTag, "location", val)
@@ -1237,11 +1259,15 @@ const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
       employees,
       assigneeOptions,
       editingNoteTag,
-      columnConfigs,
+      categoryOptions,
+      statusOptions,
+      companyOptions,
+      locationOptions,
       handleFieldUpdate,
       handleAssigneeChange,
       handleEdit,
       setEditingNoteTag,
+      setAuditModal,
     ],
   );
 
@@ -1252,37 +1278,56 @@ const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
     >
       {/* ── Fixed top bar ── */}
       <div className="flex-shrink-0 px-4 pt-4 pb-0">
-        <div className="flex items-center justify-between gap-4 mb-4">
+        {/* Row 1: Title + action buttons */}
+        <div className="flex items-center justify-between gap-4 mb-3">
           <div>
-            <h1 style={{ color: theme.text }} className="text-xl font-bold">
+            <h1 style={{ color: theme.text }} className="text-2xl font-bold">
               IT Inventory
             </h1>
+            <p style={{ color: theme.subtext }} className="text-xs mt-0.5">
+              View and manage all IT equipment stock
+            </p>
             <p style={{ color: theme.subtext }} className="text-xs mt-0.5">
               {sortedFiltered.length} of {data.length} records
             </p>
           </div>
 
           <div className="flex items-center gap-3">
-            <input
-              type="text"
-              placeholder="Search asset tag, brand, model..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+            <button
+              onClick={() => setAuditModal({})} // no recordId = full-table mode
               style={{
-                backgroundColor: theme.inputBg,
-                borderColor: theme.inputBorder,
-                color: theme.inputText,
+                backgroundColor: theme.surface,
+                color: theme.text,
+                borderColor: theme.border,
               }}
-              className="w-80 px-4 py-2.5 text-sm border rounded-lg focus:outline-none"
-              onFocus={(e) =>
-                (e.currentTarget.style.borderColor = theme.inputBorderFocus)
+              className="px-3 py-2 text-sm font-medium rounded-lg border whitespace-nowrap"
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = theme.bgHover)
               }
-              onBlur={(e) =>
-                (e.currentTarget.style.borderColor = theme.inputBorder)
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = theme.surface)
               }
-            />
-
-            {/* ── Superadmin only button ── */}
+            >
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{
+                  display: "inline",
+                  verticalAlign: "middle",
+                  marginRight: 5,
+                }}
+              >
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              Audit Trail
+            </button>
             {isSuperAdmin && (
               <button
                 onClick={() => setManageColumnsVisible(true)}
@@ -1322,6 +1367,105 @@ const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
           </div>
         </div>
 
+        {/* Row 2: Search bar (left) + Filter button (right) */}
+        <div className="flex items-center gap-2 mb-3">
+          {/* Search — takes remaining space */}
+          <div className="flex-1">
+            <div className="relative w-full max-w-md">
+              {/* Search Icon */}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                style={{ color: theme.subtext }}
+              >
+                <path d="m21 21-4.34-4.34" />
+                <circle cx="11" cy="11" r="8" />
+              </svg>
+
+              <input
+                type="text"
+                placeholder="Search asset tag, brand, model..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{
+                  backgroundColor: theme.inputBg,
+                  borderColor: theme.inputBorder,
+                  color: theme.inputText,
+                }}
+                className="w-full px-4 py-2.5 pl-9 text-sm border rounded-lg focus:outline-none"
+                onFocus={(e) =>
+                  (e.currentTarget.style.borderColor = theme.inputBorderFocus)
+                }
+                onBlur={(e) =>
+                  (e.currentTarget.style.borderColor = theme.inputBorder)
+                }
+              />
+            </div>
+          </div>
+
+          {/* Filter button */}
+          <button
+            ref={filterBtnRef}
+            type="button"
+            onClick={handleFilterButtonClick}
+            style={{
+              backgroundColor: hasActiveFilters(appliedFilters)
+                ? theme.primary
+                : theme.surface,
+              color: hasActiveFilters(appliedFilters)
+                ? theme.primaryText
+                : theme.subtext,
+              borderColor: hasActiveFilters(appliedFilters)
+                ? theme.primary
+                : theme.border,
+            }}
+            className="flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium rounded-lg border whitespace-nowrap transition-all"
+            onMouseEnter={(e) => {
+              if (!hasActiveFilters(appliedFilters))
+                e.currentTarget.style.backgroundColor = theme.bgHover;
+            }}
+            onMouseLeave={(e) => {
+              if (!hasActiveFilters(appliedFilters))
+                e.currentTarget.style.backgroundColor = theme.surface;
+            }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z" />
+            </svg>
+            Filter
+            {activeFilterCount > 0 && (
+              <span
+                className="px-1.5 py-0.5 rounded-full text-xs font-semibold"
+                style={{
+                  backgroundColor: "rgba(255,255,255,0.25)",
+                  color: theme.primaryText,
+                }}
+              >
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Active filter pill from ITInventorySummary navigation */}
         {activeFilter && (
           <div className="flex flex-wrap items-center gap-2 mb-3">
             <span style={{ color: theme.subtext }} className="text-xs">
@@ -1350,56 +1494,9 @@ const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
             </span>
           </div>
         )}
-
-        <div className="flex items-center gap-2 mb-3">
-          {(["all", "grouped"] as const).map((key) => {
-            const isActive = mainTab === key;
-            const label = key === "all" ? "All" : "By Status";
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setMainTab(key)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all"
-                style={{
-                  backgroundColor: isActive ? theme.primary : theme.surface,
-                  color: isActive ? theme.primaryText : theme.subtext,
-                  borderColor: isActive ? theme.primary : theme.border,
-                }}
-              >
-                {key === "all" && <span>☰</span>}
-                {key === "grouped" && <span>▤</span>}
-                {label}
-                <span
-                  className="px-1.5 py-0.5 rounded-full"
-                  style={{
-                    backgroundColor: isActive
-                      ? "rgba(255,255,255,0.25)"
-                      : theme.surfaceRaised,
-                    color: isActive ? theme.primaryText : theme.subtext,
-                  }}
-                >
-                  {counts.all}
-                </span>
-              </button>
-            );
-          })}
-
-          <FilterTabDropdown
-            isActive={mainTab === "filter"}
-            filterStatus={filterStatus}
-            counts={counts}
-            theme={theme}
-            onActivate={() => setMainTab("filter")}
-            onChange={(val) => {
-              setMainTab("filter");
-              setFilterStatus(val);
-            }}
-          />
-        </div>
       </div>
 
-      {/* ── Scrollable content ── */}
+      {/* ── Scrollable table ── */}
       {loading ? (
         <div className="flex flex-1 items-center justify-center py-20">
           <div
@@ -1413,27 +1510,6 @@ const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
             No inventory records found.
           </p>
         </div>
-      ) : mainTab === "grouped" ? (
-        <div className="inventory-scroll flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
-          {STATUS_GROUPS.map((group) => (
-            <StatusSection
-              key={group.key}
-              group={group}
-              items={groupedItemsMap[group.key]}
-              isCollapsed={!!collapsed[group.key]}
-              theme={theme}
-              onToggle={toggleCollapsed}
-              renderTableHead={renderTableHead}
-              renderTableBody={renderTableBody}
-            />
-          ))}
-        </div>
-      ) : mainTab === "filter" && filterTabItems.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center py-20">
-          <p style={{ color: theme.subtext }} className="text-sm">
-            No {filterStatus || "assets"} found.
-          </p>
-        </div>
       ) : (
         <div className="inventory-scroll flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
           <div
@@ -1445,15 +1521,28 @@ const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
               style={{ borderCollapse: "collapse" }}
             >
               {renderTableHead(0)}
-              <tbody>
-                {renderTableBody(
-                  mainTab === "filter" ? filterTabItems : sortedFiltered,
-                )}
-              </tbody>
+              <tbody>{renderTableBody(sortedFiltered)}</tbody>
             </table>
           </div>
         </div>
       )}
+
+      {/* ── Filter panel dropdown ── */}
+      <FilterPanel
+        visible={filterPanelVisible}
+        filters={appliedFilters}
+        pendingFilters={pendingFilters}
+        setPendingFilters={setPendingFilters}
+        onFilterChange={handleFilterChange}
+        onClear={handleClearFilters}
+        onClose={() => setFilterPanelVisible(false)}
+        categoryOptions={categoryOptions}
+        statusOptions={statusOptions}
+        companyOptions={companyOptions}
+        locationOptions={locationOptions}
+        theme={theme}
+        panelPos={filterPanelPos}
+      />
 
       <AddAssetModal
         visible={addVisible}
@@ -1468,12 +1557,19 @@ const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
         onDelete={handleDelete}
         employees={employees}
       />
-
       <ManageColumnsModal
         visible={manageColumnsVisible}
         onClose={() => setManageColumnsVisible(false)}
         columns={columnConfigs}
         onSave={(updated) => setColumnConfigs(updated)}
+      />
+
+      <AuditTrailModal
+        visible={auditModal !== null}
+        onClose={() => setAuditModal(null)}
+        table="inventory"
+        recordId={auditModal?.recordId}
+        recordLabel={auditModal?.recordLabel}
       />
     </div>
   );

@@ -20,6 +20,7 @@ import ManageColumnsModal, {
   ColumnConfig,
   DropdownOption,
 } from "../../../SuperAdmin/ManageColumnsModal";
+import AuditTrailModal from "../../../../components/common/AuditTrailModal";
 // ─── Options ──────────────────────────────────────────────────────────────────
 
 const DEFAULT_CATEGORY_OPTIONS: DropdownOption[] = [
@@ -923,9 +924,12 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
   const [editingTicket, setEditingTicket] = useState<ConcernTicket | null>(
     null,
   );
-  const [mainTab, setMainTab] = useState<MainTab>("all");
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [auditModal, setAuditModal] = useState<
+    | { recordId?: string; recordLabel?: string }
+    | null
+  >(null);
 
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("default");
@@ -1093,6 +1097,14 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
     [filteredTickets, filterStatus],
   );
 
+  const displayTickets = useMemo(
+    () =>
+      filterStatus
+        ? filteredTickets.filter((t) => t.status === filterStatus)
+        : filteredTickets,
+    [filteredTickets, filterStatus],
+  );
+
   // ─── Field update ─────────────────────────────────────────────────────────
 
   const handleUpdateField = async (
@@ -1230,17 +1242,34 @@ const handleSaveEditedTicket = async (
     >
       {/* ── Fixed top bar ── */}
       <div className="flex-shrink-0 px-4 pt-4 pb-0">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between gap-4 mb-3">
           <div>
             <h1 style={{ color: theme.text }} className="text-xl font-bold">
               Concern Tickets
             </h1>
             <p style={{ color: theme.subtext }} className="text-xs mt-0.5">
-              {filteredTickets.length} of {tickets.length} tickets
+              {displayTickets.length} of {tickets.length} tickets
             </p>
           </div>
+
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setAuditModal({})}
+              style={{
+                backgroundColor: theme.surface,
+                color: theme.text,
+                borderColor: theme.border,
+              }}
+              className="px-3 py-2 text-sm font-medium rounded-lg border whitespace-nowrap"
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = theme.bgHover)
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = theme.surface)
+              }
+            >
+              Audit Trail
+            </button>
             {isSuperAdmin && (
               <button
                 onClick={() => setManageColumnsVisible(true)}
@@ -1279,73 +1308,60 @@ const handleSaveEditedTicket = async (
           </div>
         </div>
 
-        {/* Search */}
-        <input
-          type="text"
-          placeholder="Search tickets..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{
-            backgroundColor: theme.inputBg,
-            borderColor: theme.inputBorder,
-            color: theme.inputText,
-          }}
-          className="w-full px-4 py-2.5 mb-3 text-sm border rounded-lg focus:outline-none"
-          onFocus={(e) =>
-            (e.currentTarget.style.borderColor = theme.inputBorderFocus)
-          }
-          onBlur={(e) =>
-            (e.currentTarget.style.borderColor = theme.inputBorder)
-          }
-        />
-
-        {/* Tab bar */}
         <div className="flex items-center gap-2 mb-3">
-          {(["all", "grouped"] as const).map((key) => {
-            const isActive = mainTab === key;
-            const label = key === "all" ? "All" : "By Status";
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setMainTab(key)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all"
-                style={{
-                  backgroundColor: isActive ? theme.primary : theme.surface,
-                  color: isActive ? theme.primaryText : theme.subtext,
-                  borderColor: isActive ? theme.primary : theme.border,
-                }}
-              >
-                {key === "all" && <span>☰</span>}
-                {key === "grouped" && <span>▤</span>}
-                {label}
-                <span
-                  className="px-1.5 py-0.5 rounded-full"
-                  style={{
-                    backgroundColor: isActive
-                      ? "rgba(255,255,255,0.25)"
-                      : theme.surfaceRaised,
-                    color: isActive ? theme.primaryText : theme.subtext,
-                  }}
-                >
-                  {counts.all}
-                </span>
-              </button>
-            );
-          })}
-
+          <input
+            type="text"
+            placeholder="Search tickets..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              backgroundColor: theme.inputBg,
+              borderColor: theme.inputBorder,
+              color: theme.inputText,
+            }}
+            className="flex-1 px-4 py-2.5 text-sm border rounded-lg focus:outline-none"
+            onFocus={(e) =>
+              (e.currentTarget.style.borderColor = theme.inputBorderFocus)
+            }
+            onBlur={(e) =>
+              (e.currentTarget.style.borderColor = theme.inputBorder)
+            }
+          />
           <FilterTabDropdown
-            isActive={mainTab === "filter"}
+            isActive={!!filterStatus}
             filterStatus={filterStatus}
             counts={counts}
             theme={theme}
-            onActivate={() => setMainTab("filter")}
-            onChange={(val) => {
-              setMainTab("filter");
-              setFilterStatus(val);
-            }}
+            onActivate={() => {}}
+            onChange={(val) => setFilterStatus(val)}
           />
         </div>
+
+        {filterStatus && (
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <span style={{ color: theme.subtext }} className="text-xs">
+              Filtered by:
+            </span>
+            <div
+              style={{
+                backgroundColor: theme.primarySubtle,
+                color: theme.primarySubtleText,
+              }}
+              className="flex items-center gap-2 px-3 py-1 rounded-full"
+            >
+              <span className="text-xs font-medium">
+                Status: {filterStatus}
+              </span>
+              <button
+                type="button"
+                onClick={() => setFilterStatus("")}
+                className="text-xs font-bold"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Scrollable content ── */}
@@ -1356,36 +1372,13 @@ const handleSaveEditedTicket = async (
             className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin"
           />
         </div>
-      ) : filteredTickets.length === 0 ? (
+      ) : displayTickets.length === 0 ? (
         <div className="flex flex-1 items-center justify-center py-20">
           <p style={{ color: theme.subtext }} className="text-sm">
             No tickets found.
           </p>
         </div>
-      ) : mainTab === "grouped" ? (
-        /* ── By Status: collapsible sections ── */
-        <div className="inventory-scroll flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
-          {STATUS_GROUPS.map((group) => (
-            <StatusSection
-              key={group.key}
-              group={group}
-              items={groupedItemsMap[group.key]}
-              isCollapsed={!!collapsed[group.key]}
-              theme={theme}
-              onToggle={toggleCollapsed}
-              renderTableHead={renderTableHead}
-              renderTableBody={renderTableBody}
-            />
-          ))}
-        </div>
-      ) : mainTab === "filter" && filterTabItems.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center py-20">
-          <p style={{ color: theme.subtext }} className="text-sm">
-            No {filterStatus || "tickets"} found.
-          </p>
-        </div>
       ) : (
-        /* ── All / Filter: flat table ── */
         <div className="inventory-scroll flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
           <div
             style={{ borderColor: theme.border }}
@@ -1396,11 +1389,7 @@ const handleSaveEditedTicket = async (
               style={{ borderCollapse: "collapse" }}
             >
               {renderTableHead(0)}
-              <tbody>
-                {renderTableBody(
-                  mainTab === "filter" ? filterTabItems : filteredTickets,
-                )}
-              </tbody>
+              <tbody>{renderTableBody(displayTickets)}</tbody>
             </table>
           </div>
         </div>
@@ -1413,7 +1402,7 @@ const handleSaveEditedTicket = async (
         currentUserName={user?.username ?? currentUserName ?? ""}
         onClose={() => setModalVisible(false)}
         onSuccess={loadTickets}
-      />z
+      />
 
       <EditAssetModal
         visible={editModalVisible}
@@ -1440,6 +1429,13 @@ const handleSaveEditedTicket = async (
             updated.find((c) => c.id === "ticket_status")?.options ?? [];
           setDropdownOptions({ category: cat, priority: pri, status: sta });
         }}
+      />
+      <AuditTrailModal
+        visible={auditModal !== null}
+        onClose={() => setAuditModal(null)}
+        table="tickets"
+        recordId={auditModal?.recordId}
+        recordLabel={auditModal?.recordLabel}
       />
     </div>
   );

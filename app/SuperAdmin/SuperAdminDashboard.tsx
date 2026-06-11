@@ -78,9 +78,8 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
         return <ConsumablesPage isSuperAdmin={true} />;
       case "tickets":
         return <TicketsPage user={user} isSuperAdmin={true} />;
-      case "users": // 👈 new case
+      case "users":
         return <UsersPage currentUser={user} />;
-      case "dashboard":
       case "audit":
         return <AuditTrailPage />;
       default:
@@ -99,7 +98,7 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
       case "tickets":
         return "Concern Tickets";
       case "users":
-        return "User Accounts"; 
+        return "User Accounts";
       case "audit":
         return "Audit Trail";
       default:
