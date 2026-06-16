@@ -30,9 +30,33 @@ export const DashboardIcon: React.FC<{ color: string; size?: number }> = ({
 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Rect x="3" y="3" width="8" height="8" rx="1.5" fill={color} />
-    <Rect x="13" y="3" width="8" height="8" rx="1.5" fill={color} opacity="0.7" />
-    <Rect x="3" y="13" width="8" height="8" rx="1.5" fill={color} opacity="0.7" />
-    <Rect x="13" y="13" width="8" height="8" rx="1.5" fill={color} opacity="0.4" />
+    <Rect
+      x="13"
+      y="3"
+      width="8"
+      height="8"
+      rx="1.5"
+      fill={color}
+      opacity="0.7"
+    />
+    <Rect
+      x="3"
+      y="13"
+      width="8"
+      height="8"
+      rx="1.5"
+      fill={color}
+      opacity="0.7"
+    />
+    <Rect
+      x="13"
+      y="13"
+      width="8"
+      height="8"
+      rx="1.5"
+      fill={color}
+      opacity="0.4"
+    />
   </Svg>
 );
 
@@ -47,8 +71,21 @@ export const TicketsIcon: React.FC<{ color: string; size?: number }> = ({
       strokeWidth="2"
       strokeLinecap="round"
     />
-    <Rect x="9" y="3" width="6" height="4" rx="1" stroke={color} strokeWidth="2" />
-    <Path d="M9 12h6M9 16h4" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    <Rect
+      x="9"
+      y="3"
+      width="6"
+      height="4"
+      rx="1"
+      stroke={color}
+      strokeWidth="2"
+    />
+    <Path
+      d="M9 12h6M9 16h4"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
   </Svg>
 );
 
@@ -62,8 +99,17 @@ export const InventoryIcon: React.FC<{ color: string; size?: number }> = ({
       stroke={color}
       strokeWidth="2"
     />
-    <Path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" stroke={color} strokeWidth="2" />
-    <Path d="M12 12v4M10 14h4" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    <Path
+      d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"
+      stroke={color}
+      strokeWidth="2"
+    />
+    <Path
+      d="M12 12v4M10 14h4"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
   </Svg>
 );
 
@@ -72,7 +118,15 @@ export const ConsumablesIcon: React.FC<{ color: string; size?: number }> = ({
   size = 20,
 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Rect x="4" y="8" width="16" height="9" rx="1.5" stroke={color} strokeWidth="2" />
+    <Rect
+      x="4"
+      y="8"
+      width="16"
+      height="9"
+      rx="1.5"
+      stroke={color}
+      strokeWidth="2"
+    />
     <Path
       d="M7 8V5a1 1 0 011-1h8a1 1 0 011 1v3"
       stroke={color}
@@ -156,7 +210,17 @@ export const SubmitTicketIcon: React.FC<{ color: string; size?: number }> = ({
   size = 20,
 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Rect width="8" height="4" x="8" y="2" rx="1" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <Rect
+      width="8"
+      height="4"
+      x="8"
+      y="2"
+      rx="1"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
     <Path
       d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
       stroke={color}
@@ -164,8 +228,20 @@ export const SubmitTicketIcon: React.FC<{ color: string; size?: number }> = ({
       strokeLinecap="round"
       strokeLinejoin="round"
     />
-    <Path d="M9 14h6" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    <Path d="M12 17v-6" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <Path
+      d="M9 14h6"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M12 17v-6"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </Svg>
 );
 
@@ -204,7 +280,17 @@ export const SuppliesIcon: React.FC<{ color: string; size?: number }> = ({
   size = 20,
 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Rect width="20" height="5" x="2" y="3" rx="1" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <Rect
+      width="20"
+      height="5"
+      x="2"
+      y="3"
+      rx="1"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
     <Path
       d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"
       stroke={color}
@@ -212,7 +298,13 @@ export const SuppliesIcon: React.FC<{ color: string; size?: number }> = ({
       strokeLinecap="round"
       strokeLinejoin="round"
     />
-    <Path d="M10 12h4" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <Path
+      d="M10 12h4"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </Svg>
 );
 
@@ -252,31 +344,191 @@ export const AuditIcon: React.FC<{ color: string; size?: number }> = ({
   </Svg>
 );
 
+// ─── Office section icons ─────────────────────────────────────────────────────
+
+export const OfficeSuppliesIcon: React.FC<{ color: string; size?: number }> = ({
+  color,
+  size = 20,
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M16 2H8a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M10 6h4M10 10h4M10 14h2"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+  </Svg>
+);
+
+export const SupplyRequestIcon: React.FC<{ color: string; size?: number }> = ({
+  color,
+  size = 20,
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Rect
+      x="9"
+      y="3"
+      width="6"
+      height="4"
+      rx="1"
+      stroke={color}
+      strokeWidth="2"
+    />
+    <Path
+      d="M12 12v4M10 14h4"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+  </Svg>
+);
+
+export const MonthlyReportIcon: React.FC<{ color: string; size?: number }> = ({
+  color,
+  size = 20,
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect
+      x="3"
+      y="4"
+      width="18"
+      height="18"
+      rx="2"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M16 2v4M8 2v4M3 10h18"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"
+      stroke={color}
+      strokeWidth="2.5"
+      strokeLinecap="round"
+    />
+  </Svg>
+);
+
+export const ActivityIcon: React.FC<{ color: string; size?: number }> = ({
+  color,
+  size = 20,
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M22 12h-4l-3 9L9 3l-3 9H2"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
 // ─── Menu config ──────────────────────────────────────────────────────────────
 
-export const MENU_BY_ROLE: Record<string, NavItem[]> = {
+export type NavSection = {
+  sectionLabel?: string; // undefined = no header, just items
+  items: NavItem[];
+};
+
+export const MENU_BY_ROLE: Record<string, NavSection[]> = {
   superadmin: [
-    { key: "dashboard",   label: "Dashboard",     icon: DashboardIcon   },
-    { key: "tickets",     label: "Tickets",        icon: TicketsIcon     },
-    { key: "inventory",   label: "IT Inventory",   icon: InventoryIcon   },
-    { key: "consumables", label: "IT Consumables", icon: ConsumablesIcon },
-    { key: "users",       label: "Users",          icon: UsersIcon       },
-    { key: "audit",       label: "Audit Trail",    icon: AuditIcon       },
+    {
+      items: [
+        { key: "dashboard", label: "Dashboard", icon: DashboardIcon },
+        { key: "users",     label: "Users",     icon: UsersIcon     },
+        { key: "audit",     label: "Audit Trail", icon: AuditIcon   },
+      ],
+    },
+    {
+      sectionLabel: "IT",
+      items: [
+        { key: "tickets",     label: "Tickets",        icon: TicketsIcon     },
+        { key: "inventory",   label: "IT Inventory",   icon: InventoryIcon   },
+        { key: "consumables", label: "IT Consumables", icon: ConsumablesIcon },
+      ],
+    },
+    {
+      sectionLabel: "Office Supplies",
+      items: [
+        { key: "officesupplies",  label: "Inventory", icon: OfficeSuppliesIcon  },
+        { key: "supplyrequest",   label: "Supply Request",            icon: SupplyRequestIcon   },
+        { key: "monthlyreport",   label: "Monthly Report",            icon: MonthlyReportIcon   },
+        { key: "activity",        label: "Activity",                  icon: ActivityIcon        },
+      ],
+    },
   ],
   admin: [
-    { key: "dashboard",   label: "Dashboard",     icon: DashboardIcon   },
-    { key: "tickets",     label: "Tickets",        icon: TicketsIcon     },
-    { key: "inventory",   label: "IT Inventory",   icon: InventoryIcon   },
-    { key: "consumables", label: "IT Consumables", icon: ConsumablesIcon },
+    {
+      items: [
+        { key: "dashboard", label: "Dashboard", icon: DashboardIcon },
+      ],
+    },
+    {
+      sectionLabel: "IT",
+      items: [
+        { key: "tickets",     label: "Tickets",        icon: TicketsIcon     },
+        { key: "inventory",   label: "IT Inventory",   icon: InventoryIcon   },
+        { key: "consumables", label: "IT Consumables", icon: ConsumablesIcon },
+      ],
+    },
+    {
+      sectionLabel: "Office Supplies",
+      items: [
+        { key: "officesupplies",  label: "Office Supplies Inventory", icon: OfficeSuppliesIcon  },
+        { key: "supplyrequest",   label: "Supply Request",            icon: SupplyRequestIcon   },
+        { key: "monthlyreport",   label: "Monthly Report",            icon: MonthlyReportIcon   },
+        { key: "activity",        label: "Activity",                  icon: ActivityIcon        },
+      ],
+    },
   ],
   employee: [
-    { key: "dashboard",       label: "Dashboard",         icon: DashboardIcon     },
-    { key: "submitticket",    label: "Submit Ticket",      icon: SubmitTicketIcon  },
-    { key: "mytickets",       label: "My Tickets",         icon: MyTicketsIcon     },
-    { key: "supplyinventory", label: "Supply Inventory",   icon: SuppliesIcon      },
+    {
+      items: [
+        { key: "dashboard",       label: "Dashboard",         icon: DashboardIcon    },
+        { key: "submitticket",    label: "Submit Ticket",     icon: SubmitTicketIcon },
+        { key: "mytickets",       label: "My Tickets",        icon: MyTicketsIcon    },
+        { key: "supplyinventory", label: "Supply Inventory",  icon: SuppliesIcon     },
+      ],
+    },
   ],
 };
 
+export function getNavSectionsForUser(user: {
+  role: string;
+  permissions?: {
+    itInventory?: boolean;
+    consumables?: boolean;
+    tickets?: boolean;
+  };
+}): NavSection[] {
+  if (user.role === "superadmin") return MENU_BY_ROLE.superadmin;
+  if (user.role === "admin") return MENU_BY_ROLE.admin;
+  if (user.role === "employee") return MENU_BY_ROLE.employee;
+  return [];
+}
+
+// Keep getNavItemsForUser for backwards compatibility if used elsewhere
 export function getNavItemsForUser(user: {
   role: string;
   permissions?: {
@@ -285,11 +537,7 @@ export function getNavItemsForUser(user: {
     tickets?: boolean;
   };
 }): NavItem[] {
-  if (user.role === "superadmin") return MENU_BY_ROLE.superadmin;
-  if (user.role === "admin")      return MENU_BY_ROLE.admin;
-  if (user.role === "employee")   return MENU_BY_ROLE.employee;
-
-  return [];
+  return getNavSectionsForUser(user).flatMap((s) => s.items);
 }
 
 // Returns permission-gated items for employees.
@@ -306,9 +554,20 @@ export function getPermissionItemsForEmployee(user: {
 
   const items: NavItem[] = [];
 
-  if (user.permissions?.tickets)     items.push({ key: "tickets",     label: "Tickets",        icon: TicketsIcon     });
-  if (user.permissions?.itInventory) items.push({ key: "inventory",   label: "IT Inventory",   icon: InventoryIcon   });
-  if (user.permissions?.consumables) items.push({ key: "consumables", label: "IT Consumables", icon: ConsumablesIcon });
+  if (user.permissions?.tickets)
+    items.push({ key: "tickets", label: "Tickets", icon: TicketsIcon });
+  if (user.permissions?.itInventory)
+    items.push({
+      key: "inventory",
+      label: "IT Inventory",
+      icon: InventoryIcon,
+    });
+  if (user.permissions?.consumables)
+    items.push({
+      key: "consumables",
+      label: "IT Consumables",
+      icon: ConsumablesIcon,
+    });
 
   return items;
 }

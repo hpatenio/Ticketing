@@ -10,8 +10,10 @@ import {
 } from "react-native";
 import {
   getNavColors,
+  getNavSectionsForUser,
   getNavItemsForUser,
   getPermissionItemsForEmployee,
+  NavItem,
 } from "./NavItems";
 import { useTheme } from "../../theme/ThemeContext";
 import { ADUser } from "../../types";
@@ -31,7 +33,12 @@ type SidebarProps = {
 const COLLAPSED_W = 64;
 const EXPANDED_W = 220;
 
-export default function Sidebar({ user, activeKey, onNavigate, onLogout }: SidebarProps) {
+export default function Sidebar({
+  user,
+  activeKey,
+  onNavigate,
+  onLogout,
+}: SidebarProps) {
   const [expanded, setExpanded] = useState(false);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
@@ -39,7 +46,7 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
 
   const { theme, themeMode, setThemeMode } = useTheme();
   const C = getNavColors(theme);
-  const items = getNavItemsForUser(user);
+  const sections = getNavSectionsForUser(user);
   const permissionItems = getPermissionItemsForEmployee(user);
   const hasPermissions = permissionItems.length > 0;
 
@@ -104,13 +111,13 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
   };
 
   const themeOptions = [
-    { mode: "light"  as const, label: "Light",  Icon: Sun     },
-    { mode: "dark"   as const, label: "Dark",   Icon: Moon    },
+    { mode: "light" as const, label: "Light", Icon: Sun },
+    { mode: "dark" as const, label: "Dark", Icon: Moon },
     { mode: "system" as const, label: "System", Icon: Monitor },
   ];
 
   // Reusable nav item renderer
-  const renderNavItem = (item: typeof items[0]) => {
+  const renderNavItem = (item: NavItem) => {
     const isActive = item.key === activeKey;
     const isHovered = hoveredKey === item.key;
     const Icon = item.icon;
@@ -118,7 +125,9 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
     const navItemWebProps =
       Platform.OS === "web"
         ? {
-            onMouseEnter: () => { if (!isActive) setHoveredKey(item.key); },
+            onMouseEnter: () => {
+              if (!isActive) setHoveredKey(item.key);
+            },
             onMouseLeave: () => setHoveredKey(null),
           }
         : {};
@@ -141,8 +150,8 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
           backgroundColor: isActive
             ? theme.bgActive
             : isHovered
-            ? theme.bgHover
-            : "transparent",
+              ? theme.bgHover
+              : "transparent",
         }}
         {...navItemWebProps}
       >
@@ -161,7 +170,13 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
             }}
           />
         )}
-        <View style={{ flexShrink: 0, alignItems: "center", justifyContent: "center" }}>
+        <View
+          style={{
+            flexShrink: 0,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
           <Icon color={isActive ? C.iconActive : C.iconInactive} size={23} />
         </View>
         <Animated.Text
@@ -243,7 +258,39 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
 
         {/* Main nav items + Access section */}
         <View style={{ flex: 1, paddingVertical: 12 }}>
-          {items.map(renderNavItem)}
+          {sections.map((section, sIdx) => (
+            <View
+              key={sIdx}
+              style={
+                sIdx > 0
+                  ? {
+                      marginTop: 8,
+                      borderTopWidth: 0.5,
+                      borderTopColor: theme.navBorder,
+                      paddingTop: 8,
+                    }
+                  : undefined
+              }
+            >
+              {section.sectionLabel && (
+                <Animated.Text
+                  style={{
+                    fontFamily: "Outfit-SemiBold",
+                    fontSize: 10,
+                    letterSpacing: 0.8,
+                    color: C.textInactive,
+                    textTransform: "uppercase",
+                    paddingHorizontal: 20,
+                    paddingBottom: 4,
+                    opacity: labelOpacity,
+                  }}
+                >
+                  {section.sectionLabel}
+                </Animated.Text>
+              )}
+              {section.items.map(renderNavItem)}
+            </View>
+          ))}
 
           {/* Access section — only shown for employees with at least 1 permission */}
           {hasPermissions && (
@@ -269,7 +316,6 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
               >
                 Access
               </Animated.Text>
-
               {permissionItems.map(renderNavItem)}
             </View>
           )}
@@ -297,7 +343,13 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
               borderRadius: 10,
             }}
           >
-            <View style={{ flexShrink: 0, alignItems: "center", justifyContent: "center" }}>
+            <View
+              style={{
+                flexShrink: 0,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
               <LogOut color="#f87171" size={22} />
             </View>
             <Animated.Text
@@ -343,7 +395,9 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
                     gap: 10,
                     paddingHorizontal: 14,
                     paddingVertical: 10,
-                    backgroundColor: isSelected ? theme.bgActive : "transparent",
+                    backgroundColor: isSelected
+                      ? theme.bgActive
+                      : "transparent",
                     borderTopWidth: i === 0 ? 0 : 0.5,
                     borderTopColor: theme.navBorder,
                   }}
@@ -402,7 +456,9 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
               flexShrink: 0,
             }}
           >
-            <Text style={{ fontFamily: "Outfit-Bold", color: "#fff", fontSize: 13 }}>
+            <Text
+              style={{ fontFamily: "Outfit-Bold", color: "#fff", fontSize: 13 }}
+            >
               {user.displayName?.charAt(0) ?? "U"}
             </Text>
           </View>

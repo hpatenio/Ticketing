@@ -22,7 +22,7 @@ import { logout } from "./Logout";
 import { ADUser, UserPermissions, UserRole } from "../../types";
 import { useTheme } from "../../theme/ThemeContext";
 
-const BACKEND_URL = "http://10.10.10.98:3000";
+const BACKEND_URL = "http://10.10.100.112:3000";
 const STORAGE_KEY = "AD_USER_DATA";
 
 // ─── Role badge colors ─────────────────────────────────────────────────────────

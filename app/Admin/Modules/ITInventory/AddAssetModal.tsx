@@ -16,6 +16,8 @@ import {
 import { useTheme } from "../../../../theme/ThemeContext";
 import BadgeSelect from "../../../../components/common/BadgeSelect";
 import { DropdownOption } from "../../../SuperAdmin/ManageColumnsModal";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { logAuditBatch } from "../../../../Services/auditService";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -751,30 +753,76 @@ const AddAssetModal: React.FC<Props> = ({
   ) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSingleSubmit = async () => {
-    if (!form.assetTag || !form.company || !form.brand) {
-      setError("Asset Tag, Company, and Brand are required.");
-      return;
-    }
-    setLoading(true);
-    setError("");
+  if (!form.assetTag || !form.company || !form.brand) {
+    setError("Asset Tag, Company, and Brand are required.");
+    return;
+  }
+  setLoading(true);
+  setError("");
+  try {
+    const emp = employees.find((e) => e.id === form.assigneeId);
+    const assigneeName = emp?.name ?? "";
+
+    await addAsset({
+      ...form,
+      assigneeName,
+      datePurchased: form.datePurchased
+        ? Timestamp.fromDate(new Date(form.datePurchased))
+        : Timestamp.now(),
+    });
+
+    // Resolve current user, same pattern as EditAssetModal
+    let changedBy = "Unknown";
+    let changedById = "";
     try {
-      const emp = employees.find((e) => e.id === form.assigneeId);
-      await addAsset({
-        ...form,
-        assigneeName: emp?.name ?? "",
-        datePurchased: form.datePurchased
-          ? Timestamp.fromDate(new Date(form.datePurchased))
-          : Timestamp.now(),
+      const saved = await AsyncStorage.getItem("AD_USER_DATA");
+      if (saved) {
+        const user = JSON.parse(saved);
+        changedBy = user.displayName ?? "Unknown";
+        changedById = user.username ?? "";
+      }
+    } catch {}
+
+    // Log creation — a logging failure here shouldn't surface as
+    // "add failed" to the user, since the asset was already saved.
+    try {
+      const fields: Record<string, string> = {
+        company: form.company,
+        serialNumber: form.serialNumber,
+        model: form.model,
+        brand: form.brand,
+        status: form.status,
+        assigneeName,
+        category: form.category,
+        location: form.location,
+        notes: form.notes,
+        datePurchased: form.datePurchased,
+      };
+
+      await logAuditBatch({
+        table: "inventory",
+        recordId: form.assetTag,
+        recordLabel: form.assetTag,
+        changedBy,
+        changedById,
+        changes: [
+          { field: "assetTag", oldValue: "", newValue: "Created" },
+          ...Object.entries(fields)
+            .filter(([, value]) => value !== "")
+            .map(([field, value]) => ({ field, oldValue: "", newValue: value })),
+        ],
       });
-      setForm(EMPTY_SINGLE);
-      onSuccess();
-      onClose();
-    } catch {
-      setError("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    } catch {}
+
+    setForm(EMPTY_SINGLE);
+    onSuccess();
+    onClose();
+  } catch {
+    setError("Something went wrong. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ── bulk ──────────────────────────────────────────────────────────────────
 
@@ -852,46 +900,91 @@ const AddAssetModal: React.FC<Props> = ({
   };
 
   const handleBulkSubmit = async () => {
-    const invalid = rows.find((r) => !r.assetTag || !r.brand || !r.company);
-    if (invalid) {
-      setBulkError("Every row needs Asset Tag, Brand, and Company.");
-      return;
-    }
-    setBulkLoading(true);
-    setBulkError("");
-    setBulkSuccess(0);
+  const invalid = rows.find((r) => !r.assetTag || !r.brand || !r.company);
+  if (invalid) {
+    setBulkError("Every row needs Asset Tag, Brand, and Company.");
+    return;
+  }
+  setBulkLoading(true);
+  setBulkError("");
+  setBulkSuccess(0);
+  try {
+    // Resolve current user once, reused for every row's audit entry
+    let changedBy = "Unknown";
+    let changedById = "";
     try {
-      await Promise.all(
-        rows.map((r) => {
-          const assignee = employees.find((e) => e.id === r.assigneeId);
-          return addAsset({
-            assetTag: r.assetTag,
+      const saved = await AsyncStorage.getItem("AD_USER_DATA");
+      if (saved) {
+        const user = JSON.parse(saved);
+        changedBy = user.displayName ?? "Unknown";
+        changedById = user.username ?? "";
+      }
+    } catch {}
+
+    await Promise.all(
+      rows.map(async (r) => {
+        const assignee = employees.find((e) => e.id === r.assigneeId);
+        const assigneeName = r.assigneeName || assignee?.name || "";
+
+        await addAsset({
+          assetTag: r.assetTag,
+          company: r.company,
+          serialNumber: r.serialNumber,
+          model: r.model,
+          brand: r.brand,
+          category: r.category,
+          status: r.status,
+          assigneeId: r.assigneeId,
+          assigneeName,
+          location: r.location,
+          notes: r.notes,
+          datePurchased: r.datePurchased
+            ? Timestamp.fromDate(new Date(r.datePurchased))
+            : Timestamp.now(),
+        });
+
+        // Each row is a distinct asset, so each gets its own audit entry
+        try {
+          const fields: Record<string, string> = {
             company: r.company,
             serialNumber: r.serialNumber,
             model: r.model,
             brand: r.brand,
-            category: r.category,
             status: r.status,
-            assigneeId: r.assigneeId,
-            assigneeName: r.assigneeName || assignee?.name || "",
+            assigneeName,
+            category: r.category,
             location: r.location,
             notes: r.notes,
-            datePurchased: r.datePurchased
-              ? Timestamp.fromDate(new Date(r.datePurchased))
-              : Timestamp.now(),
+            datePurchased: r.datePurchased,
+          };
+
+          await logAuditBatch({
+            table: "inventory",
+            recordId: r.assetTag,
+            recordLabel: r.assetTag,
+            changedBy,
+            changedById,
+            changes: [
+              { field: "assetTag", oldValue: "", newValue: "Created" },
+              ...Object.entries(fields)
+                .filter(([, value]) => value !== "")
+                .map(([field, value]) => ({ field, oldValue: "", newValue: value })),
+            ],
           });
-        }),
-      );
-      setBulkSuccess(rows.length);
-      setRows([EMPTY_ROW(1)]);
-      onSuccess();
-      setTimeout(onClose, 900);
-    } catch {
-      setBulkError("Something went wrong. Please try again.");
-    } finally {
-      setBulkLoading(false);
-    }
-  };
+        } catch {}
+      }),
+    );
+
+    setBulkSuccess(rows.length);
+    setRows([EMPTY_ROW(1)]);
+    onSuccess();
+    setTimeout(onClose, 900);
+  } catch {
+    setBulkError("Something went wrong. Please try again.");
+  } finally {
+    setBulkLoading(false);
+  }
+};
 
   // ── close ─────────────────────────────────────────────────────────────────
 

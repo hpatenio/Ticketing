@@ -564,7 +564,65 @@ const EditAssetModal: React.FC<Props> = ({
     if (!selectedAsset) return;
     setDeleting(true);
     try {
+      // Resolve current user, same pattern as handleSubmit
+      let changedBy = "Unknown";
+      let changedById = "";
+      try {
+        const saved = await AsyncStorage.getItem("AD_USER_DATA");
+        if (saved) {
+          const user = JSON.parse(saved);
+          changedBy = user.displayName ?? "Unknown";
+          changedById = user.username ?? "";
+        }
+      } catch {}
+
+      // Snapshot the asset's fields before it's gone, so the audit trail
+      // still shows what was deleted, not just that something was.
+      const snapshot: Record<string, string> = {
+        company: selectedAsset.company ?? "",
+        serialNumber: selectedAsset.serialNumber ?? "",
+        model: selectedAsset.model ?? "",
+        brand: selectedAsset.brand ?? "",
+        status: selectedAsset.status ?? "",
+        assigneeName: selectedAsset.assigneeName ?? "",
+        category: selectedAsset.category ?? "",
+        location: selectedAsset.location ?? "",
+        notes: selectedAsset.notes ?? "",
+        datePurchased: selectedAsset.datePurchased
+          ? selectedAsset.datePurchased.toDate().toISOString().split("T")[0]
+          : "",
+      };
+
       await onDelete(selectedAsset.assetTag);
+
+      // Log the deletion after it succeeds — a logging failure here
+      // shouldn't surface as "delete failed" to the user.
+      try {
+        await logAuditBatch({
+          table: "inventory",
+          recordId: selectedAsset.assetTag,
+          recordLabel: selectedAsset.assetTag,
+          changedBy,
+          changedById,
+          changes: [
+            {
+              field: "assetTag",
+              oldValue: selectedAsset.assetTag,
+              newValue: "Deleted",
+            },
+            ...Object.entries(snapshot)
+              .filter(([, value]) => value !== "")
+              .map(([field, value]) => ({
+                field,
+                oldValue: value,
+                newValue: "",
+              })),
+          ],
+        });
+      } catch {
+        // Swallow audit failures silently — the asset was already deleted.
+      }
+
       onClose();
     } catch {
       setError("Failed to delete asset. Please try again.");
@@ -853,7 +911,7 @@ const EditAssetModal: React.FC<Props> = ({
               <BadgeSelect
                 value={form.company}
                 displayName={form.company}
-               options={dropdownOptions.company}
+                options={dropdownOptions.company}
                 placeholder="Select company"
                 onChange={(val, label) =>
                   setForm((f) => ({ ...f, company: val }))
