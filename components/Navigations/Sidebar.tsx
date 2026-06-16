@@ -11,6 +11,7 @@ import {
 import {
   getNavColors,
   getNavItemsForUser,
+  getPermissionItemsForEmployee,
 } from "./NavItems";
 import { useTheme } from "../../theme/ThemeContext";
 import { ADUser } from "../../types";
@@ -39,6 +40,8 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
   const { theme, themeMode, setThemeMode } = useTheme();
   const C = getNavColors(theme);
   const items = getNavItemsForUser(user);
+  const permissionItems = getPermissionItemsForEmployee(user);
+  const hasPermissions = permissionItems.length > 0;
 
   const animatedWidth = useRef(new Animated.Value(COLLAPSED_W)).current;
   const animatedExpand = useRef(new Animated.Value(0)).current;
@@ -106,6 +109,79 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
     { mode: "system" as const, label: "System", Icon: Monitor },
   ];
 
+  // Reusable nav item renderer
+  const renderNavItem = (item: typeof items[0]) => {
+    const isActive = item.key === activeKey;
+    const isHovered = hoveredKey === item.key;
+    const Icon = item.icon;
+
+    const navItemWebProps =
+      Platform.OS === "web"
+        ? {
+            onMouseEnter: () => { if (!isActive) setHoveredKey(item.key); },
+            onMouseLeave: () => setHoveredKey(null),
+          }
+        : {};
+
+    return (
+      <TouchableOpacity
+        key={item.key}
+        onPress={() => onNavigate(item.key)}
+        activeOpacity={0.7}
+        style={{
+          position: "relative",
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 12,
+          marginHorizontal: 8,
+          marginVertical: 2,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          borderRadius: 10,
+          backgroundColor: isActive
+            ? theme.bgActive
+            : isHovered
+            ? theme.bgHover
+            : "transparent",
+        }}
+        {...navItemWebProps}
+      >
+        {isActive && (
+          <View
+            style={{
+              position: "absolute",
+              right: 0,
+              top: "50%",
+              marginTop: -11,
+              width: 3,
+              height: 22,
+              borderTopLeftRadius: 3,
+              borderBottomLeftRadius: 3,
+              backgroundColor: C.activeBar,
+            }}
+          />
+        )}
+        <View style={{ flexShrink: 0, alignItems: "center", justifyContent: "center" }}>
+          <Icon color={isActive ? C.iconActive : C.iconInactive} size={23} />
+        </View>
+        <Animated.Text
+          numberOfLines={1}
+          style={{
+            fontFamily: isActive ? "Outfit-SemiBold" : "Outfit",
+            fontSize: 15.5,
+            letterSpacing: -0.1,
+            color: isActive ? C.textActive : C.textInactive,
+            opacity: labelOpacity,
+            transform: [{ translateX: labelTranslateX }],
+            flexShrink: 1,
+          }}
+        >
+          {item.label}
+        </Animated.Text>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <>
       <Animated.View
@@ -165,114 +241,81 @@ export default function Sidebar({ user, activeKey, onNavigate, onLogout }: Sideb
           </Animated.Text>
         </TouchableOpacity>
 
-        {/* Nav items */}
+        {/* Main nav items + Access section */}
         <View style={{ flex: 1, paddingVertical: 12 }}>
-          {items.map((item) => {
-            const isActive = item.key === activeKey;
-            const isHovered = hoveredKey === item.key;
-            const Icon = item.icon;
+          {items.map(renderNavItem)}
 
-            const navItemWebProps =
-              Platform.OS === "web"
-                ? {
-                    onMouseEnter: () => { if (!isActive) setHoveredKey(item.key); },
-                    onMouseLeave: () => setHoveredKey(null),
-                  }
-                : {};
-
-            return (
-              <TouchableOpacity
-                key={item.key}
-                onPress={() => onNavigate(item.key)}
-                activeOpacity={0.7}
+          {/* Access section — only shown for employees with at least 1 permission */}
+          {hasPermissions && (
+            <View
+              style={{
+                marginTop: 8,
+                borderTopWidth: 0.5,
+                borderTopColor: theme.navBorder,
+                paddingTop: 8,
+              }}
+            >
+              <Animated.Text
                 style={{
-                  position: "relative",
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 12,
-                  marginHorizontal: 8,
-                  marginVertical: 2,
-                  paddingHorizontal: 12,
-                  paddingVertical: 10,
-                  borderRadius: 10,
-                  backgroundColor: isActive
-                    ? theme.bgActive
-                    : isHovered
-                    ? theme.bgHover
-                    : "transparent",
+                  fontFamily: "Outfit-SemiBold",
+                  fontSize: 10,
+                  letterSpacing: 0.8,
+                  color: C.textInactive,
+                  textTransform: "uppercase",
+                  paddingHorizontal: 20,
+                  paddingBottom: 4,
+                  opacity: labelOpacity,
                 }}
-                {...navItemWebProps}
               >
-                {isActive && (
-                  <View
-                    style={{
-                      position: "absolute",
-                      right: 0,
-                      top: "50%",
-                      marginTop: -11,
-                      width: 3,
-                      height: 22,
-                      borderTopLeftRadius: 3,
-                      borderBottomLeftRadius: 3,
-                      backgroundColor: C.activeBar,
-                    }}
-                  />
-                )}
-                <View style={{ flexShrink: 0, alignItems: "center", justifyContent: "center" }}>
-                  <Icon color={isActive ? C.iconActive : C.iconInactive} size={23} />
-                </View>
-                <Animated.Text
-                  numberOfLines={1}
-                  style={{
-                    fontFamily: isActive ? "Outfit-SemiBold" : "Outfit",
-                    fontSize: 15.5,
-                    letterSpacing: -0.1,
-                    color: isActive ? C.textActive : C.textInactive,
-                    opacity: labelOpacity,
-                    transform: [{ translateX: labelTranslateX }],
-                    flexShrink: 1,
-                  }}
-                >
-                  {item.label}
-                </Animated.Text>
-              </TouchableOpacity>
-            );
-          })}
+                Access
+              </Animated.Text>
+
+              {permissionItems.map(renderNavItem)}
+            </View>
+          )}
         </View>
 
         {/* Logout button */}
-        <TouchableOpacity
-          onPress={() => setLogoutModalVisible(true)}
-          activeOpacity={0.7}
+        <View
           style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 12,
-            marginHorizontal: 8,
-            marginBottom: 8,
-            paddingHorizontal: 12,
-            paddingVertical: 10,
-            borderRadius: 10,
+            borderTopWidth: 0.5,
+            borderTopColor: theme.navBorder,
+            paddingTop: 0,
           }}
         >
-          <View style={{ flexShrink: 0, alignItems: "center", justifyContent: "center" }}>
-            <LogOut color="#f87171" size={22} />
-          </View>
-          <Animated.Text
-            numberOfLines={1}
+          <TouchableOpacity
+            onPress={() => setLogoutModalVisible(true)}
+            activeOpacity={0.7}
             style={{
-              fontFamily: "Outfit",
-              fontSize: 15.5,
-              letterSpacing: -0.1,
-              color: "#f87171",
-              opacity: labelOpacity,
-              transform: [{ translateX: labelTranslateX }],
-              flexShrink: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+              marginHorizontal: 8,
+              marginBottom: 8,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              borderRadius: 10,
             }}
           >
-            Log out
-          </Animated.Text>
-        </TouchableOpacity>
+            <View style={{ flexShrink: 0, alignItems: "center", justifyContent: "center" }}>
+              <LogOut color="#f87171" size={22} />
+            </View>
+            <Animated.Text
+              numberOfLines={1}
+              style={{
+                fontFamily: "Outfit",
+                fontSize: 15.5,
+                letterSpacing: -0.1,
+                color: "#f87171",
+                opacity: labelOpacity,
+                transform: [{ translateX: labelTranslateX }],
+                flexShrink: 1,
+              }}
+            >
+              Log out
+            </Animated.Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Theme popout */}
         {settingsOpen && (

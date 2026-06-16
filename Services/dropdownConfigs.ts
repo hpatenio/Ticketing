@@ -6,6 +6,20 @@ const COLLECTION = "dropdown_configs";
 
 export type DropdownNamespace = "inventory" | "ticket" | "consumable";
 
+// Virtual "no value" entry — never stored in Firestore, always re-applied on read
+// so every dropdown gets a way to clear/skip the field.
+const NO_VALUE_OPTION: DropdownOption = {
+  label: "-",
+  value: "",
+  badgeClass:
+    "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-gray-100 text-gray-500",
+} as DropdownOption;
+
+function withNoValueOption(options: DropdownOption[]): DropdownOption[] {
+  const hasBlank = options.some((o) => o.value === "");
+  return hasBlank ? options : [NO_VALUE_OPTION, ...options];
+}
+
 // Matches your actual Firestore doc IDs exactly:
 // inventory → inventory_status, inventory_category, inventory_location, inventory_company
 // ticket    → ticket_status, ticket_category, ticket_priority
@@ -22,12 +36,13 @@ export async function getDropdownOptions(
     const ref = doc(db, COLLECTION, docIdStr);
     const snap = await getDoc(ref);
     if (snap.exists()) {
-      return snap.data().options as DropdownOption[];
+      const options = snap.data().options as DropdownOption[];
+      return withNoValueOption(options);
     }
-    return fallback;
+    return withNoValueOption(fallback);
   } catch (err) {
     console.error(`Failed to fetch dropdown config for ${docIdStr}:`, err);
-    return fallback;
+    return withNoValueOption(fallback);
   }
 }
 
@@ -37,7 +52,10 @@ export async function saveDropdownOptions(
 ): Promise<void> {
   try {
     const ref = doc(db, COLLECTION, docIdStr);
-    await setDoc(ref, { options });
+    // Strip the virtual "no value" entry before persisting — it's re-applied
+    // on every read, so we never want a duplicate (or a stale one) saved.
+    const cleaned = options.filter((o) => o.value !== "");
+    await setDoc(ref, { options: cleaned });
   } catch (err) {
     console.error(`Failed to save dropdown config for ${docIdStr}:`, err);
     throw err;

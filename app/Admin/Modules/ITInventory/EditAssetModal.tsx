@@ -9,6 +9,7 @@ import { useTheme } from "../../../../theme/ThemeContext";
 import BadgeSelect from "../../../../components/common/BadgeSelect"; // adjust path
 import { logAuditBatch } from "../../../../Services/auditService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { DropdownOption } from "../../../SuperAdmin/ManageColumnsModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,13 @@ interface Props {
   onDelete: (assetTag: string) => Promise<void>;
   selectedAsset: ITInventory | null;
   employees: Employee[];
+  dropdownOptions: {
+    // ← add
+    category: DropdownOption[];
+    status: DropdownOption[];
+    company: DropdownOption[];
+    location: DropdownOption[];
+  };
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -41,96 +49,6 @@ const EMPTY_FORM = {
   datePurchased: "",
   notes: "",
 };
-
-const COMPANY_OPTIONS = [
-  {
-    label: "OCG",
-    value: "OCG",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-purple-100 text-purple-800",
-  },
-  {
-    label: "SDB",
-    value: "SDB",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-800",
-  },
-];
-
-const STATUS_OPTIONS = [
-  {
-    label: "Spare",
-    value: "Spare",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-sky-100 text-sky-700",
-  },
-  {
-    label: "Deployed",
-    value: "Deployed",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-green-100 text-green-800",
-  },
-  {
-    label: "Defective",
-    value: "Defective",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-red-100 text-red-700",
-  },
-];
-
-const CATEGORY_OPTIONS = [
-  {
-    label: "Laptop",
-    value: "Laptop",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-orange-100 text-orange-700",
-  },
-  {
-    label: "Monitor",
-    value: "Monitor",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-yellow-100 text-yellow-700",
-  },
-  {
-    label: "Desktop",
-    value: "Desktop",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-teal-100 text-teal-700",
-  },
-];
-
-const LOCATION_OPTIONS = [
-  {
-    label: "Unit 1 & 2",
-    value: "Unit 1 & 2",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-pink-100 text-pink-700",
-  },
-  {
-    label: "Unit 3",
-    value: "Unit 3",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-pink-100 text-pink-700",
-  },
-  {
-    label: "BDO Makati",
-    value: "BDO Makati",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-teal-100 text-teal-700",
-  },
-  {
-    label: "Triumph",
-    value: "Triumph",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-indigo-100 text-indigo-700",
-  },
-  {
-    label: "WFH",
-    value: "WFH",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-gray-100 text-gray-700",
-  },
-];
 
 // ─── SearchableSelect ─────────────────────────────────────────────────────────
 
@@ -503,6 +421,7 @@ const EditAssetModal: React.FC<Props> = ({
   onDelete,
   selectedAsset,
   employees,
+  dropdownOptions,
 }) => {
   const { theme } = useTheme();
   const [form, setForm] = useState(EMPTY_FORM);
@@ -510,6 +429,11 @@ const EditAssetModal: React.FC<Props> = ({
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState("");
+
+  const COMPANY_OPTIONS = dropdownOptions.company;
+  const STATUS_OPTIONS = dropdownOptions.status;
+  const CATEGORY_OPTIONS = dropdownOptions.category;
+  const LOCATION_OPTIONS = dropdownOptions.location;
 
   useEffect(() => {
     if (selectedAsset) {
@@ -929,7 +853,7 @@ const EditAssetModal: React.FC<Props> = ({
               <BadgeSelect
                 value={form.company}
                 displayName={form.company}
-                options={COMPANY_OPTIONS}
+               options={dropdownOptions.company}
                 placeholder="Select company"
                 onChange={(val, label) =>
                   setForm((f) => ({ ...f, company: val }))
@@ -941,7 +865,7 @@ const EditAssetModal: React.FC<Props> = ({
               <BadgeSelect
                 value={form.category}
                 displayName={form.category}
-                options={CATEGORY_OPTIONS}
+                options={dropdownOptions.category}
                 placeholder="Select category"
                 onChange={(val) =>
                   setForm((f) => ({
@@ -960,7 +884,7 @@ const EditAssetModal: React.FC<Props> = ({
               <BadgeSelect
                 value={form.location}
                 displayName={form.location}
-                options={LOCATION_OPTIONS}
+                options={dropdownOptions.location}
                 placeholder="Select location"
                 onChange={(val) =>
                   setForm((f) => ({
@@ -975,7 +899,7 @@ const EditAssetModal: React.FC<Props> = ({
               <BadgeSelect
                 value={form.status}
                 displayName={form.status}
-                options={STATUS_OPTIONS}
+                options={dropdownOptions.status}
                 placeholder="Select status"
                 onChange={(val) =>
                   setForm((f) => ({

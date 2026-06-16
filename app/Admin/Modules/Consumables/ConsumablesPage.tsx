@@ -21,6 +21,11 @@ import ManageColumnsModal, {
 } from "../../../SuperAdmin/ManageColumnsModal";
 import AuditTrailModal from "../../../../components/common/AuditTrailModal";
 import { getAllDropdownConfigs, getDropdownOptions } from "../../../../Services/dropdownConfigs";
+import {
+  useTableFilter,
+  TableFilterButton,
+  TableFilterPanel,
+} from "../../../../components/common/TableFilterPanel";
 
 // ─── Options ──────────────────────────────────────────────────────────────────
 const DEFAULT_STATUS_OPTIONS: DropdownOption[] = [
@@ -374,165 +379,66 @@ const StatusSection: React.FC<StatusSectionProps> = React.memo(
   },
 );
 
-// ─── Filter tab — acts as both a tab button and an instant dropdown ───────────
-
-type FilterTabDropdownProps = {
-  isActive: boolean;
-  filterStatus: string;
-  counts: Record<string, number>;
-  theme: ReturnType<typeof useTheme>["theme"];
-  onActivate: () => void;
-  onChange: (val: string) => void;
-};
-
-const FilterTabDropdown: React.FC<FilterTabDropdownProps> = ({
-  isActive,
-  filterStatus,
-  counts,
-  theme,
-  onActivate,
-  onChange,
-}) => {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<React.CSSProperties>({});
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  const options = [
-    { label: "All statuses", value: "", dot: undefined },
-    { label: "Deployed", value: "Deployed", dot: "#10b981" },
-    { label: "Defective", value: "Defective", dot: "#ef4444" },
-    { label: "Spare", value: "Spare", dot: "#8b5cf6" },
-  ];
-
-  const selected = options.find((o) => o.value === filterStatus) ?? options[0];
-
-  const handleClick = () => {
-    onActivate();
-    if (!triggerRef.current) return;
-    const r = triggerRef.current.getBoundingClientRect();
-    setPos({
-      position: "fixed",
-      top: r.bottom + 4,
-      left: r.left,
-      minWidth: r.width,
-      zIndex: 9999,
-    });
-    setOpen((prev) => !prev);
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    const h = (e: MouseEvent) => {
-      if (
-        !triggerRef.current?.contains(e.target as Node) &&
-        !dropdownRef.current?.contains(e.target as Node)
-      )
-        setOpen(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [open]);
-
-  const displayCount = filterStatus ? (counts[filterStatus] ?? 0) : counts.all;
-
-  return (
-    <>
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={handleClick}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all"
-        style={{
-          backgroundColor: isActive ? theme.primary : theme.surface,
-          color: isActive ? theme.primaryText : theme.subtext,
-          borderColor: isActive ? theme.primary : theme.border,
-        }}
-      >
-        <span>⊟</span>
-        {isActive && filterStatus ? selected.label : "Filter"}
-        {isActive && selected.dot && (
-          <span
-            className="w-2 h-2 rounded-full"
-            style={{ backgroundColor: selected.dot }}
-          />
-        )}
-        <span
-          className="px-1.5 py-0.5 rounded-full"
-          style={{
-            backgroundColor: isActive
-              ? "rgba(255,255,255,0.25)"
-              : theme.surfaceRaised,
-            color: isActive ? theme.primaryText : theme.subtext,
-          }}
-        >
-          {displayCount}
-        </span>
-        <span style={{ opacity: 0.7 }}>▾</span>
-      </button>
-
-      {open && (
-        <div
-          ref={dropdownRef}
-          style={{
-            ...pos,
-            backgroundColor: theme.surface,
-            border: `1px solid ${theme.border}`,
-          }}
-          className="rounded-lg shadow-lg overflow-hidden"
-        >
-          {options.map((opt) => {
-            const isSelected = opt.value === filterStatus;
-            const cnt = opt.value ? (counts[opt.value] ?? 0) : counts.all;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  onChange(opt.value);
-                  setOpen(false);
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left"
-                style={{
-                  backgroundColor: isSelected
-                    ? theme.surfaceRaised
-                    : "transparent",
-                  color: theme.text,
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.backgroundColor = theme.surfaceRaised)
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.backgroundColor = isSelected
-                    ? theme.surfaceRaised
-                    : "transparent")
-                }
-              >
-                {opt.dot ? (
-                  <span
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: opt.dot }}
-                  />
-                ) : (
-                  <span className="w-2 h-2 flex-shrink-0" />
-                )}
-                <span className="flex-1">{opt.label}</span>
-                <span style={{ color: theme.subtext }}>{cnt}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </>
-  );
-};
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 type Props = { isSuperAdmin?: boolean };
 const ConsumablesPage: React.FC<Props> = ({ isSuperAdmin = false }) => {
   const { theme } = useTheme();
+
+  // ─── Dropdown options (declared first so hook can reference them) ─────────
+  const [dropdownOptions, setDropdownOptions] = useState({
+    status: DEFAULT_STATUS_OPTIONS,
+    location: DEFAULT_LOCATION_OPTIONS,
+  });
+
+  // ─── Filter hook ──────────────────────────────────────────────────────────
+  const consumableFilter = useTableFilter({
+    fields: [
+      { key: "status", label: "Status", options: dropdownOptions.status },
+      { key: "location", label: "Location", options: dropdownOptions.location },
+    ],
+  });
+
+  const [data, setData] = useState<ITConsumable[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState<ConsumablesSortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("default");
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [addVisible, setAddVisible] = useState(false);
+  const [editVisible, setEditVisible] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<ITConsumable | null>(null);
+  const [manageColumnsVisible, setManageColumnsVisible] = useState(false);
+  const [auditModal, setAuditModal] = useState<
+    | { recordId?: string; recordLabel?: string }
+    | null
+  >(null);
+
+  const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
+    {
+      id: "consumable_status",
+      docId: "consumable_status",
+      label: "Status",
+      editable: true,
+      options: [],
+    },
+    {
+      id: "consumable_location",
+      docId: "consumable_location",
+      label: "Location",
+      editable: true,
+      options: [],
+    },
+  ]);
+
+  // ─── Data ──────────────────────────────────────────────────────────────────
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    const result = await getAllConsumables();
+    setData(result);
+    setLoading(false);
+  }, []);
 
   // Themed scrollbar
   useEffect(() => {
@@ -566,61 +472,12 @@ const ConsumablesPage: React.FC<Props> = ({ isSuperAdmin = false }) => {
       document.getElementById("inventory-scrollbar-style")?.remove();
     };
   }, [theme]);
-  const [data, setData] = useState<ITConsumable[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [sortKey, setSortKey] = useState<ConsumablesSortKey | null>(null);
-  const [sortDir, setSortDir] = useState<SortDir>("default");
-  const [filterStatus, setFilterStatus] = useState<string>("");
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [addVisible, setAddVisible] = useState(false);
-  const [editVisible, setEditVisible] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<ITConsumable | null>(null);
-  const [manageColumnsVisible, setManageColumnsVisible] = useState(false);
-  const [auditModal, setAuditModal] = useState<
-    | { recordId?: string; recordLabel?: string }
-    | null
-  >(null);
 
-  const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
-    {
-      id: "consumable_status",
-      docId: "consumable_status",
-      label: "Status",
-      editable: true,
-      options: [],
-    },
-    {
-      id: "consumable_location",
-      docId: "consumable_location",
-      label: "Location",
-      editable: true,
-      options: [],
-    },
-  ]);
-
-  const [dropdownOptions, setDropdownOptions] = useState<{
-    status: DropdownOption[];
-    location: DropdownOption[];
-  }>({
-    status: [],
-    location: [],
-  });
-
-  // ─── Data ──────────────────────────────────────────────────────────────────
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    const result = await getAllConsumables();
-    setData(result);
-    setLoading(false);
-  }, []);
-  
   useEffect(() => {
     getAllDropdownConfigs({
       inventory: { status: [], category: [], location: [], company: [] },
       ticket: { status: [], category: [], priority: [] },
-      consumable: { status: [], location: [] },
+      consumable: { status: DEFAULT_STATUS_OPTIONS, location: DEFAULT_LOCATION_OPTIONS },
     })
       .then((result) => {
         const consumable = result.consumable;
@@ -644,6 +501,7 @@ const ConsumablesPage: React.FC<Props> = ({ isSuperAdmin = false }) => {
         console.error("Failed to load consumable dropdown configs:", err),
       );
   }, []);
+  
   useEffect(() => {
     fetchData();
   }, []);
@@ -713,8 +571,15 @@ const ConsumablesPage: React.FC<Props> = ({ isSuperAdmin = false }) => {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    if (!q) return data;
-    return data.filter((item) =>
+    let result = data;
+
+    result = consumableFilter.applyToData(result, {
+      status: "status",
+      location: "location",
+    });
+
+    if (!q) return result;
+    return result.filter((item) =>
       [
         item.name,
         item.model,
@@ -724,7 +589,7 @@ const ConsumablesPage: React.FC<Props> = ({ isSuperAdmin = false }) => {
         item.macAddress,
       ].some((v) => (v ?? "").toLowerCase().includes(q)),
     );
-  }, [data, search]);
+  }, [data, search, consumableFilter.appliedFilters]);
 
   const sortedFiltered = useMemo(() => {
     if (!sortKey || sortDir === "default") return filtered;
@@ -766,22 +631,6 @@ const ConsumablesPage: React.FC<Props> = ({ isSuperAdmin = false }) => {
     }),
     [groupedDeployed, groupedDefective, groupedSpare],
   );
-
-  // Items shown in the "filter" tab — respects the status dropdown
-  const displayItems = useMemo(
-    () =>
-      filterStatus
-        ? sortedFiltered.filter((i) => i.status === filterStatus)
-        : sortedFiltered,
-    [sortedFiltered, filterStatus],
-  );
-
-  const counts = {
-    all: sortedFiltered.length,
-    Deployed: groupedDeployed.length,
-    Defective: groupedDefective.length,
-    Spare: groupedSpare.length,
-  };
 
   // ─── Table head ────────────────────────────────────────────────────────────
 
@@ -933,7 +782,7 @@ const ConsumablesPage: React.FC<Props> = ({ isSuperAdmin = false }) => {
               IT Consumables
             </h1>
             <p style={{ color: theme.subtext }} className="text-xs mt-0.5">
-              {displayItems.length} of {data.length} printers
+              {sortedFiltered.length} of {data.length} printers
             </p>
           </div>
 
@@ -993,60 +842,58 @@ const ConsumablesPage: React.FC<Props> = ({ isSuperAdmin = false }) => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 mb-3">
-          <input
-            type="text"
-            placeholder="Search printer name, model, IP, location..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{
-              backgroundColor: theme.inputBg,
-              borderColor: theme.inputBorder,
-              color: theme.inputText,
-            }}
-            className="flex-1 px-4 py-2.5 text-sm border rounded-lg focus:outline-none"
-            onFocus={(e) =>
-              (e.currentTarget.style.borderColor = theme.inputBorderFocus)
-            }
-            onBlur={(e) =>
-              (e.currentTarget.style.borderColor = theme.inputBorder)
-            }
-          />
-          <FilterTabDropdown
-            isActive={!!filterStatus}
-            filterStatus={filterStatus}
-            counts={counts}
-            theme={theme}
-            onActivate={() => {}}
-            onChange={(val) => setFilterStatus(val)}
-          />
-        </div>
+        {/* Row 2: Search bar (left) + Filter button (right) */}
+<div className="flex items-center gap-2 mb-3">
+  {/* Search */}
+  <div className="flex-1">
+    <div className="relative w-full max-w-md">
+      {/* Search Icon */}
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+        style={{ color: theme.subtext }}
+      >
+        <path d="m21 21-4.34-4.34" />
+        <circle cx="11" cy="11" r="8" />
+      </svg>
 
-        {filterStatus && (
-          <div className="flex flex-wrap items-center gap-2 mb-3">
-            <span style={{ color: theme.subtext }} className="text-xs">
-              Filtered by:
-            </span>
-            <div
-              style={{
-                backgroundColor: theme.primarySubtle,
-                color: theme.primarySubtleText,
-              }}
-              className="flex items-center gap-2 px-3 py-1 rounded-full"
-            >
-              <span className="text-xs font-medium">
-                Status: {filterStatus}
-              </span>
-              <button
-                type="button"
-                onClick={() => setFilterStatus("")}
-                className="text-xs font-bold"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        )}
+      <input
+        type="text"
+        placeholder="Search printer name, model, IP, location..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        style={{
+          backgroundColor: theme.inputBg,
+          borderColor: theme.inputBorder,
+          color: theme.inputText,
+        }}
+        className="w-full px-4 py-2.5 pl-9 text-sm border rounded-lg focus:outline-none"
+        onFocus={(e) =>
+          (e.currentTarget.style.borderColor = theme.inputBorderFocus)
+        }
+        onBlur={(e) =>
+          (e.currentTarget.style.borderColor = theme.inputBorder)
+        }
+      />
+    </div>
+  </div>
+
+  {/* Filter button */}
+  <TableFilterButton
+    btnRef={consumableFilter.filterBtnRef}
+    onClick={consumableFilter.handleFilterButtonClick}
+    activeCount={consumableFilter.activeCount}
+    hasActive={consumableFilter.hasActive()}
+  />
+</div>
       </div>
 
       {/* ── Scrollable content ── */}
@@ -1057,7 +904,7 @@ const ConsumablesPage: React.FC<Props> = ({ isSuperAdmin = false }) => {
             className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin"
           />
         </div>
-      ) : displayItems.length === 0 ? (
+      ) : sortedFiltered.length === 0 ? (
         <div className="flex flex-1 items-center justify-center py-20">
           <p style={{ color: theme.subtext }} className="text-sm">
             No printers found.
@@ -1074,11 +921,28 @@ const ConsumablesPage: React.FC<Props> = ({ isSuperAdmin = false }) => {
               style={{ borderCollapse: "collapse" }}
             >
               {renderTableHead(0)}
-              <tbody>{renderTableBody(displayItems)}</tbody>
+              <tbody>{renderTableBody(sortedFiltered)}</tbody>
             </table>
           </div>
         </div>
       )}
+
+      {/* ── Filter panel ── */}
+      <TableFilterPanel
+        visible={consumableFilter.filterPanelVisible}
+        config={{
+          fields: [
+            { key: "status", label: "Status", options: dropdownOptions.status },
+            { key: "location", label: "Location", options: dropdownOptions.location },
+          ],
+        }}
+        pendingFilters={consumableFilter.pendingFilters}
+        setPendingFilters={consumableFilter.setPendingFilters}
+        onFilterChange={(updated) => consumableFilter.setAppliedFilters(updated)}
+        onClear={consumableFilter.handleClear}
+        onClose={() => consumableFilter.setFilterPanelVisible(false)}
+        panelPos={consumableFilter.filterPanelPos}
+      />
 
       <AddConsumableModal
         visible={addVisible}

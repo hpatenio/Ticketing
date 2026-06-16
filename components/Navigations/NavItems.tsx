@@ -149,6 +149,73 @@ export const SettingsIcon: React.FC<{ color: string; size?: number }> = ({
   </Svg>
 );
 
+// ─── Employee-specific icons ──────────────────────────────────────────────────
+
+export const SubmitTicketIcon: React.FC<{ color: string; size?: number }> = ({
+  color,
+  size = 20,
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect width="8" height="4" x="8" y="2" rx="1" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <Path
+      d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path d="M9 14h6" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M12 17v-6" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+export const MyTicketsIcon: React.FC<{ color: string; size?: number }> = ({
+  color,
+  size = 20,
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M14 2v5a1 1 0 0 0 1 1h5"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M16 22a4 4 0 0 0-8 0"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Circle cx="12" cy="15" r="3" stroke={color} strokeWidth="2" />
+  </Svg>
+);
+
+export const SuppliesIcon: React.FC<{ color: string; size?: number }> = ({
+  color,
+  size = 20,
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect width="20" height="5" x="2" y="3" rx="1" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <Path
+      d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path d="M10 12h4" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
 // ─── Audit Trail icon ─────────────────────────────────────────────────────────
 
 export const AuditIcon: React.FC<{ color: string; size?: number }> = ({
@@ -203,7 +270,10 @@ export const MENU_BY_ROLE: Record<string, NavItem[]> = {
     { key: "consumables", label: "IT Consumables", icon: ConsumablesIcon },
   ],
   employee: [
-    { key: "dashboard", label: "Dashboard", icon: DashboardIcon },
+    { key: "dashboard",       label: "Dashboard",         icon: DashboardIcon     },
+    { key: "submitticket",    label: "Submit Ticket",      icon: SubmitTicketIcon  },
+    { key: "mytickets",       label: "My Tickets",         icon: MyTicketsIcon     },
+    { key: "supplyinventory", label: "Supply Inventory",   icon: SuppliesIcon      },
   ],
 };
 
@@ -217,11 +287,24 @@ export function getNavItemsForUser(user: {
 }): NavItem[] {
   if (user.role === "superadmin") return MENU_BY_ROLE.superadmin;
   if (user.role === "admin")      return MENU_BY_ROLE.admin;
+  if (user.role === "employee")   return MENU_BY_ROLE.employee;
 
-  // Employee: start with dashboard, add pages based on permissions
-  const items: NavItem[] = [
-    { key: "dashboard", label: "Dashboard", icon: DashboardIcon },
-  ];
+  return [];
+}
+
+// Returns permission-gated items for employees.
+// Returns an empty array if the employee has no permissions at all.
+export function getPermissionItemsForEmployee(user: {
+  role: string;
+  permissions?: {
+    itInventory?: boolean;
+    consumables?: boolean;
+    tickets?: boolean;
+  };
+}): NavItem[] {
+  if (user.role !== "employee") return [];
+
+  const items: NavItem[] = [];
 
   if (user.permissions?.tickets)     items.push({ key: "tickets",     label: "Tickets",        icon: TicketsIcon     });
   if (user.permissions?.itInventory) items.push({ key: "inventory",   label: "IT Inventory",   icon: InventoryIcon   });

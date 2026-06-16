@@ -137,6 +137,18 @@ function makeBadgeClass(
   return `${bg} ${text} ${BASE_BADGE} ${minW}`;
 }
 
+// The dropdown service auto-prepends a virtual "no value" option
+// (value: "") to every list it returns so selects can be cleared.
+// It's never actually stored — re-applied fresh on every read — so
+// it has no business showing up here as something an admin can
+// rename, recolor, or delete. Strip it the moment columns come in.
+function stripAutoOption(cols: ColumnConfig[]): ColumnConfig[] {
+  return cols.map((col) => ({
+    ...col,
+    options: col.options.filter((opt) => opt.value !== ""),
+  }));
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const ManageColumnsModal: React.FC<Props> = ({
@@ -147,7 +159,7 @@ const ManageColumnsModal: React.FC<Props> = ({
 }) => {
   const { theme } = useTheme();
   const [localCols, setLocalCols] = useState<ColumnConfig[]>(
-    JSON.parse(JSON.stringify(columns)),
+    stripAutoOption(JSON.parse(JSON.stringify(columns))),
   );
   const [activeColId, setActiveColId] = useState(
     columns.find((c) => c.editable)?.id ?? columns[0]?.id,
@@ -158,7 +170,7 @@ const ManageColumnsModal: React.FC<Props> = ({
 
   useEffect(() => {
     if (!visible) return;
-    setLocalCols(JSON.parse(JSON.stringify(columns)));
+    setLocalCols(stripAutoOption(JSON.parse(JSON.stringify(columns))));
     setActiveColId(columns.find((c) => c.editable)?.id ?? columns[0]?.id);
   }, [visible, columns]);
   if (!visible) return null;
@@ -253,7 +265,7 @@ const ManageColumnsModal: React.FC<Props> = ({
   };
 
   const handleReset = () => {
-    setLocalCols(JSON.parse(JSON.stringify(columns)));
+    setLocalCols(stripAutoOption(JSON.parse(JSON.stringify(columns))));
     setSaveError(null);
   };
 

@@ -23,6 +23,11 @@ import ManageColumnsModal, {
 } from "../../../SuperAdmin/ManageColumnsModal";
 import { getAllDropdownConfigs } from "../../../../Services/dropdownConfigs";
 import AuditTrailModal from "../../../../components/common/AuditTrailModal";
+import {
+  useTableFilter,
+  TableFilterButton,
+  TableFilterPanel,
+} from "../../../../components/common/TableFilterPanel";
 
 // ─── Default dropdown options (Firestore seeding fallbacks only) ─────────────
 
@@ -213,262 +218,6 @@ const SortIcon = ({ dir }: { dir: SortDir }) => {
   if (dir === "asc") return <span className="ml-1 text-blue-500">▲</span>;
   if (dir === "desc") return <span className="ml-1 text-blue-500">▼</span>;
   return <span className="ml-1 text-gray-300">▲▼</span>;
-};
-
-// ─── Filter panel state ───────────────────────────────────────────────────────
-
-type FilterState = {
-  categories: string[];
-  statuses: string[];
-  companies: string[];
-  locations: string[];
-  dateFrom: string;
-  dateTo: string;
-};
-
-const EMPTY_FILTER: FilterState = {
-  categories: [],
-  statuses: [],
-  companies: [],
-  locations: [],
-  dateFrom: "",
-  dateTo: "",
-};
-
-const hasActiveFilters = (f: FilterState) =>
-  f.categories.length > 0 ||
-  f.statuses.length > 0 ||
-  f.companies.length > 0 ||
-  f.locations.length > 0 ||
-  !!f.dateFrom ||
-  !!f.dateTo;
-
-// ─── FilterPanel ──────────────────────────────────────────────────────────────
-
-type FilterPanelProps = {
-  visible: boolean;
-  filters: FilterState;
-  pendingFilters: FilterState;
-  setPendingFilters: React.Dispatch<React.SetStateAction<FilterState>>;
-  onFilterChange: (updated: FilterState) => void;
-  onClear: () => void;
-  onClose: () => void;
-  categoryOptions: DropdownOption[];
-  statusOptions: DropdownOption[];
-  companyOptions: DropdownOption[];
-  locationOptions: DropdownOption[];
-  theme: ReturnType<typeof useTheme>["theme"];
-  panelPos: React.CSSProperties;
-};
-
-const FilterPanel: React.FC<FilterPanelProps> = ({
-  visible,
-  filters,
-  pendingFilters,
-  setPendingFilters,
-  onFilterChange,
-  onClear,
-  onClose,
-  categoryOptions,
-  statusOptions,
-  companyOptions,
-  locationOptions,
-  theme,
-  panelPos,
-}) => {
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!visible) return;
-    const handler = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-    // slight delay so the button click that opened it doesn't immediately close it
-    const t = setTimeout(
-      () => document.addEventListener("mousedown", handler),
-      50,
-    );
-    return () => {
-      clearTimeout(t);
-      document.removeEventListener("mousedown", handler);
-    };
-  }, [visible, onClose]);
-
-  if (!visible) return null;
-
-  const toggleChip = (
-    key: keyof Pick<
-      FilterState,
-      "categories" | "statuses" | "companies" | "locations"
-    >,
-    value: string,
-  ) => {
-    setPendingFilters((prev) => {
-      const arr = prev[key];
-      const exists = arr.includes(value);
-      const updated = {
-        ...prev,
-        [key]: exists ? arr.filter((v) => v !== value) : [...arr, value],
-      };
-      onFilterChange(updated);
-      return updated;
-    });
-  };
-
-  const SectionLabel = ({ label }: { label: string }) => (
-    <p
-      style={{ color: theme.subtext }}
-      className="text-xs font-semibold uppercase tracking-wider mb-2"
-    >
-      {label}
-    </p>
-  );
-
-  const ChipGroup = ({
-    options,
-    selected,
-    onToggle,
-  }: {
-    options: DropdownOption[];
-    selected: string[];
-    onToggle: (val: string) => void;
-  }) => (
-    <div className="flex flex-wrap gap-1.5 mb-4">
-      {options.map((opt) => {
-        const isActive = selected.includes(opt.value);
-        return (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => onToggle(opt.value)}
-            className="px-3 py-1 rounded-full text-xs font-medium border transition-all"
-            style={
-              isActive
-                ? {
-                    backgroundColor: opt.bgColor,
-                    color: opt.textColor,
-                    borderColor: opt.textColor + "55",
-                  }
-                : {
-                    backgroundColor: theme.surface,
-                    color: theme.subtext,
-                    borderColor: theme.border,
-                  }
-            }
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-
-  return (
-    <div
-      ref={panelRef}
-      style={{
-        ...panelPos,
-        backgroundColor: theme.surface,
-        borderColor: theme.border,
-        boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
-        zIndex: 9999,
-        width: 280,
-      }}
-      className="fixed rounded-xl border overflow-hidden"
-    >
-      {/* Header */}
-      <div
-        style={{ borderBottomColor: theme.border }}
-        className="flex items-center justify-between px-4 py-3 border-b"
-      >
-        <div className="flex items-center gap-2">
-          <span style={{ color: theme.text }} className="text-sm font-semibold">
-            ⊟ Filters
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={onClear}
-          style={{ color: theme.subtext }}
-          className="text-xs hover:underline"
-        >
-          Clear all
-        </button>
-      </div>
-
-      {/* Body */}
-      <div className="px-4 pt-3 pb-2 max-h-[70vh] overflow-y-auto inventory-scroll">
-        <SectionLabel label="Category" />
-        <ChipGroup
-          options={categoryOptions}
-          selected={pendingFilters.categories}
-          onToggle={(v) => toggleChip("categories", v)}
-        />
-
-        <SectionLabel label="Status" />
-        <ChipGroup
-          options={statusOptions}
-          selected={pendingFilters.statuses}
-          onToggle={(v) => toggleChip("statuses", v)}
-        />
-
-        <SectionLabel label="Company" />
-        <ChipGroup
-          options={companyOptions}
-          selected={pendingFilters.companies}
-          onToggle={(v) => toggleChip("companies", v)}
-        />
-
-        <SectionLabel label="Location" />
-        <ChipGroup
-          options={locationOptions}
-          selected={pendingFilters.locations}
-          onToggle={(v) => toggleChip("locations", v)}
-        />
-
-        <SectionLabel label="Date Purchased" />
-        <div className="flex items-center gap-2 mb-4">
-          <input
-            type="date"
-            value={pendingFilters.dateFrom}
-            onChange={(e) => {
-              const updated = { ...pendingFilters, dateFrom: e.target.value };
-              setPendingFilters(updated);
-              onFilterChange(updated);
-            }}
-            style={{
-              backgroundColor: theme.inputBg,
-              borderColor: theme.inputBorder,
-              color: theme.inputText,
-              colorScheme: theme.mode,
-            }}
-            className="flex-1 text-xs px-2 py-1.5 border rounded-lg focus:outline-none"
-          />
-          <span style={{ color: theme.subtext }} className="text-xs">
-            —
-          </span>
-          <input
-            type="date"
-            value={pendingFilters.dateTo}
-            onChange={(e) => {
-              const updated = { ...pendingFilters, dateTo: e.target.value };
-              setPendingFilters(updated);
-              onFilterChange(updated);
-            }}
-            style={{
-              backgroundColor: theme.inputBg,
-              borderColor: theme.inputBorder,
-              color: theme.inputText,
-              colorScheme: theme.mode,
-            }}
-            className="flex-1 text-xs px-2 py-1.5 border rounded-lg focus:outline-none"
-          />
-        </div>
-      </div>
-    </div>
-  );
 };
 
 // ─── SearchableSelect ─────────────────────────────────────────────────────────
@@ -712,6 +461,28 @@ const ITInventoryPage: React.FC<Props> = ({
   isSuperAdmin = false,
 }) => {
   const { theme } = useTheme();
+
+  // ─── Dropdown options (declared first so hook can reference them) ─────────
+  const [dropdownOptions, setDropdownOptions] = useState({
+    category: DEFAULT_CATEGORY_OPTIONS,
+    status: DEFAULT_STATUS_OPTIONS,
+    company: DEFAULT_COMPANY_OPTIONS,
+    location: DEFAULT_LOCATION_OPTIONS,
+  });
+
+  // ─── Filter hook ──────────────────────────────────────────────────────────
+  const inventoryFilter = useTableFilter({
+    fields: [
+      { key: "category", label: "Category", options: dropdownOptions.category },
+      { key: "status", label: "Status", options: dropdownOptions.status },
+      { key: "company", label: "Company", options: dropdownOptions.company },
+      { key: "location", label: "Location", options: dropdownOptions.location },
+    ],
+    showDateRange: true,
+    dateLabel: "Date Purchased",
+  });
+
+  // ─── State ────────────────────────────────────────────────────────────────
   const [data, setData] = useState<ITInventory[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -725,15 +496,6 @@ const ITInventoryPage: React.FC<Props> = ({
   const [selectedAsset, setSelectedAsset] = useState<ITInventory | null>(null);
   const [editingNoteTag, setEditingNoteTag] = useState<string | null>(null);
   const [manageColumnsVisible, setManageColumnsVisible] = useState(false);
-
-  // Filter panel state
-  const [filterPanelVisible, setFilterPanelVisible] = useState(false);
-  const [pendingFilters, setPendingFilters] =
-    useState<FilterState>(EMPTY_FILTER);
-  const [appliedFilters, setAppliedFilters] =
-    useState<FilterState>(EMPTY_FILTER);
-  const [filterPanelPos, setFilterPanelPos] = useState<React.CSSProperties>({});
-  const filterBtnRef = useRef<HTMLButtonElement>(null);
 
   // Column configs from Firestore
   const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
@@ -777,20 +539,33 @@ const ITInventoryPage: React.FC<Props> = ({
     recordId?: string;
     recordLabel?: string;
   } | null>(null);
+
   useEffect(() => {
     getAllDropdownConfigs({
-      status: DEFAULT_STATUS_OPTIONS,
-      category: DEFAULT_CATEGORY_OPTIONS,
-      location: DEFAULT_LOCATION_OPTIONS,
-      company: DEFAULT_COMPANY_OPTIONS,
+      inventory: {
+        status: DEFAULT_STATUS_OPTIONS,
+        category: DEFAULT_CATEGORY_OPTIONS,
+        location: DEFAULT_LOCATION_OPTIONS,
+        company: DEFAULT_COMPANY_OPTIONS,
+      },
+      ticket: { status: [], category: [], priority: [] },
+      consumable: { status: [], location: [] },
     })
-      .then(({ status, category, location, company }) => {
+      .then((result) => {
+        const inv = result.inventory;
+        if (!inv) return;
+        setDropdownOptions({
+          category: inv.category,
+          status: inv.status,
+          company: inv.company,
+          location: inv.location,
+        });
         setColumnConfigs((prev) =>
           prev.map((col) => {
-            if (col.id === "status") return { ...col, options: status };
-            if (col.id === "category") return { ...col, options: category };
-            if (col.id === "location") return { ...col, options: location };
-            if (col.id === "company") return { ...col, options: company };
+            if (col.id === "status") return { ...col, options: inv.status };
+            if (col.id === "category") return { ...col, options: inv.category };
+            if (col.id === "location") return { ...col, options: inv.location };
+            if (col.id === "company") return { ...col, options: inv.company };
             return col;
           }),
         );
@@ -896,82 +671,28 @@ const ITInventoryPage: React.FC<Props> = ({
     setEditVisible(true);
   }, []);
 
-  const handleSort = useCallback(
-    (key: InventorySortKey) => {
-      if (sortKey !== key) {
-        setSortKey(key);
-        setSortDir("asc");
-      } else {
-        const next = cycleDir(sortDir);
-        setSortDir(next);
-        if (next === "default") setSortKey(null);
-      }
-    },
-    [sortKey, sortDir],
-  );
-
   const dirFor = (key: InventorySortKey): SortDir =>
     sortKey === key ? sortDir : "default";
 
-  // ── Filter button click → calculate panel position ────────────────────────
-  const handleFilterButtonClick = () => {
-    if (filterPanelVisible) {
-      setFilterPanelVisible(false);
-      return;
-    }
-    if (filterBtnRef.current) {
-      const rect = filterBtnRef.current.getBoundingClientRect();
-      const panelWidth = 280;
-      // Anchor to right edge of button
-      const left = Math.min(
-        rect.right - panelWidth,
-        window.innerWidth - panelWidth - 8,
-      );
-      setFilterPanelPos({
-        top: rect.bottom + 6,
-        left: Math.max(8, left),
-      });
-    }
-    // Sync pending with currently applied
-    setPendingFilters(appliedFilters);
-    setFilterPanelVisible(true);
-  };
-
-  const handleFilterChange = (updated: FilterState) => {
-    setAppliedFilters(updated);
-  };
-
-  const handleClearFilters = () => {
-    setPendingFilters(EMPTY_FILTER);
-    setAppliedFilters(EMPTY_FILTER);
-    setFilterPanelVisible(false);
-  };
-
-  const q = search.toLowerCase().trim();
-
+  // ─── Filtered + sorted assets ────────────────────────────────────────────────
   const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
     let result = activeFilter
       ? data.filter(
           (item) => (item[activeFilter.field] ?? "") === activeFilter.value,
         )
       : data;
 
-    // Apply filter panel filters
-    const af = appliedFilters;
-    if (af.categories.length)
-      result = result.filter((i) => af.categories.includes(i.category));
-    if (af.statuses.length)
-      result = result.filter((i) => af.statuses.includes(i.status));
-    if (af.companies.length)
-      result = result.filter((i) => af.companies.includes(i.company));
-    if (af.locations.length)
-      result = result.filter((i) => af.locations.includes(i.location));
-    if (af.dateFrom)
-      result = result.filter(
-        (i) => toDateString(i.datePurchased) >= af.dateFrom,
-      );
-    if (af.dateTo)
-      result = result.filter((i) => toDateString(i.datePurchased) <= af.dateTo);
+    result = inventoryFilter.applyToData(
+      result,
+      {
+        category: "category",
+        status: "status",
+        company: "company",
+        location: "location",
+      },
+      "datePurchased",
+    );
 
     if (!q) return result;
     return result.filter((item) => {
@@ -995,7 +716,7 @@ const ITInventoryPage: React.FC<Props> = ({
         .map((v) => (v ?? "").toString().toLowerCase())
         .some((v) => v.includes(q));
     });
-  }, [data, activeFilter, appliedFilters, q, employees]);
+  }, [data, activeFilter, inventoryFilter.appliedFilters, search, employees]);
 
   const sortedFiltered = useMemo(() => {
     if (!sortKey || sortDir === "default") return filtered;
@@ -1030,26 +751,19 @@ const ITInventoryPage: React.FC<Props> = ({
     });
   }, [filtered, sortKey, sortDir, employees]);
 
-  const categoryOptions =
-    columnConfigs.find((c) => c.id === "category")?.options ??
-    DEFAULT_CATEGORY_OPTIONS;
-  const statusOptions =
-    columnConfigs.find((c) => c.id === "status")?.options ??
-    DEFAULT_STATUS_OPTIONS;
-  const companyOptions =
-    columnConfigs.find((c) => c.id === "company")?.options ??
-    DEFAULT_COMPANY_OPTIONS;
-  const locationOptions =
-    columnConfigs.find((c) => c.id === "location")?.options ??
-    DEFAULT_LOCATION_OPTIONS;
-
-  const activeFilterCount = [
-    appliedFilters.categories.length > 0,
-    appliedFilters.statuses.length > 0,
-    appliedFilters.companies.length > 0,
-    appliedFilters.locations.length > 0,
-    !!appliedFilters.dateFrom || !!appliedFilters.dateTo,
-  ].filter(Boolean).length;
+  const handleSort = useCallback(
+    (key: InventorySortKey) => {
+      if (sortKey !== key) {
+        setSortKey(key);
+        setSortDir("asc");
+      } else {
+        const next = cycleDir(sortDir);
+        setSortDir(next);
+        if (next === "default") setSortKey(null);
+      }
+    },
+    [sortKey, sortDir],
+  );
 
   const renderTableHead = useCallback(
     (stickyTop: number = 0) => (
@@ -1114,7 +828,7 @@ const ITInventoryPage: React.FC<Props> = ({
             <BadgeSelect
               value={item.company}
               displayName={item.company || "—"}
-              options={companyOptions}
+              options={dropdownOptions.company}
               placeholder="—"
               onChange={(val) =>
                 handleFieldUpdate(item.assetTag, "company", val)
@@ -1144,7 +858,7 @@ const ITInventoryPage: React.FC<Props> = ({
             <BadgeSelect
               value={item.category}
               displayName={item.category || "—"}
-              options={categoryOptions}
+              options={dropdownOptions.category}
               placeholder="—"
               onChange={(val) =>
                 handleFieldUpdate(item.assetTag, "category", val)
@@ -1156,7 +870,7 @@ const ITInventoryPage: React.FC<Props> = ({
             <BadgeSelect
               value={item.status}
               displayName={item.status || "—"}
-              options={statusOptions}
+              options={dropdownOptions.status}
               placeholder="—"
               onChange={(val) =>
                 handleFieldUpdate(item.assetTag, "status", val)
@@ -1187,7 +901,7 @@ const ITInventoryPage: React.FC<Props> = ({
             <BadgeSelect
               value={item.location}
               displayName={item.location || "—"}
-              options={locationOptions}
+              options={dropdownOptions.location}
               placeholder="—"
               onChange={(val) =>
                 handleFieldUpdate(item.assetTag, "location", val)
@@ -1259,10 +973,6 @@ const ITInventoryPage: React.FC<Props> = ({
       employees,
       assigneeOptions,
       editingNoteTag,
-      categoryOptions,
-      statusOptions,
-      companyOptions,
-      locationOptions,
       handleFieldUpdate,
       handleAssigneeChange,
       handleEdit,
@@ -1412,57 +1122,12 @@ const ITInventoryPage: React.FC<Props> = ({
           </div>
 
           {/* Filter button */}
-          <button
-            ref={filterBtnRef}
-            type="button"
-            onClick={handleFilterButtonClick}
-            style={{
-              backgroundColor: hasActiveFilters(appliedFilters)
-                ? theme.primary
-                : theme.surface,
-              color: hasActiveFilters(appliedFilters)
-                ? theme.primaryText
-                : theme.subtext,
-              borderColor: hasActiveFilters(appliedFilters)
-                ? theme.primary
-                : theme.border,
-            }}
-            className="flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium rounded-lg border whitespace-nowrap transition-all"
-            onMouseEnter={(e) => {
-              if (!hasActiveFilters(appliedFilters))
-                e.currentTarget.style.backgroundColor = theme.bgHover;
-            }}
-            onMouseLeave={(e) => {
-              if (!hasActiveFilters(appliedFilters))
-                e.currentTarget.style.backgroundColor = theme.surface;
-            }}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z" />
-            </svg>
-            Filter
-            {activeFilterCount > 0 && (
-              <span
-                className="px-1.5 py-0.5 rounded-full text-xs font-semibold"
-                style={{
-                  backgroundColor: "rgba(255,255,255,0.25)",
-                  color: theme.primaryText,
-                }}
-              >
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
+          <TableFilterButton
+            btnRef={inventoryFilter.filterBtnRef}
+            onClick={inventoryFilter.handleFilterButtonClick}
+            activeCount={inventoryFilter.activeCount}
+            hasActive={inventoryFilter.hasActive()}
+          />
         </div>
 
         {/* Active filter pill from ITInventorySummary navigation */}
@@ -1528,26 +1193,43 @@ const ITInventoryPage: React.FC<Props> = ({
       )}
 
       {/* ── Filter panel dropdown ── */}
-      <FilterPanel
-        visible={filterPanelVisible}
-        filters={appliedFilters}
-        pendingFilters={pendingFilters}
-        setPendingFilters={setPendingFilters}
-        onFilterChange={handleFilterChange}
-        onClear={handleClearFilters}
-        onClose={() => setFilterPanelVisible(false)}
-        categoryOptions={categoryOptions}
-        statusOptions={statusOptions}
-        companyOptions={companyOptions}
-        locationOptions={locationOptions}
-        theme={theme}
-        panelPos={filterPanelPos}
+      <TableFilterPanel
+        visible={inventoryFilter.filterPanelVisible}
+        config={{
+          fields: [
+            {
+              key: "category",
+              label: "Category",
+              options: dropdownOptions.category,
+            },
+            { key: "status", label: "Status", options: dropdownOptions.status },
+            {
+              key: "company",
+              label: "Company",
+              options: dropdownOptions.company,
+            },
+            {
+              key: "location",
+              label: "Location",
+              options: dropdownOptions.location,
+            },
+          ],
+          showDateRange: true,
+          dateLabel: "Date Purchased",
+        }}
+        pendingFilters={inventoryFilter.pendingFilters}
+        setPendingFilters={inventoryFilter.setPendingFilters}
+        onFilterChange={(updated) => inventoryFilter.setAppliedFilters(updated)}
+        onClear={inventoryFilter.handleClear}
+        onClose={() => inventoryFilter.setFilterPanelVisible(false)}
+        panelPos={inventoryFilter.filterPanelPos}
       />
 
       <AddAssetModal
         visible={addVisible}
         onClose={() => setAddVisible(false)}
         onSuccess={fetchData}
+        dropdownOptions={dropdownOptions}
       />
       <EditAssetModal
         visible={editVisible}
@@ -1556,12 +1238,30 @@ const ITInventoryPage: React.FC<Props> = ({
         selectedAsset={selectedAsset}
         onDelete={handleDelete}
         employees={employees}
+        dropdownOptions={dropdownOptions}
       />
       <ManageColumnsModal
         visible={manageColumnsVisible}
         onClose={() => setManageColumnsVisible(false)}
         columns={columnConfigs}
-        onSave={(updated) => setColumnConfigs(updated)}
+        onSave={(updated) => {
+          setColumnConfigs(updated);
+
+          // ← Add this: sync dropdownOptions so the table updates immediately
+          setDropdownOptions((prev) => ({
+            ...prev,
+            ...updated.reduce(
+              (acc, col) => {
+                if (col.id === "status") acc.status = col.options;
+                if (col.id === "category") acc.category = col.options;
+                if (col.id === "location") acc.location = col.options;
+                if (col.id === "company") acc.company = col.options;
+                return acc;
+              },
+              {} as Partial<typeof prev>,
+            ),
+          }));
+        }}
       />
 
       <AuditTrailModal

@@ -5,7 +5,7 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import { useEmployees, EmployeeOption } from "../../../../hooks/useEmployees";
+import { useEmployees } from "../../../../hooks/useEmployees";
 import { ADUser, ConcernTicket } from "../../../../types";
 import {
   getAllTickets,
@@ -21,6 +21,12 @@ import ManageColumnsModal, {
   DropdownOption,
 } from "../../../SuperAdmin/ManageColumnsModal";
 import AuditTrailModal from "../../../../components/common/AuditTrailModal";
+import {
+  useTableFilter,
+  TableFilterButton,
+  TableFilterPanel,
+} from "../../../../components/common/TableFilterPanel";
+
 // ─── Options ──────────────────────────────────────────────────────────────────
 
 const DEFAULT_CATEGORY_OPTIONS: DropdownOption[] = [
@@ -28,37 +34,37 @@ const DEFAULT_CATEGORY_OPTIONS: DropdownOption[] = [
     label: "CCTV",
     value: "CCTV",
     badgeClass:
-      "bg-blue-100    text-blue-800    inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
+      "bg-blue-100 text-blue-800 inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "Licenses Accounts",
     value: "Licenses Accounts",
     badgeClass:
-      "bg-indigo-100  text-indigo-800  inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
+      "bg-indigo-100 text-indigo-800 inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "Hardware",
     value: "Hardware",
     badgeClass:
-      "bg-slate-100   text-slate-800   inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
+      "bg-slate-100 text-slate-800 inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "Email",
     value: "Email",
     badgeClass:
-      "bg-cyan-100    text-cyan-800    inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
+      "bg-cyan-100 text-cyan-800 inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "Network",
     value: "Network",
     badgeClass:
-      "bg-teal-100    text-teal-800    inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
+      "bg-teal-100 text-teal-800 inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "Maintenance",
     value: "Maintenance",
     badgeClass:
-      "bg-amber-100   text-amber-800   inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
+      "bg-amber-100 text-amber-800 inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "Medicine",
@@ -76,13 +82,13 @@ const DEFAULT_CATEGORY_OPTIONS: DropdownOption[] = [
     label: "Software",
     value: "Software",
     badgeClass:
-      "bg-sky-100     text-sky-800     inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
+      "bg-sky-100 text-sky-800 inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "Other",
     value: "Other",
     badgeClass:
-      "bg-gray-100    text-gray-800    inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
+      "bg-gray-100 text-gray-800 inline-flex justify-center min-w-[130px] whitespace-nowrap px-2 py-1 rounded-lg text-sm font-medium",
   },
 ];
 
@@ -97,13 +103,13 @@ const DEFAULT_PRIORITY_OPTIONS: DropdownOption[] = [
     label: "Medium",
     value: "Medium",
     badgeClass:
-      "bg-yellow-100  text-yellow-800  inline-flex justify-center min-w-[80px] px-2 py-1 rounded-lg text-sm font-medium",
+      "bg-yellow-100 text-yellow-800 inline-flex justify-center min-w-[80px] px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "High",
     value: "High",
     badgeClass:
-      "bg-red-100     text-red-800     inline-flex justify-center min-w-[80px] px-2 py-1 rounded-lg text-sm font-medium",
+      "bg-red-100 text-red-800 inline-flex justify-center min-w-[80px] px-2 py-1 rounded-lg text-sm font-medium",
   },
 ];
 
@@ -118,7 +124,7 @@ const DEFAULT_STATUS_OPTIONS: DropdownOption[] = [
     label: "In Progress",
     value: "In Progress",
     badgeClass:
-      "bg-blue-100   text-blue-800   inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-medium",
+      "bg-blue-100 text-blue-800 inline-flex justify-center min-w-[100px] px-2 py-1 rounded-lg text-sm font-medium",
   },
   {
     label: "Resolved",
@@ -139,8 +145,6 @@ type SortKey =
   | "priority"
   | "status"
   | "dueDate";
-
-type MainTab = "all" | "grouped" | "filter";
 
 const PRIORITY_ORDER: Record<string, number> = { Low: 0, Medium: 1, High: 2 };
 const STATUS_ORDER: Record<string, number> = {
@@ -227,34 +231,19 @@ const SearchableSelect = ({
 }: SearchableSelectProps) => {
   const { theme } = useTheme();
 
-  // Themed scrollbar
   useEffect(() => {
     const style = document.createElement("style");
     style.id = "inventory-scrollbar-style";
     style.textContent = `
-      .inventory-scroll::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-      }
-      .inventory-scroll::-webkit-scrollbar-track {
-        background: ${theme.background};
-      }
-      .inventory-scroll::-webkit-scrollbar-thumb {
-        background: ${theme.border};
-        border-radius: 999px;
-      }
-      .inventory-scroll::-webkit-scrollbar-thumb:hover {
-        background: ${theme.subtext};
-      }
-      .inventory-scroll::-webkit-scrollbar-corner {
-        background: ${theme.background};
-      }
+      .inventory-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+      .inventory-scroll::-webkit-scrollbar-track { background: ${theme.background}; }
+      .inventory-scroll::-webkit-scrollbar-thumb { background: ${theme.border}; border-radius: 999px; }
+      .inventory-scroll::-webkit-scrollbar-thumb:hover { background: ${theme.subtext}; }
+      .inventory-scroll::-webkit-scrollbar-corner { background: ${theme.background}; }
     `;
-
     const existing = document.getElementById("inventory-scrollbar-style");
     if (existing) existing.remove();
     document.head.appendChild(style);
-
     return () => {
       document.getElementById("inventory-scrollbar-style")?.remove();
     };
@@ -375,10 +364,7 @@ const SearchableSelect = ({
           />
           <ul className="inventory-scroll max-h-44 overflow-y-auto">
             {filtered.length === 0 ? (
-              <li
-                style={{ color: theme.subtext }}
-                className="px-3 py-2 text-xs"
-              >
+              <li style={{ color: theme.subtext }} className="px-3 py-2 text-xs">
                 No results
               </li>
             ) : (
@@ -416,316 +402,16 @@ const SearchableSelect = ({
   );
 };
 
-// ─── Status group definitions ─────────────────────────────────────────────────
-
-type StatusGroupDef = {
-  key: "Pending" | "In Progress" | "Resolved";
-  label: string;
-  headerBg: string;
-  headerText: string;
-  badgeBg: string;
-  badgeText: string;
-};
-
-const STATUS_GROUPS: StatusGroupDef[] = [
-  {
-    key: "Pending",
-    label: "PENDING",
-    headerBg: "#fef9c3",
-    headerText: "#854d0e",
-    badgeBg: "#fef08a",
-    badgeText: "#854d0e",
-  },
-  {
-    key: "In Progress",
-    label: "IN PROGRESS",
-    headerBg: "#dbeafe",
-    headerText: "#1e40af",
-    badgeBg: "#bfdbfe",
-    badgeText: "#1e40af",
-  },
-  {
-    key: "Resolved",
-    label: "RESOLVED",
-    headerBg: "#d1fae5",
-    headerText: "#065f46",
-    badgeBg: "#a7f3d0",
-    badgeText: "#065f46",
-  },
-];
-
-// ─── StatusSection ────────────────────────────────────────────────────────────
-
-type StatusSectionProps = {
-  group: StatusGroupDef;
-  items: ConcernTicket[];
-  isCollapsed: boolean;
-  theme: ReturnType<typeof useTheme>["theme"];
-  onToggle: (key: string) => void;
-  renderTableHead: (stickyTop: number) => React.ReactNode;
-  renderTableBody: (items: ConcernTicket[]) => React.ReactNode;
-};
-
-const StatusSection: React.FC<StatusSectionProps> = React.memo(
-  ({
-    group,
-    items,
-    isCollapsed,
-    theme,
-    onToggle,
-    renderTableHead,
-    renderTableBody,
-  }) => {
-    const headerRef = useRef<HTMLDivElement>(null);
-    const measuredRef = useRef(false);
-    const [headerHeight, setHeaderHeight] = useState(37);
-
-    useEffect(() => {
-      if (measuredRef.current) return;
-      if (headerRef.current) {
-        measuredRef.current = true;
-        setHeaderHeight(headerRef.current.getBoundingClientRect().height);
-      }
-    }, []);
-
-    return (
-      <div className="mb-3">
-        <div
-          ref={headerRef}
-          style={{
-            backgroundColor: group.headerBg,
-            position: "sticky",
-            top: 0,
-            zIndex: 20,
-            borderRadius: isCollapsed ? 8 : "8px 8px 0 0",
-            border: `0.5px solid ${theme.border}`,
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => onToggle(group.key)}
-            className="w-full flex items-center gap-2 px-3 py-2 text-left select-none"
-          >
-            <span
-              style={{ color: group.headerText, fontSize: 13, fontWeight: 600 }}
-            >
-              {isCollapsed ? "▶" : "▼"}
-            </span>
-            <span
-              style={{
-                color: group.headerText,
-                fontSize: 12,
-                fontWeight: 500,
-                letterSpacing: "0.05em",
-              }}
-            >
-              {group.label}
-            </span>
-            <span
-              className="px-2 py-0.5 rounded-full text-xs font-medium ml-1"
-              style={{ backgroundColor: group.badgeBg, color: group.badgeText }}
-            >
-              {items.length}
-            </span>
-          </button>
-        </div>
-
-        {!isCollapsed && (
-          <div
-            style={{
-              border: `0.5px solid ${theme.border}`,
-              borderTop: "none",
-              borderRadius: "0 0 8px 8px",
-            }}
-          >
-            {items.length === 0 ? (
-              <p style={{ color: theme.subtext }} className="text-sm px-4 py-3">
-                No {group.key.toLowerCase()} tickets.
-              </p>
-            ) : (
-              <table
-                className="min-w-full text-sm"
-                style={{ borderCollapse: "collapse" }}
-              >
-                {renderTableHead(headerHeight)}
-                <tbody>{renderTableBody(items)}</tbody>
-              </table>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  },
-);
-
-// ─── FilterTabDropdown ────────────────────────────────────────────────────────
-
-type FilterTabDropdownProps = {
-  isActive: boolean;
-  filterStatus: string;
-  counts: Record<string, number>;
-  theme: ReturnType<typeof useTheme>["theme"];
-  onActivate: () => void;
-  onChange: (val: string) => void;
-};
-
-const FilterTabDropdown: React.FC<FilterTabDropdownProps> = ({
-  isActive,
-  filterStatus,
-  counts,
-  theme,
-  onActivate,
-  onChange,
-}) => {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<React.CSSProperties>({});
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  const options = [
-    { label: "All statuses", value: "", dot: undefined },
-    { label: "Pending", value: "Pending", dot: "#eab308" },
-    { label: "In Progress", value: "In Progress", dot: "#3b82f6" },
-    { label: "Resolved", value: "Resolved", dot: "#10b981" },
-  ];
-
-  const selected = options.find((o) => o.value === filterStatus) ?? options[0];
-
-  const handleClick = () => {
-    onActivate();
-    if (!triggerRef.current) return;
-    const r = triggerRef.current.getBoundingClientRect();
-    setPos({
-      position: "fixed",
-      top: r.bottom + 4,
-      left: r.left,
-      minWidth: r.width,
-      zIndex: 9999,
-    });
-    setOpen((prev) => !prev);
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    const h = (e: MouseEvent) => {
-      if (
-        !triggerRef.current?.contains(e.target as Node) &&
-        !dropdownRef.current?.contains(e.target as Node)
-      )
-        setOpen(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [open]);
-
-  const displayCount = filterStatus ? (counts[filterStatus] ?? 0) : counts.all;
-
-  return (
-    <>
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={handleClick}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all"
-        style={{
-          backgroundColor: isActive ? theme.primary : theme.surface,
-          color: isActive ? theme.primaryText : theme.subtext,
-          borderColor: isActive ? theme.primary : theme.border,
-        }}
-      >
-        <span>⊟</span>
-        {isActive && filterStatus ? selected.label : "Filter"}
-        {isActive && selected.dot && (
-          <span
-            className="w-2 h-2 rounded-full"
-            style={{ backgroundColor: selected.dot }}
-          />
-        )}
-        <span
-          className="px-1.5 py-0.5 rounded-full"
-          style={{
-            backgroundColor: isActive
-              ? "rgba(255,255,255,0.25)"
-              : theme.surfaceRaised,
-            color: isActive ? theme.primaryText : theme.subtext,
-          }}
-        >
-          {displayCount}
-        </span>
-        <span style={{ opacity: 0.7 }}>▾</span>
-      </button>
-
-      {open && (
-        <div
-          ref={dropdownRef}
-          style={{
-            ...pos,
-            backgroundColor: theme.surface,
-            border: `1px solid ${theme.border}`,
-          }}
-          className="rounded-lg shadow-lg overflow-hidden"
-        >
-          {options.map((opt) => {
-            const isSelected = opt.value === filterStatus;
-            const cnt = opt.value ? (counts[opt.value] ?? 0) : counts.all;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  onChange(opt.value);
-                  setOpen(false);
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left"
-                style={{
-                  backgroundColor: isSelected
-                    ? theme.surfaceRaised
-                    : "transparent",
-                  color: theme.text,
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.backgroundColor = theme.surfaceRaised)
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.backgroundColor = isSelected
-                    ? theme.surfaceRaised
-                    : "transparent")
-                }
-              >
-                {opt.dot ? (
-                  <span
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: opt.dot }}
-                  />
-                ) : (
-                  <span className="w-2 h-2 flex-shrink-0" />
-                )}
-                <span className="flex-1">{opt.label}</span>
-                <span style={{ color: theme.subtext }}>{cnt}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </>
-  );
-};
-
 // ─── Row component ────────────────────────────────────────────────────────────
 
 type TicketRowProps = {
   ticket: ConcernTicket;
   index: number;
   assigneeOptions: { label: string; value: string }[];
-  categoryOptions: DropdownOption[]; // ← add
-  priorityOptions: DropdownOption[]; // ← add
-  statusOptions: DropdownOption[]; // ← add
-  onUpdateField: (
-    ticketNumber: string,
-    field: string,
-    value: any,
-  ) => Promise<void>;
+  categoryOptions: DropdownOption[];
+  priorityOptions: DropdownOption[];
+  statusOptions: DropdownOption[];
+  onUpdateField: (ticketNumber: string, field: string, value: any) => Promise<void>;
   onOpenDetails: (ticket: ConcernTicket) => void;
 };
 
@@ -742,9 +428,7 @@ const TicketRow = ({
   const { theme } = useTheme();
   const [dueDate, setDueDate] = useState(toDateString(ticket.dueDate));
   const [clickCount, setClickCount] = useState(0);
-  const [clickTimer, setClickTimer] = useState<ReturnType<
-    typeof setTimeout
-  > | null>(null);
+  const [clickTimer, setClickTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setDueDate(toDateString(ticket.dueDate));
@@ -916,57 +600,49 @@ const HEADERS: { label: string; key: SortKey }[] = [
 
 export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
   const { theme } = useTheme();
+
+  // ─── Dropdown options (declared first so hook can reference them) ─────────
+  const [dropdownOptions, setDropdownOptions] = useState({
+    category: DEFAULT_CATEGORY_OPTIONS,
+    priority: DEFAULT_PRIORITY_OPTIONS,
+    status: DEFAULT_STATUS_OPTIONS,
+  });
+
+  // ─── Filter hook ──────────────────────────────────────────────────────────
+  const ticketFilter = useTableFilter({
+    fields: [
+      { key: "category", label: "Category", options: dropdownOptions.category },
+      { key: "priority", label: "Priority", options: dropdownOptions.priority },
+      { key: "status",   label: "Status",   options: dropdownOptions.status   },
+    ],
+    showDateRange: true,
+    dateLabel: "Due Date",
+  });
+
+  // ─── State ────────────────────────────────────────────────────────────────
   const [tickets, setTickets] = useState<ConcernTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editingTicket, setEditingTicket] = useState<ConcernTicket | null>(
-    null,
-  );
-  const [filterStatus, setFilterStatus] = useState<string>("");
+  const [editingTicket, setEditingTicket] = useState<ConcernTicket | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [auditModal, setAuditModal] = useState<
-    | { recordId?: string; recordLabel?: string }
-    | null
-  >(null);
-
+  const [auditModal, setAuditModal] = useState<{
+    recordId?: string;
+    recordLabel?: string;
+  } | null>(null);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("default");
-
   const { employees, currentUserId, currentUserName } = useEmployees();
   const [manageColumnsVisible, setManageColumnsVisible] = useState(false);
   const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
-    {
-      id: "ticket_category",
-      docId: "ticket_category",
-      label: "Category",
-      editable: true,
-      options: [],
-    },
-    {
-      id: "ticket_priority",
-      docId: "ticket_priority",
-      label: "Priority",
-      editable: true,
-      options: [],
-    },
-    {
-      id: "ticket_status",
-      docId: "ticket_status",
-      label: "Status",
-      editable: true,
-      options: [],
-    },
-    {
-      id: "assignee",
-      docId: "",
-      label: "Assignee",
-      editable: false,
-      options: [],
-    },
+    { id: "ticket_category", docId: "ticket_category", label: "Category", editable: true, options: [] },
+    { id: "ticket_priority", docId: "ticket_priority", label: "Priority", editable: true, options: [] },
+    { id: "ticket_status",   docId: "ticket_status",   label: "Status",   editable: true, options: [] },
+    { id: "assignee",        docId: "",                label: "Assignee", editable: false, options: [] },
   ]);
 
+  // ─── Data loading ─────────────────────────────────────────────────────────
   const loadTickets = async () => {
     setLoading(true);
     try {
@@ -981,11 +657,6 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
   useEffect(() => {
     loadTickets().catch(console.error);
   }, []);
-  const [dropdownOptions, setDropdownOptions] = useState({
-    category: DEFAULT_CATEGORY_OPTIONS,
-    priority: DEFAULT_PRIORITY_OPTIONS,
-    status: DEFAULT_STATUS_OPTIONS,
-  });
 
   useEffect(() => {
     getAllDropdownConfigs({
@@ -996,7 +667,6 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
       .then((result) => {
         const ticket = result.ticket;
         if (!ticket) return;
-
         setDropdownOptions({
           category: ticket.category,
           priority: ticket.priority,
@@ -1004,12 +674,9 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
         });
         setColumnConfigs((prev) =>
           prev.map((col) => {
-            if (col.id === "ticket_category")
-              return { ...col, options: ticket.category };
-            if (col.id === "ticket_priority")
-              return { ...col, options: ticket.priority };
-            if (col.id === "ticket_status")
-              return { ...col, options: ticket.status };
+            if (col.id === "ticket_category") return { ...col, options: ticket.category };
+            if (col.id === "ticket_priority") return { ...col, options: ticket.priority };
+            if (col.id === "ticket_status")   return { ...col, options: ticket.status };
             return col;
           }),
         );
@@ -1018,6 +685,8 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
         console.error("Failed to load ticket dropdown configs:", err),
       );
   }, []);
+
+  // ─── Sort ─────────────────────────────────────────────────────────────────
   const handleSort = (key: SortKey) => {
     if (sortKey !== key) {
       setSortKey(key);
@@ -1032,9 +701,10 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
   const dirFor = (key: SortKey): SortDir =>
     sortKey === key ? sortDir : "default";
 
+  // ─── Filtered + sorted tickets ────────────────────────────────────────────
   const filteredTickets = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const base = q
+    let result = q
       ? tickets.filter((t) =>
           [
             t.summary,
@@ -1050,63 +720,24 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
             .includes(q),
         )
       : tickets;
-    return sortKey ? sortTickets(base, sortKey, sortDir) : base;
-  }, [tickets, search, sortKey, sortDir]);
+
+    result = ticketFilter.applyToData(
+      result,
+      { category: "category", priority: "priority", status: "status" },
+      "dueDate",
+    );
+
+    return sortKey ? sortTickets(result, sortKey, sortDir) : result;
+  }, [tickets, search, sortKey, sortDir, ticketFilter.appliedFilters]);
+
+  const displayTickets = filteredTickets;
 
   const toggleCollapsed = useCallback(
     (key: string) => setCollapsed((prev) => ({ ...prev, [key]: !prev[key] })),
     [],
   );
 
-  // ─── Grouped arrays ──────────────────────────────────────────────────────
-
-  const groupedPending = useMemo(
-    () => filteredTickets.filter((t) => t.status === "Pending"),
-    [filteredTickets],
-  );
-  const groupedInProgress = useMemo(
-    () => filteredTickets.filter((t) => t.status === "In Progress"),
-    [filteredTickets],
-  );
-  const groupedResolved = useMemo(
-    () => filteredTickets.filter((t) => t.status === "Resolved"),
-    [filteredTickets],
-  );
-
-  const groupedItemsMap = useMemo(
-    () => ({
-      Pending: groupedPending,
-      "In Progress": groupedInProgress,
-      Resolved: groupedResolved,
-    }),
-    [groupedPending, groupedInProgress, groupedResolved],
-  );
-
-  const counts = {
-    all: filteredTickets.length,
-    Pending: groupedPending.length,
-    "In Progress": groupedInProgress.length,
-    Resolved: groupedResolved.length,
-  };
-
-  const filterTabItems = useMemo(
-    () =>
-      filterStatus
-        ? filteredTickets.filter((t) => t.status === filterStatus)
-        : filteredTickets,
-    [filteredTickets, filterStatus],
-  );
-
-  const displayTickets = useMemo(
-    () =>
-      filterStatus
-        ? filteredTickets.filter((t) => t.status === filterStatus)
-        : filteredTickets,
-    [filteredTickets, filterStatus],
-  );
-
   // ─── Field update ─────────────────────────────────────────────────────────
-
   const handleUpdateField = async (
     ticketNumber: string,
     field: string,
@@ -1116,10 +747,7 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
       await updateTicketField(ticketNumber, field, value);
       await loadTickets();
     } catch (err) {
-      console.error(
-        `Unable to update ${field} for ticket ${ticketNumber}:`,
-        err,
-      );
+      console.error(`Unable to update ${field} for ticket ${ticketNumber}:`, err);
     }
   };
 
@@ -1128,27 +756,28 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
     setEditModalVisible(true);
   };
 
-const handleSaveEditedTicket = async (
-  ticketNumber: string,
-  updates: {
-    summary: string;
-    details: string;
-    category: string;
-    priority: string;
-    status: string;
-    assigneeId: string;
-    assigneeName: string;
-    dueDate: string;
-  },
-) => {
-  try {
-    await loadTickets(); // ← just refresh, writes already done in EditTicketModal
-  } catch (err) {
-    console.error("Unable to refresh tickets:", err);
-    throw err;
-  }
-};
-  // Deduplicated assignee options
+  const handleSaveEditedTicket = async (
+    ticketNumber: string,
+    updates: {
+      summary: string;
+      details: string;
+      category: string;
+      priority: string;
+      status: string;
+      assigneeId: string;
+      assigneeName: string;
+      dueDate: string;
+    },
+  ) => {
+    try {
+      await loadTickets();
+    } catch (err) {
+      console.error("Unable to refresh tickets:", err);
+      throw err;
+    }
+  };
+
+  // ─── Assignee options ─────────────────────────────────────────────────────
   const assigneeOptions = useMemo(() => {
     const seen = new Set<string>();
     return employees
@@ -1161,7 +790,6 @@ const handleSaveEditedTicket = async (
   }, [employees]);
 
   // ─── Table head ───────────────────────────────────────────────────────────
-
   const renderTableHead = useCallback(
     (stickyTop: number = 0) => (
       <thead>
@@ -1180,9 +808,7 @@ const handleSaveEditedTicket = async (
               }}
               className="px-3 py-1.5 text-left text-xs font-medium uppercase tracking-wide whitespace-nowrap border-b cursor-pointer select-none transition-colors"
               onMouseEnter={(e) => (e.currentTarget.style.color = theme.text)}
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.color = theme.subtext)
-              }
+              onMouseLeave={(e) => (e.currentTarget.style.color = theme.subtext)}
             >
               <span className="inline-flex items-center gap-1">
                 {label}
@@ -1197,7 +823,6 @@ const handleSaveEditedTicket = async (
   );
 
   // ─── Table body ───────────────────────────────────────────────────────────
-
   const renderTableBody = useCallback(
     (items: ConcernTicket[]) =>
       items.map((ticket, index) => {
@@ -1208,9 +833,9 @@ const handleSaveEditedTicket = async (
               ticket={ticket}
               index={index}
               assigneeOptions={assigneeOptions}
-              categoryOptions={dropdownOptions.category} // ← add
-              priorityOptions={dropdownOptions.priority} // ← add
-              statusOptions={dropdownOptions.status} // ← add
+              categoryOptions={dropdownOptions.category}
+              priorityOptions={dropdownOptions.priority}
+              statusOptions={dropdownOptions.status}
               onUpdateField={handleUpdateField}
               onOpenDetails={openEditModal}
             />
@@ -1234,7 +859,6 @@ const handleSaveEditedTicket = async (
   );
 
   // ─── Render ───────────────────────────────────────────────────────────────
-
   return (
     <div
       style={{ backgroundColor: theme.background }}
@@ -1308,60 +932,59 @@ const handleSaveEditedTicket = async (
           </div>
         </div>
 
-        <div className="flex items-center gap-2 mb-3">
-          <input
-            type="text"
-            placeholder="Search tickets..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{
-              backgroundColor: theme.inputBg,
-              borderColor: theme.inputBorder,
-              color: theme.inputText,
-            }}
-            className="flex-1 px-4 py-2.5 text-sm border rounded-lg focus:outline-none"
-            onFocus={(e) =>
-              (e.currentTarget.style.borderColor = theme.inputBorderFocus)
-            }
-            onBlur={(e) =>
-              (e.currentTarget.style.borderColor = theme.inputBorder)
-            }
-          />
-          <FilterTabDropdown
-            isActive={!!filterStatus}
-            filterStatus={filterStatus}
-            counts={counts}
-            theme={theme}
-            onActivate={() => {}}
-            onChange={(val) => setFilterStatus(val)}
-          />
-        </div>
+{/* Row 2: Search bar (left) + Filter button (right) */}
+<div className="flex items-center gap-2 mb-3">
+  {/* Search */}
+  <div className="flex-1">
+    <div className="relative w-full max-w-md">
+      {/* Search Icon */}
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+        style={{ color: theme.subtext }}
+      >
+        <path d="m21 21-4.34-4.34" />
+        <circle cx="11" cy="11" r="8" />
+      </svg>
 
-        {filterStatus && (
-          <div className="flex flex-wrap items-center gap-2 mb-3">
-            <span style={{ color: theme.subtext }} className="text-xs">
-              Filtered by:
-            </span>
-            <div
-              style={{
-                backgroundColor: theme.primarySubtle,
-                color: theme.primarySubtleText,
-              }}
-              className="flex items-center gap-2 px-3 py-1 rounded-full"
-            >
-              <span className="text-xs font-medium">
-                Status: {filterStatus}
-              </span>
-              <button
-                type="button"
-                onClick={() => setFilterStatus("")}
-                className="text-xs font-bold"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        )}
+      <input
+        type="text"
+        placeholder="Search tickets..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        style={{
+          backgroundColor: theme.inputBg,
+          borderColor: theme.inputBorder,
+          color: theme.inputText,
+        }}
+        className="w-full px-4 py-2.5 pl-9 text-sm border rounded-lg focus:outline-none"
+        onFocus={(e) =>
+          (e.currentTarget.style.borderColor = theme.inputBorderFocus)
+        }
+        onBlur={(e) =>
+          (e.currentTarget.style.borderColor = theme.inputBorder)
+        }
+      />
+    </div>
+  </div>
+
+  {/* Filter button */}
+  <TableFilterButton
+    btnRef={ticketFilter.filterBtnRef}
+    onClick={ticketFilter.handleFilterButtonClick}
+    activeCount={ticketFilter.activeCount}
+    hasActive={ticketFilter.hasActive()}
+  />
+</div>
+        
       </div>
 
       {/* ── Scrollable content ── */}
@@ -1395,6 +1018,26 @@ const handleSaveEditedTicket = async (
         </div>
       )}
 
+      {/* ── Filter panel ── */}
+      <TableFilterPanel
+        visible={ticketFilter.filterPanelVisible}
+        config={{
+          fields: [
+            { key: "category", label: "Category", options: dropdownOptions.category },
+            { key: "priority", label: "Priority", options: dropdownOptions.priority },
+            { key: "status",   label: "Status",   options: dropdownOptions.status   },
+          ],
+          showDateRange: true,
+          dateLabel: "Due Date",
+        }}
+        pendingFilters={ticketFilter.pendingFilters}
+        setPendingFilters={ticketFilter.setPendingFilters}
+        onFilterChange={(updated) => ticketFilter.setAppliedFilters(updated)}
+        onClear={ticketFilter.handleClear}
+        onClose={() => ticketFilter.setFilterPanelVisible(false)}
+        panelPos={ticketFilter.filterPanelPos}
+      />
+
       <AddAssetModal
         visible={modalVisible}
         assigneeOptions={assigneeOptions}
@@ -1421,15 +1064,13 @@ const handleSaveEditedTicket = async (
         columns={columnConfigs}
         onSave={(updated) => {
           setColumnConfigs(updated);
-          const cat =
-            updated.find((c) => c.id === "ticket_category")?.options ?? [];
-          const pri =
-            updated.find((c) => c.id === "ticket_priority")?.options ?? [];
-          const sta =
-            updated.find((c) => c.id === "ticket_status")?.options ?? [];
+          const cat = updated.find((c) => c.id === "ticket_category")?.options ?? [];
+          const pri = updated.find((c) => c.id === "ticket_priority")?.options ?? [];
+          const sta = updated.find((c) => c.id === "ticket_status")?.options ?? [];
           setDropdownOptions({ category: cat, priority: pri, status: sta });
         }}
       />
+
       <AuditTrailModal
         visible={auditModal !== null}
         onClose={() => setAuditModal(null)}

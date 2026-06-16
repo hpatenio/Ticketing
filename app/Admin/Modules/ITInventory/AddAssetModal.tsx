@@ -1,11 +1,21 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+// @ts-ignore
+import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
 import { ITInventory } from "../../../../types";
 import { addAsset } from "../../../../Services/itInventory";
 import { useEmployees } from "../../../../hooks/useEmployees";
-import { Timestamp } from "firebase/firestore";
+import {
+  Timestamp,
+  collection,
+  query,
+  where,
+  getDocs,
+  getFirestore,
+} from "firebase/firestore";
 import { useTheme } from "../../../../theme/ThemeContext";
 import BadgeSelect from "../../../../components/common/BadgeSelect";
+import { DropdownOption } from "../../../SuperAdmin/ManageColumnsModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -13,6 +23,13 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  dropdownOptions: {
+    // ← add
+    category: DropdownOption[];
+    status: DropdownOption[];
+    company: DropdownOption[];
+    location: DropdownOption[];
+  };
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -104,97 +121,254 @@ const normalizeCompany = (val: string): string => {
   return match ?? val?.toString().trim() ?? "";
 };
 
-// ─── Badge options (mirrors EditAssetModal) ───────────────────────────────────
+// ─── SearchableSelect (ported from EditAssetModal) ────────────────────────────
 
-const COMPANY_OPTIONS = [
-  {
-    label: "OCG",
-    value: "OCG",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-purple-100 text-purple-800",
-  },
-  {
-    label: "SDB",
-    value: "SDB",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-800",
-  },
-];
+type SearchableSelectProps = {
+  value: string;
+  displayName: string;
+  options: { label: string; value: string }[];
+  placeholder?: string;
+  onChange: (value: string, label: string) => void;
+};
 
-const STATUS_OPTIONS = [
-  {
-    label: "Spare",
-    value: "Spare",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-sky-100 text-sky-700",
-  },
-  {
-    label: "Deployed",
-    value: "Deployed",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-green-100 text-green-800",
-  },
-  {
-    label: "Defective",
-    value: "Defective",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-red-100 text-red-700",
-  },
-];
+const SearchableSelect = ({
+  value,
+  displayName,
+  options,
+  placeholder = "Unassigned",
+  onChange,
+}: SearchableSelectProps) => {
+  const { theme } = useTheme();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
-const CATEGORY_OPTIONS = [
-  {
-    label: "Laptop",
-    value: "Laptop",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-orange-100 text-orange-700",
-  },
-  {
-    label: "Monitor",
-    value: "Monitor",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-yellow-100 text-yellow-700",
-  },
-  {
-    label: "Desktop",
-    value: "Desktop",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-teal-100 text-teal-700",
-  },
-];
+  const allOptions = [{ label: "—", value: "" }, ...options];
 
-const LOCATION_OPTIONS = [
-  {
-    label: "Unit 1 & 2",
-    value: "Unit 1 & 2",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-pink-100 text-pink-700",
-  },
-  {
-    label: "Unit 3",
-    value: "Unit 3",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-pink-100 text-pink-700",
-  },
-  {
-    label: "BDO Makati",
-    value: "BDO Makati",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-teal-100 text-teal-700",
-  },
-  {
-    label: "Triumph",
-    value: "Triumph",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-indigo-100 text-indigo-700",
-  },
-  {
-    label: "WFH",
-    value: "WFH",
-    badgeClass:
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-gray-100 text-gray-700",
-  },
-];
+  const filtered = query
+    ? allOptions.filter((o) =>
+        o.label.toLowerCase().includes(query.toLowerCase()),
+      )
+    : allOptions;
+
+  const openDropdown = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const dropdownH = Math.min(220, filtered.length * 28 + 40);
+      const showAbove = spaceBelow < dropdownH && rect.top > dropdownH;
+      setDropdownStyle({
+        position: "fixed",
+        left: rect.left,
+        width: rect.width,
+        zIndex: 9999,
+        ...(showAbove
+          ? { bottom: window.innerHeight - rect.top + 4 }
+          : { top: rect.bottom + 4 }),
+      });
+    }
+    setQuery("");
+    setOpen(true);
+  };
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      const insideTrigger = wrapRef.current?.contains(target);
+      const insidePopover = popoverRef.current?.contains(target);
+      if (!insideTrigger && !insidePopover) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={wrapRef} className="relative w-full">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={openDropdown}
+        className="w-full"
+        style={{
+          backgroundColor: theme.inputBg,
+          border: `1px solid ${theme.inputBorder}`,
+          borderRadius: 8,
+          padding: "0 10px",
+          height: 38,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          cursor: "pointer",
+        }}
+      >
+        {value ? (
+          <>
+            <span
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: "50%",
+                backgroundColor: theme.primary,
+                color: theme.primaryText,
+                fontSize: 10,
+                fontWeight: 600,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              {displayName
+                .split(" ")
+                .map((w) => w[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase()}
+            </span>
+            <span
+              style={{
+                fontSize: 13,
+                color: theme.text,
+                flex: 1,
+                textAlign: "left",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {displayName}
+            </span>
+          </>
+        ) : (
+          <span style={{ fontSize: 13, color: theme.inputPlaceholder }}>
+            {placeholder}
+          </span>
+        )}
+      </button>
+
+      {open &&
+        createPortal(
+          <div
+            ref={popoverRef}
+            style={{
+              ...dropdownStyle,
+              backgroundColor: theme.surface,
+              border: `1px solid ${theme.border}`,
+              borderRadius: 8,
+              boxShadow: `0 4px 16px ${theme.shadow}`,
+            }}
+          >
+            <input
+              autoFocus
+              type="text"
+              value={query}
+              placeholder="Search..."
+              style={{
+                width: "100%",
+                padding: "8px 12px",
+                fontSize: 12,
+                borderBottom: `1px solid ${theme.border}`,
+                outline: "none",
+                backgroundColor: theme.inputBg,
+                color: theme.inputText,
+                boxSizing: "border-box",
+              }}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setOpen(false);
+                  setQuery("");
+                }
+              }}
+            />
+            <ul
+              style={{
+                maxHeight: 176,
+                overflowY: "auto",
+                margin: 0,
+                padding: 0,
+                listStyle: "none",
+              }}
+            >
+              {filtered.length === 0 ? (
+                <li
+                  style={{
+                    padding: "8px 12px",
+                    fontSize: 12,
+                    color: theme.subtext,
+                  }}
+                >
+                  No results
+                </li>
+              ) : (
+                filtered.map((o) => (
+                  <li
+                    key={o.value}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      onChange(o.value, o.label);
+                      setOpen(false);
+                      setQuery("");
+                    }}
+                    style={{
+                      padding: "8px 12px",
+                      fontSize: 13,
+                      cursor: "pointer",
+                      color: o.value === value ? theme.primary : theme.text,
+                      fontWeight: o.value === value ? 600 : 400,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      borderBottom: `1px solid ${theme.border}`,
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.backgroundColor = theme.bgHover)
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.backgroundColor = "transparent")
+                    }
+                  >
+                    {o.value && (
+                      <span
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: "50%",
+                          backgroundColor: theme.primarySubtle,
+                          color: theme.primary,
+                          fontSize: 10,
+                          fontWeight: 600,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {o.label
+                          .split(" ")
+                          .map((w) => w[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase()}
+                      </span>
+                    )}
+                    {o.label}
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
+};
 
 // ─── Shared sub-components (same as EditAssetModal) ───────────────────────────
 
@@ -332,91 +506,222 @@ const ThemedSelect: React.FC<{
 
 const icons = {
   tag: (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M11 3H5a2 2 0 00-2 2v6l9 9 7-7-9-9z" />
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M7 7h.01M11 3H5a2 2 0 00-2 2v6l9 9 7-7-9-9z"
+      />
     </svg>
   ),
   company: (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M9 21V7l6-4v18M9 11H3v10" />
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3 21h18M9 21V7l6-4v18M9 11H3v10"
+      />
     </svg>
   ),
   hash: (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 9h16M4 15h16M10 3l-1 18M15 3l-1 18" />
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4 9h16M4 15h16M10 3l-1 18M15 3l-1 18"
+      />
     </svg>
   ),
   brand: (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <rect x="2" y="3" width="20" height="14" rx="2" />
       <path strokeLinecap="round" d="M8 21h8M12 17v4" />
     </svg>
   ),
   model: (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <rect x="3" y="3" width="18" height="18" rx="2" />
       <path strokeLinecap="round" d="M3 9h18M9 21V9" />
     </svg>
   ),
   category: (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M11 3H5a2 2 0 00-2 2v6l9 9 7-7-9-9zm0 0" />
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M7 7h.01M11 3H5a2 2 0 00-2 2v6l9 9 7-7-9-9zm0 0"
+      />
     </svg>
   ),
   status: (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <circle cx="12" cy="12" r="9" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4" />
     </svg>
   ),
   location: (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 21s-6-5.686-6-10a6 6 0 1112 0c0 4.314-6 10-6 10z" />
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 21s-6-5.686-6-10a6 6 0 1112 0c0 4.314-6 10-6 10z"
+      />
       <circle cx="12" cy="11" r="2" />
     </svg>
   ),
   date: (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <rect x="3" y="4" width="18" height="18" rx="2" />
       <path strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18" />
     </svg>
   ),
   assignee: (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <circle cx="12" cy="8" r="4" />
       <path strokeLinecap="round" d="M4 20c0-4 3.582-7 8-7s8 3 8 7" />
     </svg>
   ),
   notes: (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+      />
     </svg>
   ),
   upload: (
-    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M16 8l-4-4-4 4M12 4v12" />
+    <svg
+      className="w-4 h-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M16 8l-4-4-4 4M12 4v12"
+      />
     </svg>
   ),
   download: (
-    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M8 12l4 4 4-4M12 4v12" />
+    <svg
+      className="w-4 h-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M8 12l4 4 4-4M12 4v12"
+      />
     </svg>
   ),
   plus: (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16M4 12h16" />
     </svg>
   ),
   save: (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+    <svg
+      className="w-3.5 h-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+      />
     </svg>
   ),
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
+const AddAssetModal: React.FC<Props> = ({
+  visible,
+  onClose,
+  onSuccess,
+  dropdownOptions,
+}) => {
   const { theme } = useTheme();
   const [tab, setTab] = useState<"single" | "bulk">("single");
 
@@ -435,6 +740,10 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { employees } = useEmployees();
 
+  const COMPANY_OPTIONS = dropdownOptions.company;
+  const STATUS_OPTIONS = dropdownOptions.status;
+  const CATEGORY_OPTIONS = dropdownOptions.category;
+  const LOCATION_OPTIONS = dropdownOptions.location;
   // ── single ────────────────────────────────────────────────────────────────
 
   const handleChange = (
@@ -508,9 +817,11 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
               if (val) normalized[mapped] = val;
             }
           }
-          if (!normalized.assetTag) warnings.push(`Row ${i + 2}: Missing Asset Tag`);
+          if (!normalized.assetTag)
+            warnings.push(`Row ${i + 2}: Missing Asset Tag`);
           if (!normalized.brand) warnings.push(`Row ${i + 2}: Missing Brand`);
-          if (!normalized.company) warnings.push(`Row ${i + 2}: Missing Company`);
+          if (!normalized.company)
+            warnings.push(`Row ${i + 2}: Missing Company`);
           return {
             id: Date.now() + i,
             assetTag: normalized.assetTag ?? "",
@@ -522,7 +833,8 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
             status: (normalized.status as ITInventory["status"]) ?? "Spare",
             assigneeName: normalized.assigneeName ?? "",
             assigneeId: normalized.assigneeId ?? "",
-            location: (normalized.location as ITInventory["location"]) ?? "Unit 1 & 2",
+            location:
+              (normalized.location as ITInventory["location"]) ?? "Unit 1 & 2",
             datePurchased: normalized.datePurchased ?? "",
             notes: normalized.notes ?? "",
           };
@@ -530,7 +842,9 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
         setParseWarnings(warnings);
         setRows(parsed);
       } catch {
-        setBulkError("Could not read the file. Make sure it's a valid .xlsx or .csv.");
+        setBulkError(
+          "Could not read the file. Make sure it's a valid .xlsx or .csv.",
+        );
       }
     };
     reader.readAsArrayBuffer(file);
@@ -658,7 +972,14 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
           style={{ borderBottom: `1px solid ${theme.border}` }}
         >
           <div>
-            <h2 style={{ fontSize: 17, fontWeight: 600, color: theme.text, margin: 0 }}>
+            <h2
+              style={{
+                fontSize: 17,
+                fontWeight: 600,
+                color: theme.text,
+                margin: 0,
+              }}
+            >
               Add asset
             </h2>
             <p style={{ fontSize: 11, color: theme.subtext, marginTop: 2 }}>
@@ -734,7 +1055,9 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
                     padding: "8px 12px",
                   }}
                 >
-                  <p style={{ fontSize: 12, color: theme.dangerText, margin: 0 }}>
+                  <p
+                    style={{ fontSize: 12, color: theme.dangerText, margin: 0 }}
+                  >
                     ⚠ {error}
                   </p>
                 </div>
@@ -868,10 +1191,13 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
 
               {/* Assignee */}
               <Field label="Assignee" icon={icons.assignee}>
-                <BadgeSelect
+                <SearchableSelect
                   value={form.assigneeId}
                   displayName={form.assigneeName}
-                  options={employees.map((e) => ({ label: e.name, value: e.id }))}
+                  options={employees.map((e) => ({
+                    label: e.name,
+                    value: e.id,
+                  }))}
                   placeholder="Search assignee..."
                   onChange={(id, name) =>
                     setForm((f) => ({
@@ -880,7 +1206,6 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
                       assigneeName: name === "—" ? "" : name,
                     }))
                   }
-                  className="w-full"
                 />
               </Field>
 
@@ -921,7 +1246,10 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
         ════════════════════════════════════════════════════════════════════ */}
         {tab === "bulk" && (
           <>
-            <div className="px-5 pt-4 pb-3" style={{ borderBottom: `1px solid ${theme.border}` }}>
+            <div
+              className="px-5 pt-4 pb-3"
+              style={{ borderBottom: `1px solid ${theme.border}` }}
+            >
               {/* Upload / template row */}
               <div className="flex items-center gap-3 flex-wrap">
                 <input
@@ -966,7 +1294,11 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
                   Download template
                 </a>
                 <span
-                  style={{ fontSize: 11, color: theme.subtext, marginLeft: "auto" }}
+                  style={{
+                    fontSize: 11,
+                    color: theme.subtext,
+                    marginLeft: "auto",
+                  }}
                 >
                   {rows.length} row{rows.length !== 1 ? "s" : ""}
                 </span>
@@ -983,16 +1315,36 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
                     padding: "8px 12px",
                   }}
                 >
-                  <p style={{ fontSize: 12, fontWeight: 600, color: theme.dangerText, margin: "0 0 4px" }}>
+                  <p
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: theme.dangerText,
+                      margin: "0 0 4px",
+                    }}
+                  >
                     ⚠ Import warnings
                   </p>
                   {parseWarnings.slice(0, 5).map((w, i) => (
-                    <p key={i} style={{ fontSize: 12, color: theme.dangerText, margin: 0 }}>
+                    <p
+                      key={i}
+                      style={{
+                        fontSize: 12,
+                        color: theme.dangerText,
+                        margin: 0,
+                      }}
+                    >
                       {w}
                     </p>
                   ))}
                   {parseWarnings.length > 5 && (
-                    <p style={{ fontSize: 12, color: theme.subtext, marginTop: 4 }}>
+                    <p
+                      style={{
+                        fontSize: 12,
+                        color: theme.subtext,
+                        marginTop: 4,
+                      }}
+                    >
                       …and {parseWarnings.length - 5} more
                     </p>
                   )}
@@ -1009,7 +1361,11 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
                     padding: "8px 12px",
                   }}
                 >
-                  <p style={{ fontSize: 12, color: theme.dangerText, margin: 0 }}>⚠ {bulkError}</p>
+                  <p
+                    style={{ fontSize: 12, color: theme.dangerText, margin: 0 }}
+                  >
+                    ⚠ {bulkError}
+                  </p>
                 </div>
               )}
 
@@ -1023,8 +1379,15 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
                     padding: "8px 12px",
                   }}
                 >
-                  <p style={{ fontSize: 12, color: theme.successText ?? "#16a34a", margin: 0 }}>
-                    ✓ {bulkSuccess} asset{bulkSuccess > 1 ? "s" : ""} saved successfully!
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: theme.successText ?? "#16a34a",
+                      margin: 0,
+                    }}
+                  >
+                    ✓ {bulkSuccess} asset{bulkSuccess > 1 ? "s" : ""} saved
+                    successfully!
                   </p>
                 </div>
               )}
@@ -1032,13 +1395,29 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
 
             {/* Table */}
             <div className="overflow-auto flex-1 px-5 py-3">
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  minWidth: 900,
+                }}
+              >
                 <thead>
                   <tr>
                     {[
-                      "#", "Asset Tag *", "Company *", "Serial #",
-                      "Model", "Brand *", "Category", "Status",
-                      "Assignee", "Location", "Date", "Notes", "",
+                      "#",
+                      "Asset Tag *",
+                      "Company *",
+                      "Serial #",
+                      "Model",
+                      "Brand *",
+                      "Category",
+                      "Status",
+                      "Assignee",
+                      "Location",
+                      "Date",
+                      "Notes",
+                      "",
                     ].map((h) => (
                       <th
                         key={h}
@@ -1068,33 +1447,53 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
                           i % 2 === 0 ? "transparent" : theme.inputBg,
                       }}
                     >
-                      <td style={{ padding: "4px 8px", fontSize: 11, color: theme.subtext, width: 28 }}>
+                      <td
+                        style={{
+                          padding: "4px 8px",
+                          fontSize: 11,
+                          color: theme.subtext,
+                          width: 28,
+                        }}
+                      >
                         {i + 1}
                       </td>
                       <td style={{ padding: "4px 4px" }}>
                         <input
                           placeholder="OCG-001"
                           value={row.assetTag}
-                          onChange={(e) => updateRow(row.id, "assetTag", e.target.value)}
-                          style={{ ...cellInputStyle(!row.assetTag), width: 90 }}
+                          onChange={(e) =>
+                            updateRow(row.id, "assetTag", e.target.value)
+                          }
+                          style={{
+                            ...cellInputStyle(!row.assetTag),
+                            width: 90,
+                          }}
                         />
                       </td>
                       <td style={{ padding: "4px 4px" }}>
                         <ThemedSelect
                           value={row.company}
-                          onChange={(e) => updateRow(row.id, "company", e.target.value)}
-                          style={{ width: 72, border: !row.company ? `1px solid ${theme.dangerBorder}` : undefined }}
+                          onChange={(e) =>
+                            updateRow(row.id, "company", e.target.value)
+                          }
                         >
                           <option value="">—</option>
-                          <option value="OCG">OCG</option>
-                          <option value="SDB">SDB</option>
+                          {dropdownOptions.company
+                            .filter((o) => o.value !== "")
+                            .map((o) => (
+                              <option key={o.value} value={o.value}>
+                                {o.label}
+                              </option>
+                            ))}
                         </ThemedSelect>
                       </td>
                       <td style={{ padding: "4px 4px" }}>
                         <input
                           placeholder="SN..."
                           value={row.serialNumber}
-                          onChange={(e) => updateRow(row.id, "serialNumber", e.target.value)}
+                          onChange={(e) =>
+                            updateRow(row.id, "serialNumber", e.target.value)
+                          }
                           style={{ ...cellInputStyle(), width: 90 }}
                         />
                       </td>
@@ -1102,7 +1501,9 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
                         <input
                           placeholder="Model"
                           value={row.model}
-                          onChange={(e) => updateRow(row.id, "model", e.target.value)}
+                          onChange={(e) =>
+                            updateRow(row.id, "model", e.target.value)
+                          }
                           style={{ ...cellInputStyle(), width: 90 }}
                         />
                       </td>
@@ -1110,62 +1511,82 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
                         <input
                           placeholder="Brand"
                           value={row.brand}
-                          onChange={(e) => updateRow(row.id, "brand", e.target.value)}
+                          onChange={(e) =>
+                            updateRow(row.id, "brand", e.target.value)
+                          }
                           style={{ ...cellInputStyle(!row.brand), width: 80 }}
                         />
                       </td>
                       <td style={{ padding: "4px 4px" }}>
                         <ThemedSelect
                           value={row.category}
-                          onChange={(e) => updateRow(row.id, "category", e.target.value)}
-                          style={{ width: 82 }}
+                          onChange={(e) =>
+                            updateRow(row.id, "category", e.target.value)
+                          }
                         >
-                          <option value="Laptop">Laptop</option>
-                          <option value="Monitor">Monitor</option>
-                          <option value="Desktop">Desktop</option>
+                          {dropdownOptions.category
+                            .filter((o) => o.value !== "")
+                            .map((o) => (
+                              <option key={o.value} value={o.value}>
+                                {o.label}
+                              </option>
+                            ))}
                         </ThemedSelect>
                       </td>
                       <td style={{ padding: "4px 4px" }}>
                         <ThemedSelect
                           value={row.status}
-                          onChange={(e) => updateRow(row.id, "status", e.target.value as ITInventory["status"])}
-                          style={{ width: 88 }}
+                          onChange={(e) =>
+                            updateRow(row.id, "status", e.target.value)
+                          }
                         >
-                          <option value="Spare">Spare</option>
-                          <option value="Deployed">Deployed</option>
-                          <option value="Defective">Defective</option>
+                          {dropdownOptions.status
+                            .filter((o) => o.value !== "")
+                            .map((o) => (
+                              <option key={o.value} value={o.value}>
+                                {o.label}
+                              </option>
+                            ))}
                         </ThemedSelect>
                       </td>
                       <td style={{ padding: "4px 4px" }}>
                         <input
                           placeholder="Name"
                           value={row.assigneeName}
-                          onChange={(e) => updateRow(row.id, "assigneeName", e.target.value)}
+                          onChange={(e) =>
+                            updateRow(row.id, "assigneeName", e.target.value)
+                          }
                           style={{ ...cellInputStyle(), width: 100 }}
                         />
                       </td>
                       <td style={{ padding: "4px 4px" }}>
                         <ThemedSelect
                           value={row.location}
-                          onChange={(e) => updateRow(row.id, "location", e.target.value as ITInventory["location"])}
-                          style={{ width: 100 }}
+                          onChange={(e) =>
+                            updateRow(row.id, "location", e.target.value)
+                          }
                         >
-                          <option value="Unit 1 & 2">Unit 1 & 2</option>
-                          <option value="Unit 3">Unit 3</option>
-                          <option value="BDO Makati">BDO Makati</option>
-                          <option value="Triumph">Triumph</option>
-                          <option value="WFH">WFH</option>
+                          {dropdownOptions.location
+                            .filter((o) => o.value !== "")
+                            .map((o) => (
+                              <option key={o.value} value={o.value}>
+                                {o.label}
+                              </option>
+                            ))}
                         </ThemedSelect>
                       </td>
                       <td style={{ padding: "4px 4px" }}>
                         <input
                           type="date"
                           value={row.datePurchased}
-                          onChange={(e) => updateRow(row.id, "datePurchased", e.target.value)}
+                          onChange={(e) =>
+                            updateRow(row.id, "datePurchased", e.target.value)
+                          }
                           style={{
                             ...cellInputStyle(),
                             width: 128,
-                            colorScheme: theme.mode === "dark" ? "dark" : "light",
+                            colorScheme:
+                              theme.mode === "dark" ? "dark" : "light",
                           }}
                         />
                       </td>
@@ -1173,7 +1594,9 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
                         <input
                           placeholder="Notes..."
                           value={row.notes}
-                          onChange={(e) => updateRow(row.id, "notes", e.target.value)}
+                          onChange={(e) =>
+                            updateRow(row.id, "notes", e.target.value)
+                          }
                           style={{ ...cellInputStyle(), width: 110 }}
                         />
                       </td>
@@ -1234,7 +1657,8 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
               style={{ borderTop: `1px solid ${theme.border}` }}
             >
               <p style={{ fontSize: 11, color: theme.subtext, margin: 0 }}>
-                {rows.length} row{rows.length !== 1 ? "s" : ""} · Required fields marked with *
+                {rows.length} row{rows.length !== 1 ? "s" : ""} · Required
+                fields marked with *
               </p>
               <div className="flex gap-2">
                 <button onClick={handleClose} style={cancelBtnStyle}>
@@ -1246,7 +1670,9 @@ const AddAssetModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
                   style={primaryBtnStyle}
                 >
                   {icons.save}
-                  {bulkLoading ? "Saving…" : `Save ${rows.length} asset${rows.length !== 1 ? "s" : ""}`}
+                  {bulkLoading
+                    ? "Saving…"
+                    : `Save ${rows.length} asset${rows.length !== 1 ? "s" : ""}`}
                 </button>
               </div>
             </div>
