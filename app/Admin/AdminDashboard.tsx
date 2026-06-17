@@ -10,12 +10,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ADUser } from "../../types";
 import Sidebar from "../../components/Navigations/Sidebar";
 import BottomNavBar from "../../components/Navigations/BottmNavBar";
-import ITInventoryPage from "./Modules/ITInventory/ITInventoryPage";
+import ITInventoryPage from "./IT Modules/ITInventory/ITInventoryPage";
 import ITInventorySummary, {
   InventoryFilter,
-} from "./Modules/ITInventory/ITInventorySummary";
-import ConsumablesPage from "./Modules/Consumables/ConsumablesPage";
-import TicketsPage from "./Modules/Tickets/TicketsPage";
+} from "./IT Modules/ITInventory/ITInventorySummary";
+import ConsumablesPage from "./IT Modules/Consumables/ConsumablesPage";
+import TicketsPage from "./IT Modules/Tickets/TicketsPage";
 import { useTheme } from "../../theme/ThemeContext";
 
 const ACTIVE_KEY_STORAGE = "admin_active_key";

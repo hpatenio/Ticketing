@@ -74,3 +74,81 @@ export interface Column<T> {
   label:   string;
   render?: (row: T) => React.ReactNode;
 }
+
+
+
+
+
+export type OfficeCategory =
+  | "office_supplies"
+  | "printer_supplies"
+  | "cleaning"
+  | "ppe"
+  | "medicine";
+ 
+export type OfficeUnit =
+  | "piece"
+  | "ream"
+  | "box"
+  | "roll"
+  | "pack"
+  | "bottle"
+  | "gallon";
+ 
+export type StockStatus = "in_stock" | "low_stock" | "out_of_stock";
+ 
+export interface OfficeInventoryItem {
+  id: string; // Firestore doc id
+  itemCode: string; // e.g. "OS016" — preset by OnM, not editable
+  name: string; // e.g. "Bond Paper A4"
+  brand?: string;
+  category: OfficeCategory;
+  unit: OfficeUnit;
+  pricePerUnit: number;
+  currentStock: number;
+  stockStatus: StockStatus; // recomputed on every write
+  lowStockThreshold: number; // default 5
+  inStockThreshold: number; // default 10
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+ 
+export interface StockTransaction {
+  id: string;
+  itemId: string;
+  itemCode: string;
+  itemName: string;
+  type: "ticket_deduction" | "manual_adjustment" | "delivery";
+  quantityChange: number; // negative for deductions, positive for deliveries
+  stockBefore: number;
+  stockAfter: number;
+  pricePerUnit: number;
+  totalAmount: number;
+  reason?: string;
+  performedByName: string;
+  transactionDate: string;
+  createdAt: string;
+}
+ 
+export interface NewItemInput {
+  itemCode: string;
+  name: string;
+  brand?: string;
+  category: OfficeCategory;
+  unit: OfficeUnit;
+  pricePerUnit: number;
+  beginningInventory: number;
+  lowStockThreshold?: number;
+  inStockThreshold?: number;
+}
+ 
+export interface EditItemInput {
+  name: string;
+  brand?: string;
+  category: OfficeCategory;
+  unit: OfficeUnit;
+  pricePerUnit: number;
+  lowStockThreshold: number;
+  inStockThreshold: number;
+}

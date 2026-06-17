@@ -10,15 +10,16 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ADUser } from "../../types";
 import Sidebar from "../../components/Navigations/Sidebar";
 import BottomNavBar from "../../components/Navigations/BottmNavBar";
-import ITInventoryPage from "../Admin/Modules/ITInventory/ITInventoryPage";
+import ITInventoryPage from "../Admin/IT Modules/ITInventory/ITInventoryPage";
 import ITInventorySummary, {
   InventoryFilter,
-} from "../Admin/Modules/ITInventory/ITInventorySummary";
-import ConsumablesPage from "../Admin/Modules/Consumables/ConsumablesPage";
-import TicketsPage from "../Admin/Modules/Tickets/TicketsPage";
+} from "../Admin/IT Modules/ITInventory/ITInventorySummary";
+import ConsumablesPage from "../Admin/IT Modules/Consumables/ConsumablesPage";
+import TicketsPage from "../Admin/IT Modules/Tickets/TicketsPage";
 import UsersPage from "./UsersPage"; // 👈 add this
 import { useTheme } from "../../theme/ThemeContext";
 import AuditTrailPage from "./AuditTrailPage";
+import OfficeInventoryPage from "../Admin/OnM Modules/OfficeInventoryPage";
 
 const ACTIVE_KEY_STORAGE = "superadmin_active_key";
 const JUST_LOGGED_IN_KEY = "just_logged_in";
@@ -82,6 +83,8 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
         return <UsersPage currentUser={user} />;
       case "audit":
         return <AuditTrailPage />;
+        case "officeinventory":
+        return <OfficeInventoryPage />;
       default:
         return (
           <DashboardHome user={user} onFilterNavigate={handleFilterNavigate} />

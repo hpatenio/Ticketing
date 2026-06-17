@@ -471,7 +471,7 @@ export const MENU_BY_ROLE: Record<string, NavSection[]> = {
     {
       sectionLabel: "Office Supplies",
       items: [
-        { key: "officesupplies",  label: "Inventory", icon: OfficeSuppliesIcon  },
+        { key: "officeinventory",  label: "Office Supplies",           icon: OfficeSuppliesIcon  },
         { key: "supplyrequest",   label: "Supply Request",            icon: SupplyRequestIcon   },
         { key: "monthlyreport",   label: "Monthly Report",            icon: MonthlyReportIcon   },
         { key: "activity",        label: "Activity",                  icon: ActivityIcon        },
@@ -495,7 +495,7 @@ export const MENU_BY_ROLE: Record<string, NavSection[]> = {
     {
       sectionLabel: "Office Supplies",
       items: [
-        { key: "officesupplies",  label: "Office Supplies Inventory", icon: OfficeSuppliesIcon  },
+        { key: "officeinventory",  label: "Office Supplies",           icon: OfficeSuppliesIcon  },
         { key: "supplyrequest",   label: "Supply Request",            icon: SupplyRequestIcon   },
         { key: "monthlyreport",   label: "Monthly Report",            icon: MonthlyReportIcon   },
         { key: "activity",        label: "Activity",                  icon: ActivityIcon        },

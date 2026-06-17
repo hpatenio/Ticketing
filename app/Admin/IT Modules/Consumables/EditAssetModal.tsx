@@ -14,6 +14,7 @@ interface Props {
 }
 
 const EMPTY_FORM = {
+  model: "",
   name: "",
   status: "Spare" as ITConsumable["status"],
   location: "Unit 1 & 2" as ITConsumable["location"],
@@ -57,6 +58,7 @@ const EditConsumableModal: React.FC<Props> = ({
   useEffect(() => {
     if (selectedItem) {
       setForm({
+        model: selectedItem.model,
         name: selectedItem.name,
         status: selectedItem.status ?? "Spare",
         location: selectedItem.location,
@@ -89,6 +91,10 @@ const EditConsumableModal: React.FC<Props> = ({
       setError("Printer Name is required.");
       return;
     }
+    if (!form.model) {
+      setError("Model is required.");
+      return;
+    }
     if (!selectedItem) return;
     setLoading(true);
     setError("");
@@ -106,6 +112,7 @@ const EditConsumableModal: React.FC<Props> = ({
       } catch {}
 
       const original: Record<keyof typeof form, string | number> = {
+        model: selectedItem.model,
         name: selectedItem.name,
         status: selectedItem.status ?? "Spare",
         location: selectedItem.location,
@@ -133,6 +140,9 @@ const EditConsumableModal: React.FC<Props> = ({
         payload[field] = form[field] as any;
       });
 
+      // Always look up the existing doc by its ORIGINAL model — even if the
+      // user just changed it in this same save — since that's still the
+      // current key for the record until/unless the service does a real rename.
       await updateConsumable(selectedItem.model, payload);
 
       await logAuditBatch({
@@ -273,9 +283,6 @@ const EditConsumableModal: React.FC<Props> = ({
             <h2 className="text-xl font-semibold text-[var(--t-text)]">
               Edit Printer
             </h2>
-            <p className="text-xs text-[var(--t-subtext)] mt-0.5">
-              Model: {selectedItem.model}
-            </p>
           </div>
           <button
             onClick={handleClose}
@@ -292,50 +299,91 @@ const EditConsumableModal: React.FC<Props> = ({
         )}
 
         <div className="flex flex-col gap-3">
-          <input
-            name="name"
-            placeholder="Printer Name *"
-            value={form.name}
-            onChange={handleChange}
-            className={inputClass}
-          />
-          <select
-            name="status"
-            value={form.status}
-            onChange={handleChange}
-            className={inputClass}
-          >
-            <option value="Spare">Spare</option>
-            <option value="Deployed">Deployed</option>
-            <option value="Defective">Defective</option>
-          </select>
-          <select
-            name="location"
-            value={form.location}
-            onChange={handleChange}
-            className={inputClass}
-          >
-            <option value="Unit 1 & 2">Unit 1 & 2</option>
-            <option value="Unit 3">Unit 3</option>
-            <option value="BDO Makati">BDO Makati</option>
-            <option value="Triumph">Triumph</option>
-            <option value="WFH">WFH</option>
-          </select>
+          <div>
+            <label className="block text-xs font-medium mb-1 text-[var(--t-text)]">
+              Printer Name
+            </label>
+            <input
+              name="name"
+              placeholder="Printer Name *"
+              value={form.name}
+              onChange={handleChange}
+              className={inputClass}
+            />
+          </div>
 
-          <input
-            name="ipAddress"
-            placeholder="IP Address (e.g. 192.168.1.100)"
-            value={form.ipAddress}
-            onChange={handleChange}
-            className={inputClass}
-          />
-          <input
-            name="macAddress"
-            placeholder="MAC Address (e.g. AA:BB:CC:DD:EE:FF)"
-            value={form.macAddress}
-            onChange={handleChange}
-            className={inputClass}
-          />
+          <div>
+            <label className="block text-xs font-medium mb-1 text-[var(--t-text)]">
+              Model
+            </label>
+            <input
+              name="model"
+              placeholder="Model *"
+              value={form.model}
+              onChange={handleChange}
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-1 text-[var(--t-text)]">
+              Status
+            </label>
+            <select
+              name="status"
+              value={form.status}
+              onChange={handleChange}
+              className={inputClass}
+            >
+              <option value="Spare">Spare</option>
+              <option value="Deployed">Deployed</option>
+              <option value="Defective">Defective</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-1 text-[var(--t-text)]">
+              Location
+            </label>
+            <select
+              name="location"
+              value={form.location}
+              onChange={handleChange}
+              className={inputClass}
+            >
+              <option value="Unit 1 & 2">Unit 1 & 2</option>
+              <option value="Unit 3">Unit 3</option>
+              <option value="BDO Makati">BDO Makati</option>
+              <option value="Triumph">Triumph</option>
+              <option value="WFH">WFH</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-1 text-[var(--t-text)]">
+              IP Address
+            </label>
+            <input
+              name="ipAddress"
+              placeholder="e.g. 192.168.1.100"
+              value={form.ipAddress}
+              onChange={handleChange}
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-1 text-[var(--t-text)]">
+              MAC Address
+            </label>
+            <input
+              name="macAddress"
+              placeholder="e.g. AA:BB:CC:DD:EE:FF"
+              value={form.macAddress}
+              onChange={handleChange}
+              className={inputClass}
+            />
+          </div>
 
           {/* Ink stock fields */}
           <div className="border-t border-[var(--t-border)] pt-3 mt-1">

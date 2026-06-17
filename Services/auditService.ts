@@ -13,7 +13,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type AuditTable = "inventory" | "consumables" | "tickets";
+export type AuditTable = "inventory" | "consumables" | "tickets"   | "office_inventory" ;
 
 /** A single field change within a batch */
 export type AuditFieldChange = {
@@ -87,6 +87,7 @@ const COLLECTION_MAP: Record<AuditTable, string> = {
   inventory:   "audit_inventory",
   consumables: "audit_consumables",
   tickets:     "audit_tickets",
+  office_inventory: "audit_office_inventory",
 };
 
 // ─── Write — single field (legacy / inline edits) ─────────────────────────────

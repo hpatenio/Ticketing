@@ -17,9 +17,9 @@ import { getTicketsByRequester } from "../../Services/ticketService";
 import { useTheme } from "../../theme/ThemeContext";
 
 // ─── Shared page imports ─────────────────────────────────────────────────────
-import ITInventoryPage from "../Admin/Modules/ITInventory/ITInventoryPage";
-import ConsumablesPage from "../Admin/Modules/Consumables/ConsumablesPage";
-import TicketsPage from "../Admin/Modules/Tickets/TicketsPage";
+import ITInventoryPage from "../Admin/IT Modules/ITInventory/ITInventoryPage";
+import ConsumablesPage from "../Admin/IT Modules/Consumables/ConsumablesPage";
+import TicketsPage from "../Admin/IT Modules/Tickets/TicketsPage";
 import SubmitTicketPage from "./SubmitTicketPage";
 
 function formatTimestamp(value: any) {

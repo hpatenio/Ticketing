@@ -495,6 +495,7 @@ const ITInventoryPage: React.FC<Props> = ({
   const [editVisible, setEditVisible] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<ITInventory | null>(null);
   const [editingNoteTag, setEditingNoteTag] = useState<string | null>(null);
+  const [draftNote, setDraftNote] = useState<string>("");
   const [manageColumnsVisible, setManageColumnsVisible] = useState(false);
 
   // Column configs from Firestore
@@ -812,7 +813,10 @@ const ITInventoryPage: React.FC<Props> = ({
           <td className="px-3 py-1 min-w-[130px]">
             <button
               type="button"
-              onDoubleClick={() => handleEdit(item)}
+              onDoubleClick={() => {
+                setEditingNoteTag(item.assetTag);
+                setDraftNote(item.notes ?? "");
+              }}
               className="text-left w-full"
             >
               <p
@@ -930,10 +934,8 @@ const ITInventoryPage: React.FC<Props> = ({
             {editingNoteTag === item.assetTag ? (
               <input
                 type="text"
-                value={item.notes ?? ""}
-                onChange={(e) =>
-                  handleFieldUpdate(item.assetTag, "notes", e.target.value)
-                }
+                value={draftNote}
+                onChange={(e) => setDraftNote(e.target.value)} // local only, no Firestore write
                 autoFocus
                 placeholder="Notes"
                 style={{
@@ -945,15 +947,28 @@ const ITInventoryPage: React.FC<Props> = ({
                 onFocus={(e) =>
                   (e.currentTarget.style.borderColor = theme.inputBorderFocus)
                 }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.currentTarget.blur(); // triggers onBlur commit below
+                  } else if (e.key === "Escape") {
+                    setEditingNoteTag(null); // cancel without saving
+                  }
+                }}
                 onBlur={(e) => {
-                  setEditingNoteTag(null);
                   e.currentTarget.style.borderColor = theme.inputBorder;
+                  if (draftNote !== (item.notes ?? "")) {
+                    handleFieldUpdate(item.assetTag, "notes", draftNote); // single write
+                  }
+                  setEditingNoteTag(null);
                 }}
               />
             ) : (
               <button
                 type="button"
-                onDoubleClick={() => setEditingNoteTag(item.assetTag)}
+                onDoubleClick={() => {
+                  setEditingNoteTag(item.assetTag);
+                  setDraftNote(item.notes ?? "");
+                }}
                 className="text-left w-full"
                 title="Double-click to edit"
               >
