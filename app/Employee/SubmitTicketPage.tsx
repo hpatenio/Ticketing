@@ -11,6 +11,7 @@ import { ADUser } from "../../types";
 import { addTicket } from "../../Services/ticketService";
 import { useTheme } from "../../theme/ThemeContext";
 import { ChevronLeft } from "lucide-react-native";
+import SupplyRequestModal from "./Modal/SupplyRequestModal"; // adjust path
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,14 +62,18 @@ type StepBarProps = {
 function StepBar({ step, theme, primary }: StepBarProps) {
   const steps = ["Choose Type", "Fill Details", "Review", "Done"];
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 28 }}>
+    <View
+      style={{ flexDirection: "row", alignItems: "center", marginBottom: 28 }}
+    >
       {steps.map((label, i) => {
         const num = i + 1;
         const isDone = num < step;
         const isActive = num === step;
         return (
           <React.Fragment key={num}>
-            <View style={{ alignItems: "center", flexDirection: "row", gap: 6 }}>
+            <View
+              style={{ alignItems: "center", flexDirection: "row", gap: 6 }}
+            >
               <View
                 style={{
                   width: 28,
@@ -78,13 +83,13 @@ function StepBar({ step, theme, primary }: StepBarProps) {
                   borderColor: isDone
                     ? "#10B981"
                     : isActive
-                    ? primary
-                    : theme.border,
+                      ? primary
+                      : theme.border,
                   backgroundColor: isDone
                     ? "#10B981"
                     : isActive
-                    ? primary
-                    : theme.surface,
+                      ? primary
+                      : theme.surface,
                   alignItems: "center",
                   justifyContent: "center",
                 }}
@@ -106,8 +111,8 @@ function StepBar({ step, theme, primary }: StepBarProps) {
                   color: isDone
                     ? "#10B981"
                     : isActive
-                    ? primary
-                    : theme.subtext,
+                      ? primary
+                      : theme.subtext,
                   flexShrink: 1,
                 }}
                 numberOfLines={1}
@@ -144,7 +149,17 @@ type TypeCardProps = {
   theme: any;
 };
 
-function TypeCard({ icon, title, desc, badge, selected, onPress, accentColor, accentBg, theme }: TypeCardProps) {
+function TypeCard({
+  icon,
+  title,
+  desc,
+  badge,
+  selected,
+  onPress,
+  accentColor,
+  accentBg,
+  theme,
+}: TypeCardProps) {
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -195,7 +210,13 @@ function TypeCard({ icon, title, desc, badge, selected, onPress, accentColor, ac
             paddingVertical: 2,
           }}
         >
-          <Text style={{ fontFamily: "Outfit-SemiBold", fontSize: 10, color: "#C2410C" }}>
+          <Text
+            style={{
+              fontFamily: "Outfit-SemiBold",
+              fontSize: 10,
+              color: "#C2410C",
+            }}
+          >
             {badge}
           </Text>
         </View>
@@ -213,7 +234,14 @@ type SubOptProps = {
   fullWidth?: boolean;
 };
 
-function SubOpt({ label, selected, onPress, theme, primary, fullWidth }: SubOptProps) {
+function SubOpt({
+  label,
+  selected,
+  onPress,
+  theme,
+  primary,
+  fullWidth,
+}: SubOptProps) {
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -226,7 +254,9 @@ function SubOpt({ label, selected, onPress, theme, primary, fullWidth }: SubOptP
         borderWidth: 1.5,
         borderColor: selected ? primary : theme.border,
         borderRadius: 8,
-        backgroundColor: selected ? (theme.bgActive ?? "#EEF2FF") : "transparent",
+        backgroundColor: selected
+          ? (theme.bgActive ?? "#EEF2FF")
+          : "transparent",
         width: fullWidth ? "100%" : undefined,
         flex: fullWidth ? undefined : 1,
       }}
@@ -274,9 +304,7 @@ function Field({ label, required, children, theme }: FieldProps) {
         }}
       >
         {label}
-        {required && (
-          <Text style={{ color: "#EF4444" }}> *</Text>
-        )}
+        {required && <Text style={{ color: "#EF4444" }}> *</Text>}
       </Text>
       {children}
     </View>
@@ -314,7 +342,7 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
   const [hrEndTime, setHrEndTime] = useState("");
   const [hrReason, setHrReason] = useState("");
   const [hrNotes, setHrNotes] = useState("");
-
+  const [supplyModalVisible, setSupplyModalVisible] = useState(false);
   // Priority (review step)
   const [priority, setPriority] = useState<PriorityValue>("Normal");
 
@@ -358,7 +386,9 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
         >
           What do you need help with?
         </Text>
-        <Text style={{ fontFamily: "Outfit", fontSize: 13, color: theme.subtext }}>
+        <Text
+          style={{ fontFamily: "Outfit", fontSize: 13, color: theme.subtext }}
+        >
           Select the category for your request.
         </Text>
       </View>
@@ -412,7 +442,9 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
           opacity: ticketType ? 1 : 0.4,
         }}
       >
-        <Text style={{ fontFamily: "Outfit-SemiBold", fontSize: 13, color: "#fff" }}>
+        <Text
+          style={{ fontFamily: "Outfit-SemiBold", fontSize: 13, color: "#fff" }}
+        >
           Continue →
         </Text>
       </TouchableOpacity>
@@ -432,15 +464,36 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
           padding: 24,
         }}
       >
-        <Text style={{ fontFamily: "Outfit-SemiBold", fontSize: 17, color: theme.textActive, marginBottom: 4 }}>
+        <Text
+          style={{
+            fontFamily: "Outfit-SemiBold",
+            fontSize: 17,
+            color: theme.textActive,
+            marginBottom: 4,
+          }}
+        >
           💻 IT Concern
         </Text>
-        <Text style={{ fontFamily: "Outfit", fontSize: 13, color: theme.subtext, marginBottom: 20 }}>
+        <Text
+          style={{
+            fontFamily: "Outfit",
+            fontSize: 13,
+            color: theme.subtext,
+            marginBottom: 20,
+          }}
+        >
           Select a category and describe your issue.
         </Text>
 
         <Field label="IT Category" required theme={theme}>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 2 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              gap: 8,
+              marginTop: 2,
+            }}
+          >
             {IT_CATEGORIES.map((cat, idx) => (
               <SubOpt
                 key={cat}
@@ -487,7 +540,14 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
         </Field>
 
         {error ? (
-          <Text style={{ fontFamily: "Outfit", color: "#EF4444", fontSize: 13, marginBottom: 8 }}>
+          <Text
+            style={{
+              fontFamily: "Outfit",
+              color: "#EF4444",
+              fontSize: 13,
+              marginBottom: 8,
+            }}
+          >
             {error}
           </Text>
         ) : null}
@@ -498,9 +558,18 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
             label="Review →"
             onPress={() => {
               setError("");
-              if (!itCategory) { setError("Please select an IT category."); return; }
-              if (!itTitle.trim()) { setError("Please enter an issue title."); return; }
-              if (!itDesc.trim()) { setError("Please describe the issue."); return; }
+              if (!itCategory) {
+                setError("Please select an IT category.");
+                return;
+              }
+              if (!itTitle.trim()) {
+                setError("Please enter an issue title.");
+                return;
+              }
+              if (!itDesc.trim()) {
+                setError("Please describe the issue.");
+                return;
+              }
               setStep(3);
             }}
             primary={primary}
@@ -523,10 +592,24 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
           padding: 24,
         }}
       >
-        <Text style={{ fontFamily: "Outfit-SemiBold", fontSize: 17, color: theme.textActive, marginBottom: 4 }}>
+        <Text
+          style={{
+            fontFamily: "Outfit-SemiBold",
+            fontSize: 17,
+            color: theme.textActive,
+            marginBottom: 4,
+          }}
+        >
           📋 HR Concern
         </Text>
-        <Text style={{ fontFamily: "Outfit", fontSize: 13, color: theme.subtext, marginBottom: 16 }}>
+        <Text
+          style={{
+            fontFamily: "Outfit",
+            fontSize: 13,
+            color: theme.subtext,
+            marginBottom: 16,
+          }}
+        >
           Submit an HR-related request for review.
         </Text>
 
@@ -544,12 +627,21 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
           }}
         >
           <Text style={{ fontSize: 13, color: "#92400E" }}>
-            ⚠️ This feature is in <Text style={{ fontFamily: "Outfit-SemiBold" }}>draft</Text>. Some options may change in future updates.
+            ⚠️ This feature is in{" "}
+            <Text style={{ fontFamily: "Outfit-SemiBold" }}>draft</Text>. Some
+            options may change in future updates.
           </Text>
         </View>
 
         <Field label="HR Category" required theme={theme}>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 2 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              gap: 8,
+              marginTop: 2,
+            }}
+          >
             {HR_CATEGORIES.map((cat) => (
               <SubOpt
                 key={cat}
@@ -624,7 +716,13 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
               overflow: "hidden",
             }}
           >
-            {["Heavy workload / deadline", "Special project or task", "Client deliverable", "System maintenance", "Other"].map((opt) => (
+            {[
+              "Heavy workload / deadline",
+              "Special project or task",
+              "Client deliverable",
+              "System maintenance",
+              "Other",
+            ].map((opt) => (
               <TouchableOpacity
                 key={opt}
                 onPress={() => setHrReason(opt)}
@@ -632,7 +730,10 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
                 style={{
                   paddingHorizontal: 13,
                   paddingVertical: 10,
-                  backgroundColor: hrReason === opt ? (theme.bgActive ?? "#EEF2FF") : "transparent",
+                  backgroundColor:
+                    hrReason === opt
+                      ? (theme.bgActive ?? "#EEF2FF")
+                      : "transparent",
                   borderBottomWidth: 0.5,
                   borderBottomColor: theme.border,
                 }}
@@ -663,7 +764,14 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
         </Field>
 
         {error ? (
-          <Text style={{ fontFamily: "Outfit", color: "#EF4444", fontSize: 13, marginBottom: 8 }}>
+          <Text
+            style={{
+              fontFamily: "Outfit",
+              color: "#EF4444",
+              fontSize: 13,
+              marginBottom: 8,
+            }}
+          >
             {error}
           </Text>
         ) : null}
@@ -674,8 +782,14 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
             label="Review →"
             onPress={() => {
               setError("");
-              if (!hrDate.trim()) { setError("Please enter the overtime date."); return; }
-              if (!hrReason) { setError("Please select a reason."); return; }
+              if (!hrDate.trim()) {
+                setError("Please enter the overtime date.");
+                return;
+              }
+              if (!hrReason) {
+                setError("Please select a reason.");
+                return;
+              }
               setStep(3);
             }}
             primary={primary}
@@ -687,67 +801,22 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
 
   // ─── Step 2c: Supply (simple note, as supply data comes from inventory) ─────
   const renderStep2Supply = () => (
-    <View>
-      <BackButton onPress={() => setStep(1)} theme={theme} />
-      <View
-        style={{
-          backgroundColor: theme.surface,
-          borderWidth: 1.5,
-          borderColor: theme.border,
-          borderRadius: 12,
-          padding: 24,
-        }}
-      >
-        <Text style={{ fontFamily: "Outfit-SemiBold", fontSize: 17, color: theme.textActive, marginBottom: 4 }}>
-          📦 Office Supply Request
-        </Text>
-        <Text style={{ fontFamily: "Outfit", fontSize: 13, color: theme.subtext, marginBottom: 20 }}>
-          Describe the supplies you need. The admin team will process your request.
-        </Text>
-
-        <Field label="Summary" required theme={theme}>
-          <TextInput
-            style={inputStyle}
-            placeholder="e.g. Bond paper (A4, 2 reams) and ballpoint pens"
-            placeholderTextColor={theme.subtext}
-            value={itTitle}
-            onChangeText={setItTitle}
-          />
-        </Field>
-
-        <Field label="Details" required theme={theme}>
-          <TextInput
-            style={[inputStyle, { height: 100, textAlignVertical: "top" }]}
-            placeholder="List each item, quantity, and any specifications…"
-            placeholderTextColor={theme.subtext}
-            multiline
-            value={itDesc}
-            onChangeText={setItDesc}
-          />
-        </Field>
-
-        {error ? (
-          <Text style={{ fontFamily: "Outfit", color: "#EF4444", fontSize: 13, marginBottom: 8 }}>
-            {error}
-          </Text>
-        ) : null}
-
-        <View style={{ flexDirection: "row", gap: 10, marginTop: 6 }}>
-          <SecondaryBtn label="Back" onPress={() => setStep(1)} theme={theme} />
-          <PrimaryBtn
-            label="Review →"
-            onPress={() => {
-              setError("");
-              if (!itTitle.trim()) { setError("Please enter a summary."); return; }
-              if (!itDesc.trim()) { setError("Please describe the supplies needed."); return; }
-              setStep(3);
-            }}
-            primary={primary}
-          />
-        </View>
-      </View>
-    </View>
-  );
+  <View>
+    <BackButton onPress={() => setStep(1)} theme={theme} />
+    <SupplyRequestModal
+      visible={supplyModalVisible}
+      onClose={() => { setSupplyModalVisible(false); setStep(1); }}
+      user={user}
+      onSuccess={(ticketNumber) => {
+        setSubmittedId(ticketNumber);
+        setStep(4);
+        setSupplyModalVisible(false);
+      }}
+    />
+    {/* Auto-open the modal when this step is reached */}
+    {!supplyModalVisible && (() => { setSupplyModalVisible(true); return null; })()}
+  </View>
+);
 
   // ─── Step 3: Review ─────────────────────────────────────────────────────────
   const typeNames: Record<TicketType, string> = {
@@ -779,20 +848,44 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
           padding: 24,
         }}
       >
-        <Text style={{ fontFamily: "Outfit-SemiBold", fontSize: 17, color: theme.textActive, marginBottom: 4 }}>
+        <Text
+          style={{
+            fontFamily: "Outfit-SemiBold",
+            fontSize: 17,
+            color: theme.textActive,
+            marginBottom: 4,
+          }}
+        >
           Review Your Ticket
         </Text>
-        <Text style={{ fontFamily: "Outfit", fontSize: 13, color: theme.subtext, marginBottom: 20 }}>
+        <Text
+          style={{
+            fontFamily: "Outfit",
+            fontSize: 13,
+            color: theme.subtext,
+            marginBottom: 20,
+          }}
+        >
           Double-check before submitting.
         </Text>
 
         {/* Review rows */}
         {[
-          { label: "Request Type", value: ticketType ? typeNames[ticketType] : "—" },
+          {
+            label: "Request Type",
+            value: ticketType ? typeNames[ticketType] : "—",
+          },
           { label: "Category", value: getCategoryLabel() },
           { label: "Title / Summary", value: getTitleLabel() },
           { label: "Submitted by", value: user.displayName },
-          { label: "Date", value: new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) },
+          {
+            label: "Date",
+            value: new Date().toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            }),
+          },
         ].map((row, i, arr) => (
           <View
             key={row.label}
@@ -804,8 +897,25 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
               borderBottomColor: theme.border,
             }}
           >
-            <Text style={{ fontFamily: "Outfit", fontSize: 13, color: theme.subtext }}>{row.label}</Text>
-            <Text style={{ fontFamily: "Outfit-SemiBold", fontSize: 13, color: theme.textActive, flexShrink: 1, textAlign: "right", maxWidth: "60%" }}>
+            <Text
+              style={{
+                fontFamily: "Outfit",
+                fontSize: 13,
+                color: theme.subtext,
+              }}
+            >
+              {row.label}
+            </Text>
+            <Text
+              style={{
+                fontFamily: "Outfit-SemiBold",
+                fontSize: 13,
+                color: theme.textActive,
+                flexShrink: 1,
+                textAlign: "right",
+                maxWidth: "60%",
+              }}
+            >
               {row.value}
             </Text>
           </View>
@@ -825,7 +935,8 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
                     borderRadius: 8,
                     paddingVertical: 10,
                     alignItems: "center",
-                    backgroundColor: priority === opt ? primary : theme.background,
+                    backgroundColor:
+                      priority === opt ? primary : theme.background,
                     borderWidth: 1.5,
                     borderColor: priority === opt ? primary : theme.border,
                   }}
@@ -842,14 +953,29 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={{ fontFamily: "Outfit", fontSize: 11, color: theme.subtext, marginTop: 5 }}>
-              Use Urgent or Critical only if this significantly affects your work.
+            <Text
+              style={{
+                fontFamily: "Outfit",
+                fontSize: 11,
+                color: theme.subtext,
+                marginTop: 5,
+              }}
+            >
+              Use Urgent or Critical only if this significantly affects your
+              work.
             </Text>
           </Field>
         </View>
 
         {error ? (
-          <Text style={{ fontFamily: "Outfit", color: "#EF4444", fontSize: 13, marginBottom: 8 }}>
+          <Text
+            style={{
+              fontFamily: "Outfit",
+              color: "#EF4444",
+              fontSize: 13,
+              marginBottom: 8,
+            }}
+          >
             {error}
           </Text>
         ) : null}
@@ -881,7 +1007,14 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
       }}
     >
       <Text style={{ fontSize: 52, marginBottom: 16 }}>🎉</Text>
-      <Text style={{ fontFamily: "Outfit-SemiBold", fontSize: 20, color: theme.textActive, marginBottom: 8 }}>
+      <Text
+        style={{
+          fontFamily: "Outfit-SemiBold",
+          fontSize: 20,
+          color: theme.textActive,
+          marginBottom: 8,
+        }}
+      >
         Ticket Submitted!
       </Text>
       <Text
@@ -922,10 +1055,25 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
         </Text>
       </View>
 
-      <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
-        <SecondaryBtn label="Submit Another" onPress={resetForm} theme={theme} />
+      <View
+        style={{
+          flexDirection: "row",
+          gap: 10,
+          flexWrap: "wrap",
+          justifyContent: "center",
+        }}
+      >
+        <SecondaryBtn
+          label="Submit Another"
+          onPress={resetForm}
+          theme={theme}
+        />
         {onNavigate && (
-          <PrimaryBtn label="View My Tickets" onPress={() => onNavigate("mytickets")} primary={primary} />
+          <PrimaryBtn
+            label="View My Tickets"
+            onPress={() => onNavigate("mytickets")}
+            primary={primary}
+          />
         )}
       </View>
     </View>
@@ -940,9 +1088,23 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
 
       let summary = "";
       let details = "";
-      let category: "CCTV" | "Licenses Accounts" | "Hardware" | "Email" | "Network" | "Maintenance" | "Medicine" | "Office Supplies" | "Software" | "Other" = "Other";
+      let category:
+        | "CCTV"
+        | "Licenses Accounts"
+        | "Hardware"
+        | "Email"
+        | "Network"
+        | "Maintenance"
+        | "Medicine"
+        | "Office Supplies"
+        | "Software"
+        | "Other" = "Other";
       const ticketPriority: "Low" | "Medium" | "High" =
-        priority === "Normal" ? "Low" : priority === "Urgent" ? "Medium" : "High";
+        priority === "Normal"
+          ? "Low"
+          : priority === "Urgent"
+            ? "Medium"
+            : "High";
 
       if (ticketType === "it") {
         summary = itTitle.trim();
@@ -951,16 +1113,16 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
           itCategory === "Hardware Issues"
             ? "Hardware"
             : itCategory === "Software Issues"
-            ? "Software"
-            : itCategory === "Network & Internet"
-            ? "Network"
-            : itCategory === "Printer & Peripherals"
-            ? "Hardware"
-            : itCategory === "Email & Account"
-            ? "Email"
-            : itCategory === "System Access"
-            ? "Licenses Accounts"
-            : "Other";
+              ? "Software"
+              : itCategory === "Network & Internet"
+                ? "Network"
+                : itCategory === "Printer & Peripherals"
+                  ? "Hardware"
+                  : itCategory === "Email & Account"
+                    ? "Email"
+                    : itCategory === "System Access"
+                      ? "Licenses Accounts"
+                      : "Other";
       } else if (ticketType === "hr") {
         summary = `${hrCategory} – ${hrDate}`;
         details = `Duration: ${hrDuration}h | Time: ${hrStartTime}–${hrEndTime} | Reason: ${hrReason}${hrNotes ? " | Notes: " + hrNotes : ""}`;
@@ -992,7 +1154,7 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
       setError(
         err?.message
           ? `Unable to submit ticket: ${err.message}`
-          : "Unable to submit ticket. Please try again."
+          : "Unable to submit ticket. Please try again.",
       );
     } finally {
       setSaving(false);
@@ -1052,10 +1214,21 @@ function BackButton({ onPress, theme }: { onPress: () => void; theme: any }) {
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
-      style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 20 }}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        marginBottom: 20,
+      }}
     >
       <ChevronLeft size={16} color={theme.subtext} />
-      <Text style={{ fontFamily: "Outfit-SemiBold", fontSize: 13, color: theme.subtext }}>
+      <Text
+        style={{
+          fontFamily: "Outfit-SemiBold",
+          fontSize: 13,
+          color: theme.subtext,
+        }}
+      >
         Back
       </Text>
     </TouchableOpacity>
@@ -1092,14 +1265,24 @@ function PrimaryBtn({
       }}
     >
       {loading && <ActivityIndicator size="small" color="#fff" />}
-      <Text style={{ fontFamily: "Outfit-SemiBold", fontSize: 13, color: "#fff" }}>
+      <Text
+        style={{ fontFamily: "Outfit-SemiBold", fontSize: 13, color: "#fff" }}
+      >
         {label}
       </Text>
     </TouchableOpacity>
   );
 }
 
-function SecondaryBtn({ label, onPress, theme }: { label: string; onPress: () => void; theme: any }) {
+function SecondaryBtn({
+  label,
+  onPress,
+  theme,
+}: {
+  label: string;
+  onPress: () => void;
+  theme: any;
+}) {
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -1113,7 +1296,13 @@ function SecondaryBtn({ label, onPress, theme }: { label: string; onPress: () =>
         borderColor: theme.border,
       }}
     >
-      <Text style={{ fontFamily: "Outfit-SemiBold", fontSize: 13, color: theme.subtext }}>
+      <Text
+        style={{
+          fontFamily: "Outfit-SemiBold",
+          fontSize: 13,
+          color: theme.subtext,
+        }}
+      >
         {label}
       </Text>
     </TouchableOpacity>

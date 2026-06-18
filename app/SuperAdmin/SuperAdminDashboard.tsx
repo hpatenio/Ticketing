@@ -16,10 +16,16 @@ import ITInventorySummary, {
 } from "../Admin/IT Modules/ITInventory/ITInventorySummary";
 import ConsumablesPage from "../Admin/IT Modules/Consumables/ConsumablesPage";
 import TicketsPage from "../Admin/IT Modules/Tickets/TicketsPage";
-import UsersPage from "./UsersPage"; // 👈 add this
+import UsersPage from "./UsersPage";
 import { useTheme } from "../../theme/ThemeContext";
 import AuditTrailPage from "./AuditTrailPage";
 import OfficeInventoryPage from "../Admin/OnM Modules/OfficeInventoryPage";
+
+// ─── Employee page imports ────────────────────────────────────────────────────
+import SubmitTicketPage from "../Employee/SubmitTicketPage";
+import MyTicketsPage from "../Admin/IT Modules/Tickets/TicketsPage";
+import SupplyRequestsPage from "../Admin/OnM Modules/SupplyRequestsPage";
+// import SupplyInventoryPage from "../Employee/SupplyInventoryPage";
 
 const ACTIVE_KEY_STORAGE = "superadmin_active_key";
 const JUST_LOGGED_IN_KEY = "just_logged_in";
@@ -68,6 +74,7 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
 
   const renderContent = () => {
     switch (activeKey) {
+      // ─── Admin pages ───────────────────────────────────────────────────────
       case "inventory":
         return (
           <ITInventoryPage
@@ -83,8 +90,19 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
         return <UsersPage currentUser={user} />;
       case "audit":
         return <AuditTrailPage />;
-        case "officeinventory":
+      case "officeinventory":
         return <OfficeInventoryPage />;
+      case "supplyrequest":
+        return <SupplyRequestsPage user={user} />;
+
+      // ─── Employee pages ────────────────────────────────────────────────────
+      case "submitticket":
+        return <SubmitTicketPage user={user} onNavigate={setActiveKey} />;
+      case "mytickets":
+        return <MyTicketsPage user={user} />;
+      case "supplyinventory":
+      // return <SupplyInventoryPage />;
+
       default:
         return (
           <DashboardHome user={user} onFilterNavigate={handleFilterNavigate} />
@@ -104,12 +122,17 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
         return "User Accounts";
       case "audit":
         return "Audit Trail";
+      case "submitticket":
+        return "Submit Ticket";
+      case "mytickets":
+        return "My Tickets";
+      case "supplyinventory":
+        return "Supply Inventory";
       default:
         return "Dashboard";
     }
   };
 
-  // Users page manages its own scroll internally, same pattern as tickets
   const needsScroll = activeKey === "dashboard";
 
   return (

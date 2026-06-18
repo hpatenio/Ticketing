@@ -21,10 +21,6 @@ import EditItemModal from "./Modal/EditItemModal";
 import AdjustStockModal from "./Modal/AdjustStockModal";
 import AddDeliveryModal from "./Modal/AddDeliveryModal";
 
-// NOTE ON PATHS: import depths above assume this file lives at the same
-// folder depth as your existing ITInventoryPage.tsx. Adjust the "../"
-// counts to match wherever you drop this module in.
-
 // ─── Dropdown options ───────────────────────────────────────────────────
 
 const CATEGORY_OPTIONS = [
@@ -35,14 +31,6 @@ const CATEGORY_OPTIONS = [
       "bg-blue-100 text-blue-800 inline-flex justify-center min-w-[120px] px-2 py-1 rounded-lg text-sm font-medium",
     bgColor: "#dbeafe",
     textColor: "#1e40af",
-  },
-  {
-    label: "Printer Supplies",
-    value: "printer_supplies",
-    badgeClass:
-      "bg-slate-100 text-slate-800 inline-flex justify-center min-w-[120px] px-2 py-1 rounded-lg text-sm font-medium",
-    bgColor: "#f1f5f9",
-    textColor: "#1e293b",
   },
   {
     label: "Cleaning",
@@ -78,11 +66,22 @@ const STATUS_FILTER_OPTIONS = [
 
 const CATEGORY_LABELS: Record<OfficeCategory, string> = {
   office_supplies: "Office Supplies",
-  printer_supplies: "Printer Supplies",
   cleaning: "Cleaning",
   ppe: "PPE",
   medicine: "Medicine",
 };
+
+// ─── Category tabs ────────────────────────────────────────────────────────────
+
+type CategoryTab = "all" | OfficeCategory;
+
+const CATEGORY_TABS: { label: string; value: CategoryTab }[] = [
+  { label: "All", value: "all" },
+  { label: "Office Supplies", value: "office_supplies" },
+  { label: "Cleaning", value: "cleaning" },
+  { label: "PPE", value: "ppe" },
+  { label: "Medicine", value: "medicine" },
+];
 
 // ─── Sort helpers ─────────────────────────────────────────────────────────
 
@@ -114,7 +113,6 @@ const TABLE_HEADERS: { label: string; key: InventorySortKey }[] = [
   { label: "Item Code", key: "itemCode" },
   { label: "Item Name", key: "name" },
   { label: "Brand", key: "brand" },
-  { label: "Category", key: "category" },
   { label: "Unit", key: "unit" },
   { label: "Stock", key: "currentStock" },
   { label: "Status", key: "stockStatus" },
@@ -136,7 +134,7 @@ const normalizeValue = (value: any) => {
 const formatPeso = (amount: number) =>
   `₱${amount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
 
-// ─── Status badge (read-only — auto computed, not user-editable) ─────────
+// ─── Status badge ─────────────────────────────────────────────────────────────
 
 const StockStatusBadge = ({ status }: { status: StockStatus }) => {
   const map: Record<
@@ -296,7 +294,6 @@ const OfficeInventoryPage: React.FC<Props> = ({
 
   const inventoryFilter = useTableFilter({
     fields: [
-      { key: "category", label: "Category", options: CATEGORY_OPTIONS },
       { key: "stockStatus", label: "Status", options: STATUS_FILTER_OPTIONS },
     ],
     showDateRange: false,
@@ -307,6 +304,7 @@ const OfficeInventoryPage: React.FC<Props> = ({
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] =
     useState<InventoryFilter>(initialFilter);
+  const [activeTab, setActiveTab] = useState<CategoryTab>("all");
   const [sortKey, setSortKey] = useState<InventorySortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("default");
 
@@ -325,14 +323,15 @@ const OfficeInventoryPage: React.FC<Props> = ({
     recordId?: string;
     recordLabel?: string;
   } | null>(null);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const result = await getAllInventoryItems();
-      console.log("[fetchData] got", result.length, "items", result); // ← add
+      console.log("[fetchData] got", result.length, "items", result);
       setData(result);
     } catch (err) {
-      console.error("Unable to load office inventory", err); // already there
+      console.error("Unable to load office inventory", err);
     } finally {
       setLoading(false);
     }
@@ -353,17 +352,37 @@ const OfficeInventoryPage: React.FC<Props> = ({
   const dirFor = (key: InventorySortKey): SortDir =>
     sortKey === key ? sortDir : "default";
 
-  // ─── Filtered + sorted items ─────────────────────────────────────────────
+  // ─── Tab counts ───────────────────────────────────────────────────────────
+  const tabCounts = useMemo(() => {
+    const counts: Record<CategoryTab, number> = {
+      all: data.length,
+      office_supplies: 0,
+      cleaning: 0,
+      ppe: 0,
+      medicine: 0,
+    };
+    data.forEach((item) => {
+      if (item.category in counts) counts[item.category as OfficeCategory]++;
+    });
+    return counts;
+  }, [data]);
+
+  // ─── Filtered + sorted items ──────────────────────────────────────────────
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
+
     let result = activeFilter
       ? data.filter(
           (item) => (item[activeFilter.field] ?? "") === activeFilter.value,
         )
       : data;
 
+    // Apply category tab
+    if (activeTab !== "all") {
+      result = result.filter((item) => item.category === activeTab);
+    }
+
     result = inventoryFilter.applyToData(result, {
-      category: "category",
       stockStatus: "stockStatus",
     });
 
@@ -373,7 +392,7 @@ const OfficeInventoryPage: React.FC<Props> = ({
         .map((v) => (v ?? "").toString().toLowerCase())
         .some((v) => v.includes(q)),
     );
-  }, [data, activeFilter, inventoryFilter.appliedFilters, search]);
+  }, [data, activeFilter, activeTab, inventoryFilter.appliedFilters, search]);
 
   const sortedFiltered = useMemo(() => {
     if (!sortKey || sortDir === "default") return filtered;
@@ -422,13 +441,14 @@ const OfficeInventoryPage: React.FC<Props> = ({
               onClick={() => handleSort(key)}
               style={{
                 color: theme.subtext,
-                borderColor: theme.border,
+                borderBottom: `1px solid ${theme.border}`,
                 backgroundColor: theme.surfaceRaised,
                 position: "sticky",
                 top: 0,
                 zIndex: 10,
+                boxShadow: `0 1px 0 ${theme.border}`,
               }}
-              className="px-3 py-1 text-left text-xs font-medium uppercase tracking-wide whitespace-nowrap border-b cursor-pointer select-none transition-colors"
+              className="px-3 py-1 text-left text-xs font-medium uppercase tracking-wide whitespace-nowrap cursor-pointer select-none transition-colors"
               onMouseEnter={(e) => (e.currentTarget.style.color = theme.text)}
               onMouseLeave={(e) =>
                 (e.currentTarget.style.color = theme.subtext)
@@ -443,13 +463,14 @@ const OfficeInventoryPage: React.FC<Props> = ({
           <th
             style={{
               color: theme.subtext,
-              borderColor: theme.border,
+              borderBottom: `1px solid ${theme.border}`,
               backgroundColor: theme.surfaceRaised,
               position: "sticky",
               top: 0,
               zIndex: 10,
+              boxShadow: `0 1px 0 ${theme.border}`,
             }}
-            className="px-3 py-1 text-left text-xs font-medium uppercase tracking-wide whitespace-nowrap border-b"
+            className="px-3 py-1 text-left text-xs font-medium uppercase tracking-wide whitespace-nowrap"
           >
             Actions
           </th>
@@ -485,21 +506,6 @@ const OfficeInventoryPage: React.FC<Props> = ({
             <span style={{ color: theme.text }} className="text-sm">
               {item.brand || "—"}
             </span>
-          </td>
-
-          <td className="px-3 py-1.5 min-w-[150px]">
-            <BadgeSelect
-              value={item.category}
-              displayName={CATEGORY_LABELS[item.category]}
-              options={CATEGORY_OPTIONS}
-              placeholder="—"
-              onChange={() => {
-                // Category changes go through Edit Item for now so price/
-                // threshold context stays together — wire directly if you'd
-                // rather allow inline changes.
-                setEditTarget(item);
-              }}
-            />
           </td>
 
           <td className="px-3 py-1.5 min-w-[80px]">
@@ -584,8 +590,7 @@ const OfficeInventoryPage: React.FC<Props> = ({
               Office Inventory
             </h1>
             <p style={{ color: theme.subtext }} className="text-xs mt-0.5">
-              Track consumable stock — supplies, printer, cleaning, PPE, and
-              medicine
+              Track consumable stock — supplies, cleaning, PPE, and medicine
             </p>
             <p style={{ color: theme.subtext }} className="text-xs mt-0.5">
               {sortedFiltered.length} of {data.length} items
@@ -743,6 +748,48 @@ const OfficeInventoryPage: React.FC<Props> = ({
             </div>
           </div>
         )}
+
+        {/* ── Category tabs ── */}
+        <div
+          style={{ borderBottom: `1px solid ${theme.border}` }}
+          className="flex items-end gap-0 -mb-px"
+        >
+          {CATEGORY_TABS.map((tab) => {
+            const isActive = activeTab === tab.value;
+            return (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => setActiveTab(tab.value)}
+                style={{
+                  color: isActive ? theme.primary : theme.subtext,
+                  borderBottom: isActive
+                    ? `2px solid ${theme.primary}`
+                    : "2px solid transparent",
+                  backgroundColor: "transparent",
+                }}
+                className="px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors focus:outline-none"
+                onMouseEnter={(e) => {
+                  if (!isActive) e.currentTarget.style.color = theme.text;
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) e.currentTarget.style.color = theme.subtext;
+                }}
+              >
+                {tab.label}
+                <span
+                  style={{
+                    backgroundColor: isActive ? theme.primary : theme.inputBg,
+                    color: isActive ? theme.primaryText : theme.subtext,
+                  }}
+                  className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold"
+                >
+                  {tabCounts[tab.value]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* ── Scrollable table ── */}
@@ -760,19 +807,17 @@ const OfficeInventoryPage: React.FC<Props> = ({
           </p>
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
-          <div
-            style={{ borderColor: theme.border }}
-            className="rounded-lg border"
+        <div
+          style={{ borderColor: theme.border }}
+          className="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4"
+        >
+          <table
+            className="min-w-full text-sm border rounded-lg"
+            style={{ borderCollapse: "separate", borderSpacing: 0, borderColor: theme.border }}
           >
-            <table
-              className="min-w-full text-sm"
-              style={{ borderCollapse: "collapse" }}
-            >
-              {renderTableHead()}
-              <tbody>{renderTableBody(sortedFiltered)}</tbody>
-            </table>
-          </div>
+            {renderTableHead()}
+            <tbody>{renderTableBody(sortedFiltered)}</tbody>
+          </table>
         </div>
       )}
 
@@ -780,7 +825,6 @@ const OfficeInventoryPage: React.FC<Props> = ({
         visible={inventoryFilter.filterPanelVisible}
         config={{
           fields: [
-            { key: "category", label: "Category", options: CATEGORY_OPTIONS },
             {
               key: "stockStatus",
               label: "Status",

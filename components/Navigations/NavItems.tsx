@@ -455,9 +455,9 @@ export const MENU_BY_ROLE: Record<string, NavSection[]> = {
   superadmin: [
     {
       items: [
-        { key: "dashboard", label: "Dashboard", icon: DashboardIcon },
-        { key: "users",     label: "Users",     icon: UsersIcon     },
-        { key: "audit",     label: "Audit Trail", icon: AuditIcon   },
+        { key: "dashboard", label: "Dashboard",   icon: DashboardIcon },
+        { key: "users",     label: "Users",        icon: UsersIcon     },
+        { key: "audit",     label: "Audit Trail",  icon: AuditIcon     },
       ],
     },
     {
@@ -471,10 +471,19 @@ export const MENU_BY_ROLE: Record<string, NavSection[]> = {
     {
       sectionLabel: "Office Supplies",
       items: [
-        { key: "officeinventory",  label: "Office Supplies",           icon: OfficeSuppliesIcon  },
-        { key: "supplyrequest",   label: "Supply Request",            icon: SupplyRequestIcon   },
-        { key: "monthlyreport",   label: "Monthly Report",            icon: MonthlyReportIcon   },
-        { key: "activity",        label: "Activity",                  icon: ActivityIcon        },
+        { key: "officeinventory", label: "Office Supplies", icon: OfficeSuppliesIcon },
+        { key: "supplyrequest",   label: "Supply Request",  icon: SupplyRequestIcon  },
+        { key: "monthlyreport",   label: "Monthly Report",  icon: MonthlyReportIcon  },
+        { key: "activity",        label: "Activity",        icon: ActivityIcon       },
+      ],
+    },
+    // ↓ Employee-side nav items added for superadmin
+    {
+      sectionLabel: "Employee",
+      items: [
+        { key: "submitticket",    label: "Submit Ticket",   icon: SubmitTicketIcon },
+        { key: "mytickets",       label: "My Tickets",      icon: MyTicketsIcon    },
+        { key: "supplyinventory", label: "Supply Inventory", icon: SuppliesIcon    },
       ],
     },
   ],
@@ -495,20 +504,20 @@ export const MENU_BY_ROLE: Record<string, NavSection[]> = {
     {
       sectionLabel: "Office Supplies",
       items: [
-        { key: "officeinventory",  label: "Office Supplies",           icon: OfficeSuppliesIcon  },
-        { key: "supplyrequest",   label: "Supply Request",            icon: SupplyRequestIcon   },
-        { key: "monthlyreport",   label: "Monthly Report",            icon: MonthlyReportIcon   },
-        { key: "activity",        label: "Activity",                  icon: ActivityIcon        },
+        { key: "officeinventory", label: "Office Supplies", icon: OfficeSuppliesIcon },
+        { key: "supplyrequest",   label: "Supply Request",  icon: SupplyRequestIcon  },
+        { key: "monthlyreport",   label: "Monthly Report",  icon: MonthlyReportIcon  },
+        { key: "activity",        label: "Activity",        icon: ActivityIcon       },
       ],
     },
   ],
   employee: [
     {
       items: [
-        { key: "dashboard",       label: "Dashboard",         icon: DashboardIcon    },
-        { key: "submitticket",    label: "Submit Ticket",     icon: SubmitTicketIcon },
-        { key: "mytickets",       label: "My Tickets",        icon: MyTicketsIcon    },
-        { key: "supplyinventory", label: "Supply Inventory",  icon: SuppliesIcon     },
+        { key: "dashboard",       label: "Dashboard",        icon: DashboardIcon    },
+        { key: "submitticket",    label: "Submit Ticket",    icon: SubmitTicketIcon },
+        { key: "mytickets",       label: "My Tickets",       icon: MyTicketsIcon    },
+        { key: "supplyinventory", label: "Supply Inventory", icon: SuppliesIcon     },
       ],
     },
   ],

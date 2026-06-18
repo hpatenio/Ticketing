@@ -81,7 +81,6 @@ export interface Column<T> {
 
 export type OfficeCategory =
   | "office_supplies"
-  | "printer_supplies"
   | "cleaning"
   | "ppe"
   | "medicine";
@@ -152,3 +151,32 @@ export interface EditItemInput {
   lowStockThreshold: number;
   inStockThreshold: number;
 }
+
+// ─── ADD to types.ts ────────────────────────────────────────────────────────
+
+export type SupplyRequestStatus = "pending" | "awaiting_stock" | "resolved" | "rejected";
+
+export type SupplyRequestItem = {
+  itemId: string;
+  itemName: string;
+  itemCode: string;
+  category: string;
+  quantityRequested: number;
+  stockStatusAtRequest: string; // "available" | "low" | "out_of_stock"
+};
+
+export type SupplyRequest = {
+  id: string;
+  ticketNumber: string;
+  requestedById: string;
+  requestedByName: string;
+  items: SupplyRequestItem[];
+  status: SupplyRequestStatus;
+  notes: string;
+  rejectionReason: string | null;
+  reviewedBy: string | null;
+  reviewedByName: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+};

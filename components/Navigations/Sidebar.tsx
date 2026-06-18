@@ -39,7 +39,8 @@ export default function Sidebar({
   onNavigate,
   onLogout,
 }: SidebarProps) {
-  const [expanded, setExpanded] = useState(false);
+  // ── Always start expanded; hover events are kept but won't collapse ──────
+  const [expanded, setExpanded] = useState(true);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -50,8 +51,9 @@ export default function Sidebar({
   const permissionItems = getPermissionItemsForEmployee(user);
   const hasPermissions = permissionItems.length > 0;
 
-  const animatedWidth = useRef(new Animated.Value(COLLAPSED_W)).current;
-  const animatedExpand = useRef(new Animated.Value(0)).current;
+  // ── Start at EXPANDED_W so labels are visible immediately ────────────────
+  const animatedWidth = useRef(new Animated.Value(EXPANDED_W)).current;
+  const animatedExpand = useRef(new Animated.Value(1)).current;
 
   const labelOpacity = animatedExpand;
   const labelTranslateX = animatedExpand.interpolate({
@@ -80,6 +82,8 @@ export default function Sidebar({
     ]).start();
   };
 
+  // Hover handlers are kept intact so the feature can be re-enabled later,
+  // but they no-op while the sidebar is locked open.
   const handleExpand = () => {
     if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
     hoverTimeout.current = setTimeout(() => {
@@ -90,9 +94,10 @@ export default function Sidebar({
 
   const handleCollapse = () => {
     if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
-    setExpanded(false);
-    setSettingsOpen(false);
-    animateSidebar(COLLAPSED_W);
+    // ── Collapse disabled — remove these two lines to re-enable ─────────
+    // setExpanded(false);
+    // setSettingsOpen(false);
+    // animateSidebar(COLLAPSED_W);
   };
 
   const webHoverProps =

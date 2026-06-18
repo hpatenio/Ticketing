@@ -9,12 +9,17 @@ import { OfficeCategory, OfficeUnit } from "../../../../types";
 
 const CATEGORY_CHOICES: { value: OfficeCategory; label: string }[] = [
   { value: "office_supplies", label: "Office Supplies" },
-  { value: "printer_supplies", label: "Printer Supplies" },
   { value: "cleaning", label: "Cleaning" },
   { value: "ppe", label: "PPE" },
   { value: "medicine", label: "Medicine" },
 ];
-
+const CATEGORY_LABEL_MAP: Record<string, OfficeCategory> = {
+  "office supplies": "office_supplies",
+  "office_supplies": "office_supplies",
+  "cleaning": "cleaning",
+  "ppe": "ppe",
+  "medicine": "medicine",
+};
 const UNIT_CHOICES: OfficeUnit[] = [
   "piece", "ream", "box", "roll", "pack", "bottle", "gallon",
 ];
@@ -273,7 +278,7 @@ const AddItemModal: React.FC<Props> = ({ visible, onClose, onSuccess }) => {
             itemCode: norm.itemCode ?? "",
             name: norm.name ?? "",
             brand: norm.brand ?? "",
-            category: (norm.category as OfficeCategory) ?? "office_supplies",
+           category: CATEGORY_LABEL_MAP[norm.category?.toLowerCase().trim() ?? ""] ?? "office_supplies",
             unit: (norm.unit as OfficeUnit) ?? "piece",
             pricePerUnit: norm.pricePerUnit ?? "",
             beginningInventory: norm.beginningInventory ?? "",
