@@ -241,7 +241,7 @@ export default function AuditTrailPage() {
   const { theme } = useTheme();
   const [activeTab, setActiveTab]   = useState<AuditTable>("inventory");
   const [logs, setLogs]             = useState<Record<AuditTable, AnyAuditEntry[]>>({
-    inventory: [], consumables: [], tickets: [],
+    inventory: [], consumables: [], tickets: [], office_inventory: [], supply_requests: [],
   });
   const [loadingTab, setLoadingTab] = useState<AuditTable | null>(null);
   const [loadedTabs, setLoadedTabs] = useState<Set<AuditTable>>(new Set());

@@ -4,8 +4,10 @@ import { ADUser, SupplyRequest, SupplyRequestStatus } from "../../../types";
 import {
   getAllSupplyRequests,
   approveSupplyRequest,
+  approveSupplyRequestPartial,
   rejectSupplyRequest,
 } from "../../../Services/officeInventory";
+import PartialApprovalModal from "./Modal/PartialApprovalModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -79,9 +81,6 @@ function stockLabel(status: StockStatus): string {
   }
 }
 
-// Worst-case stock status across all items in a request (drives the
-// "Stock status" column and also determines if a pending request should be
-// treated as awaiting stock).
 function worstStockStatus(items: SupplyRequest["items"]): StockStatus {
   if (items.some((i) => i.stockStatusAtRequest === "out_of_stock"))
     return "out_of_stock";
@@ -463,6 +462,7 @@ function RequestRow({ request, index, onApprove, onReject, onView, approvingId, 
       <td className="px-3 py-3 whitespace-nowrap text-right">
         {isActionable ? (
           <div className="inline-flex items-center gap-1.5">
+            {/* Opens the partial-approval modal */}
             <button
               onClick={() => onApprove(request)}
               disabled={isApproving}
@@ -518,7 +518,11 @@ export default function SupplyRequestsPage({ user }: Props) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [detailRequest, setDetailRequest] = useState<SupplyRequest | null>(null);
   const [rejectTarget, setRejectTarget] = useState<SupplyRequest | null>(null);
+
+  // ── Approval state ─────────────────────────────────────────────────────────
+  const [approvalTarget, setApprovalTarget] = useState<SupplyRequest | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
+
   const [rejecting, setRejecting] = useState(false);
   const [error, setError] = useState("");
 
@@ -539,10 +543,6 @@ export default function SupplyRequestsPage({ user }: Props) {
     loadRequests();
   }, [loadRequests]);
 
-  // Effective status used for filtering/display: a pending request whose
-  // worst stock status is "out_of_stock" is surfaced as "awaiting_stock"
-  // even though Firestore may still say "pending" (matches the screenshot's
-  // #051 Correction Tape row).
   const effectiveStatus = useCallback((r: SupplyRequest): SupplyRequestStatus => {
     if (r.status === "pending" && worstStockStatus(r.items) === "out_of_stock") {
       return "awaiting_stock" as SupplyRequestStatus;
@@ -552,21 +552,18 @@ export default function SupplyRequestsPage({ user }: Props) {
 
   const filtered = useMemo(() => {
     let result = requests;
-
     if (statusFilter !== "all") {
       result = result.filter((r) => effectiveStatus(r) === statusFilter);
     }
-
     const q = search.trim().toLowerCase();
     if (q) {
       result = result.filter((r) =>
         [r.ticketNumber, r.requestedByName, ...r.items.map((i) => i.itemName), ...r.items.map((i) => i.itemCode)]
           .join(" ")
           .toLowerCase()
-          .includes(q),
+          .includes(q)
       );
     }
-
     return result;
   }, [requests, statusFilter, search, effectiveStatus]);
 
@@ -585,15 +582,34 @@ export default function SupplyRequestsPage({ user }: Props) {
     return c;
   }, [requests, effectiveStatus]);
 
-  const handleApprove = async (request: SupplyRequest) => {
-    setError("");
+  // ── Approve all (existing behaviour, fires from inside PartialApprovalModal) ──
+  const handleApproveAll = async (request: SupplyRequest) => {
     setApprovingId(request.id);
+    setError("");
     try {
       await approveSupplyRequest(request.id);
       await loadRequests();
     } catch (err: any) {
-      console.error("Approve failed:", err);
       setError(err?.message ?? "Failed to approve request.");
+      throw err; // re-throw so the modal can surface it
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  // ── Approve partial (new, fires from inside PartialApprovalModal) ──────────
+  const handleApprovePartial = async (
+    requestId: string,
+    lines: { itemId: string; qtyToDispense: number }[]
+  ) => {
+    setApprovingId(requestId);
+    setError("");
+    try {
+      await approveSupplyRequestPartial(requestId, lines);
+      await loadRequests();
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to approve request.");
+      throw err;
     } finally {
       setApprovingId(null);
     }
@@ -608,7 +624,6 @@ export default function SupplyRequestsPage({ user }: Props) {
       setRejectTarget(null);
       await loadRequests();
     } catch (err: any) {
-      console.error("Reject failed:", err);
       setError(err?.message ?? "Failed to reject request.");
     } finally {
       setRejecting(false);
@@ -740,7 +755,7 @@ export default function SupplyRequestsPage({ user }: Props) {
                     key={request.id}
                     request={request}
                     index={index}
-                    onApprove={handleApprove}
+                    onApprove={(r) => setApprovalTarget(r)}   // opens modal
                     onReject={(r) => setRejectTarget(r)}
                     onView={(r) => setDetailRequest(r)}
                     approvingId={approvingId}
@@ -752,6 +767,16 @@ export default function SupplyRequestsPage({ user }: Props) {
           </div>
         </div>
       )}
+
+      {/* ── Partial approval modal ── */}
+      <PartialApprovalModal
+        visible={approvalTarget !== null}
+        request={approvalTarget}
+        onClose={() => setApprovalTarget(null)}
+        onApproveAll={handleApproveAll}
+        onApprovePartial={handleApprovePartial}
+        theme={theme}
+      />
 
       {/* ── Detail drawer ── */}
       <DetailDrawer request={detailRequest} onClose={() => setDetailRequest(null)} theme={theme} />

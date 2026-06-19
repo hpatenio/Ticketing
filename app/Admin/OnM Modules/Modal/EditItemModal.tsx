@@ -5,7 +5,6 @@ import { OfficeCategory, OfficeInventoryItem, OfficeUnit } from "../../../../typ
 
 const CATEGORY_CHOICES: { value: OfficeCategory; label: string }[] = [
   { value: "office_supplies", label: "Office Supplies" },
-  { value: "printer_supplies", label: "Printer Supplies" },
   { value: "cleaning", label: "Cleaning" },
   { value: "ppe", label: "PPE" },
   { value: "medicine", label: "Medicine" },

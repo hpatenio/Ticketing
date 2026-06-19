@@ -25,6 +25,8 @@ import OfficeInventoryPage from "../Admin/OnM Modules/OfficeInventoryPage";
 import SubmitTicketPage from "../Employee/SubmitTicketPage";
 import MyTicketsPage from "../Admin/IT Modules/Tickets/TicketsPage";
 import SupplyRequestsPage from "../Admin/OnM Modules/SupplyRequestsPage";
+import ActivityPage from "../Admin/OnM Modules/ActivityPage";
+import MonthlyReportPage from "../Admin/OnM Modules/MonthlyReportPage";
 // import SupplyInventoryPage from "../Employee/SupplyInventoryPage";
 
 const ACTIVE_KEY_STORAGE = "superadmin_active_key";
@@ -94,14 +96,16 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
         return <OfficeInventoryPage />;
       case "supplyrequest":
         return <SupplyRequestsPage user={user} />;
+        case "monthlyreport":
+        return <MonthlyReportPage />;
 
       // ─── Employee pages ────────────────────────────────────────────────────
       case "submitticket":
         return <SubmitTicketPage user={user} onNavigate={setActiveKey} />;
       case "mytickets":
         return <MyTicketsPage user={user} />;
-      case "supplyinventory":
-      // return <SupplyInventoryPage />;
+      case "activity":
+        return <ActivityPage />;
 
       default:
         return (

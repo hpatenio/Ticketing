@@ -1,5 +1,4 @@
 // Services/officeInventory.ts  — Firestore implementation
-// Drop-in replacement for the mock service. OfficeInventoryPage.tsx is unchanged.
 
 import { db } from "../firebase";
 import {
@@ -62,7 +61,6 @@ export const computeStockStatus = (
   return "in_stock";
 };
 
-// Converts a Firestore doc snapshot to a typed OfficeInventoryItem
 const toItem = (id: string, data: any): OfficeInventoryItem => ({
   id,
   itemCode: data.itemCode,
@@ -84,7 +82,6 @@ const toItem = (id: string, data: any): OfficeInventoryItem => ({
     : data.updatedAt ?? "",
 });
 
-// Converts a Firestore doc snapshot to a typed StockTransaction
 const toTransaction = (id: string, data: any): StockTransaction => ({
   id,
   itemId: data.itemId,
@@ -104,11 +101,9 @@ const toTransaction = (id: string, data: any): StockTransaction => ({
     : data.createdAt ?? "",
 });
 
-// Converts a Firestore doc snapshot to a typed SupplyRequest
 const toSupplyRequest = (id: string, data: any): SupplyRequest => ({
   id,
   ticketNumber: data.ticketNumber,
-  // requestedBy is stored as a DocumentReference ("users", id) — surface just the id
   requestedById:
     data.requestedBy && typeof data.requestedBy === "object" && "id" in data.requestedBy
       ? data.requestedBy.id
@@ -137,10 +132,8 @@ export async function getAllInventoryItems(): Promise<OfficeInventoryItem[]> {
   const q = query(
     collection(db, ITEMS_COL),
     where("isActive", "==", true),
-    // orderBy("createdAt", "desc"),   ← comment this out temporarily
   );
   const snap = await getDocs(q);
-  console.log("[getAllInventoryItems] docs:", snap.docs.length);
   return snap.docs.map((d) => toItem(d.id, d.data()));
 }
 
@@ -155,11 +148,15 @@ export async function getTransactionsForItem(
   const snap = await getDocs(q);
   return snap.docs.map((d) => toTransaction(d.id, d.data()));
 }
+export async function getAllStockTransactions(): Promise<StockTransaction[]> {
+  const q = query(collection(db, TX_COL), orderBy("createdAt", "desc"));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => toTransaction(d.id, d.data()));
+}
 
 // ─── CREATE ───────────────────────────────────────────────────────────────────
 
 export async function createInventoryItem(input: NewItemInput): Promise<OfficeInventoryItem> {
-  // 1. Check duplicate
   const existing = query(collection(db, ITEMS_COL), where("itemCode", "==", input.itemCode));
   const existingSnap = await getDocs(existing);
   if (!existingSnap.empty) throw new Error(`Item code "${input.itemCode}" already exists.`);
@@ -183,9 +180,7 @@ export async function createInventoryItem(input: NewItemInput): Promise<OfficeIn
     updatedAt: serverTimestamp(),
   };
 
-  console.log("[officeInventory] writing payload:", payload);      // ← add this
   const ref = await addDoc(collection(db, ITEMS_COL), payload);
-  console.log("[officeInventory] written with id:", ref.id);      // ← and this
 
   try {
     const user = await getCurrentUser();
@@ -232,7 +227,6 @@ export async function updateInventoryItem(
 
   await updateDoc(ref, payload);
 
-  // Audit each changed field
   const user = await getCurrentUser();
   for (const [field, newVal] of Object.entries(updates)) {
     const oldVal = current[field];
@@ -273,6 +267,53 @@ export async function archiveInventoryItem(id: string): Promise<void> {
   });
 }
 
+// ─── Sync helper ──────────────────────────────────────────────────────────────
+// Called after ANY stock change (delivery, adjustment, or approval deduction).
+// Updates the stockStatusAtRequest snapshot on every pending/awaiting_stock
+// request line that references this item, so the UI reflects live stock.
+
+function mapStockStatusToRequestStatus(status: StockStatus): "available" | "low" | "out_of_stock" {
+  if (status === "out_of_stock") return "out_of_stock";
+  if (status === "low_stock") return "low";
+  return "available";
+}
+
+async function syncSupplyRequestsForItem(
+  itemId: string,
+  newStockStatus: StockStatus,
+): Promise<void> {
+  const mappedStatus = mapStockStatusToRequestStatus(newStockStatus);
+
+  // FIX 1: query BOTH "pending" and "awaiting_stock" — either can have stale snapshots
+  const [pendingSnap, awaitingSnap] = await Promise.all([
+    getDocs(query(collection(db, REQUESTS_COL), where("status", "==", "pending"))),
+    getDocs(query(collection(db, REQUESTS_COL), where("status", "==", "awaiting_stock"))),
+  ]);
+
+  const allDocs = [...pendingSnap.docs, ...awaitingSnap.docs];
+
+  for (const reqDoc of allDocs) {
+    const data = reqDoc.data();
+    const items = Array.isArray(data.items) ? data.items : [];
+    let changed = false;
+
+    const updatedItems = items.map((line: any) => {
+      // FIX 2: update any line whose snapshot differs — not just out_of_stock ones.
+      // This means low → out_of_stock AND available → out_of_stock both work,
+      // and restocking (out_of_stock → available) also propagates correctly.
+      if (line.itemId === itemId && line.stockStatusAtRequest !== mappedStatus) {
+        changed = true;
+        return { ...line, stockStatusAtRequest: mappedStatus };
+      }
+      return line;
+    });
+
+    if (changed) {
+      await updateDoc(doc(db, REQUESTS_COL, reqDoc.id), { items: updatedItems });
+    }
+  }
+}
+
 // ─── ADJUST STOCK (deduct) ────────────────────────────────────────────────────
 
 export async function adjustStock(
@@ -295,10 +336,11 @@ export async function adjustStock(
 
   const stockAfter = stockBefore - quantityToDeduct;
   const inStockThreshold = data.inStockThreshold as number;
+  const newStockStatus = computeStockStatus(stockAfter, inStockThreshold);
 
   await updateDoc(ref, {
     currentStock: stockAfter,
-    stockStatus: computeStockStatus(stockAfter, inStockThreshold),
+    stockStatus: newStockStatus,
     updatedAt: serverTimestamp(),
   });
 
@@ -331,39 +373,10 @@ export async function adjustStock(
     changedBy: actor,
     changedById: user.id,
   });
+
+  // FIX 3: sync pending/awaiting requests when stock is manually deducted
+  await syncSupplyRequestsForItem(itemId, newStockStatus);
 }
-
-function mapStockStatusToRequestStatus(status: StockStatus): "available" | "low" | "out_of_stock" {
-  if (status === "out_of_stock") return "out_of_stock";
-  if (status === "low_stock") return "low";
-  return "available";
-}
-
-async function syncSupplyRequestsForItem(itemId: string, newStockStatus: StockStatus): Promise<void> {
-  const mappedStatus = mapStockStatusToRequestStatus(newStockStatus);
-
-  const q = query(collection(db, REQUESTS_COL), where("status", "==", "pending"));
-  const snap = await getDocs(q);
-
-  for (const reqDoc of snap.docs) {
-    const data = reqDoc.data();
-    const items = Array.isArray(data.items) ? data.items : [];
-    let changed = false;
-
-    const updatedItems = items.map((line: any) => {
-      if (line.itemId === itemId && line.stockStatusAtRequest === "out_of_stock") {
-        changed = true;
-        return { ...line, stockStatusAtRequest: mappedStatus };
-      }
-      return line;
-    });
-
-    if (changed) {
-      await updateDoc(doc(db, REQUESTS_COL, reqDoc.id), { items: updatedItems });
-    }
-  }
-}
-
 
 // ─── ADD DELIVERY (restock) ───────────────────────────────────────────────────
 
@@ -379,7 +392,7 @@ export async function addDelivery(
   const snap = await getDoc(ref);
   if (!snap.exists()) throw new Error("Item not found");
 
- const data = snap.data();
+  const data = snap.data();
   const stockBefore = data.currentStock as number;
   const stockAfter = stockBefore + quantityDelivered;
   const inStockThreshold = data.inStockThreshold as number;
@@ -387,7 +400,7 @@ export async function addDelivery(
 
   await updateDoc(ref, {
     currentStock: stockAfter,
-    pricePerUnit,                                          // update to latest delivery price
+    pricePerUnit,
     stockStatus: newStockStatus,
     updatedAt: serverTimestamp(),
   });
@@ -411,7 +424,7 @@ export async function addDelivery(
     createdAt: serverTimestamp(),
   });
 
-await logAudit({
+  await logAudit({
     table: "office_inventory",
     recordId: itemId,
     recordLabel: data.name as string,
@@ -422,11 +435,11 @@ await logAudit({
     changedById: user.id,
   });
 
-  // Stock just changed — un-stick any pending requests that were waiting on this item
+  // Sync pending/awaiting requests (stock went up — un-stick awaiting items)
   await syncSupplyRequestsForItem(itemId, newStockStatus);
 }
 
-// ─── SUPPLY REQUEST (employee submit) ──────────────────────────────────────────
+// ─── SUPPLY REQUEST (employee submit) ─────────────────────────────────────────
 
 export async function submitSupplyRequest(payload: {
   requestedById: string;
@@ -442,16 +455,14 @@ export async function submitSupplyRequest(payload: {
   notes: string;
 }): Promise<string> {
   const year = new Date().getFullYear();
-  const month = String(new Date().getMonth() + 1).padStart(2, "0");
 
-  // Generate ticket number SR-YYYY-XXXX
   const countSnap = await getDocs(
     query(collection(db, REQUESTS_COL), where("ticketNumber", ">=", `SR-${year}`))
   );
   const nextNum = String(countSnap.size + 1).padStart(4, "0");
   const ticketNumber = `SR-${year}-${nextNum}`;
 
-  const ref = await addDoc(collection(db, REQUESTS_COL), {
+  await addDoc(collection(db, REQUESTS_COL), {
     ticketNumber,
     requestedBy: doc(db, "users", payload.requestedById),
     requestedByName: payload.requestedByName,
@@ -469,7 +480,7 @@ export async function submitSupplyRequest(payload: {
   return ticketNumber;
 }
 
-// ─── SUPPLY REQUEST (admin reads) ──────────────────────────────────────────────
+// ─── SUPPLY REQUEST (admin reads) ─────────────────────────────────────────────
 
 export async function getAllSupplyRequests(): Promise<SupplyRequest[]> {
   const q = query(collection(db, REQUESTS_COL), orderBy("createdAt", "desc"));
@@ -477,12 +488,8 @@ export async function getAllSupplyRequests(): Promise<SupplyRequest[]> {
   return snap.docs.map((d) => toSupplyRequest(d.id, d.data()));
 }
 
-// ─── SUPPLY REQUEST (admin approve) ────────────────────────────────────────────
-// Deducts stock for every item in the request, then marks it resolved.
-// If any single item doesn't have enough stock, that item is skipped at the
-// floor (deduction capped at available stock) and the request is still
-// marked resolved — admins are expected to use the "Awaiting stock" status
-// shown at submit-time to decide whether to approve in the first place.
+// ─── SUPPLY REQUEST (admin approve — full) ────────────────────────────────────
+// Deducts stock for every item at the requested quantity, then marks resolved.
 
 export async function approveSupplyRequest(requestId: string): Promise<void> {
   const reqRef = doc(db, REQUESTS_COL, requestId);
@@ -499,22 +506,21 @@ export async function approveSupplyRequest(requestId: string): Promise<void> {
 
   const user = await getCurrentUser();
 
-  // Deduct stock for each item, item-by-item (mirrors adjustStock logic
-  // inline so we can write the transaction/audit entries per item).
   for (const line of items) {
     const itemRef = doc(db, ITEMS_COL, line.itemId);
     const itemSnap = await getDoc(itemRef);
-    if (!itemSnap.exists()) continue; // item may have been archived/deleted since request
+    if (!itemSnap.exists()) continue;
 
     const itemData = itemSnap.data();
     const stockBefore = itemData.currentStock as number;
-    const deduct = Math.min(line.quantityRequested, stockBefore); // floor at 0
+    const deduct = Math.min(line.quantityRequested, stockBefore);
     const stockAfter = stockBefore - deduct;
     const inStockThreshold = itemData.inStockThreshold as number;
+    const newStockStatus = computeStockStatus(stockAfter, inStockThreshold);
 
     await updateDoc(itemRef, {
       currentStock: stockAfter,
-      stockStatus: computeStockStatus(stockAfter, inStockThreshold),
+      stockStatus: newStockStatus,
       updatedAt: serverTimestamp(),
     });
 
@@ -544,6 +550,9 @@ export async function approveSupplyRequest(requestId: string): Promise<void> {
       changedBy: user.name,
       changedById: user.id,
     });
+
+    // FIX 4: sync other pending requests when this approval drains stock
+    await syncSupplyRequestsForItem(line.itemId, newStockStatus);
   }
 
   await updateDoc(reqRef, {
@@ -566,7 +575,94 @@ export async function approveSupplyRequest(requestId: string): Promise<void> {
   });
 }
 
-// ─── SUPPLY REQUEST (admin reject) ─────────────────────────────────────────────
+// ─── SUPPLY REQUEST (admin approve — partial) ─────────────────────────────────
+// Caller specifies exact qty to dispense per item. Items with qtyToDispense === 0
+// are skipped. Request is marked resolved regardless.
+
+export async function approveSupplyRequestPartial(
+  requestId: string,
+  lines: { itemId: string; qtyToDispense: number }[],
+): Promise<void> {
+  const reqRef = doc(db, REQUESTS_COL, requestId);
+  const reqSnap = await getDoc(reqRef);
+  if (!reqSnap.exists()) throw new Error("Request not found");
+
+  const request = reqSnap.data();
+  const user = await getCurrentUser();
+
+  for (const line of lines) {
+    if (line.qtyToDispense <= 0) continue;
+
+    const itemRef = doc(db, ITEMS_COL, line.itemId);
+    const itemSnap = await getDoc(itemRef);
+    if (!itemSnap.exists()) continue;
+
+    const itemData = itemSnap.data();
+    const stockBefore = itemData.currentStock as number;
+    const deduct = Math.min(line.qtyToDispense, stockBefore);
+    if (deduct <= 0) continue;
+
+    const stockAfter = stockBefore - deduct;
+    const inStockThreshold = itemData.inStockThreshold as number;
+    const newStockStatus = computeStockStatus(stockAfter, inStockThreshold);
+
+    await updateDoc(itemRef, {
+      currentStock: stockAfter,
+      stockStatus: newStockStatus,
+      updatedAt: serverTimestamp(),
+    });
+
+    await addDoc(collection(db, TX_COL), {
+      itemId: line.itemId,
+      itemCode: itemData.itemCode,
+      itemName: itemData.name,
+      type: "supply_request_fulfilled",
+      quantityChange: -deduct,
+      stockBefore,
+      stockAfter,
+      pricePerUnit: itemData.pricePerUnit,
+      totalAmount: deduct * (itemData.pricePerUnit as number),
+      reason: `Supply request ${request.ticketNumber} (partial)`,
+      performedByName: user.name,
+      transactionDate: new Date().toISOString().split("T")[0],
+      createdAt: serverTimestamp(),
+    });
+
+    await logAudit({
+      table: "office_inventory",
+      recordId: line.itemId,
+      recordLabel: itemData.name as string,
+      field: "currentStock",
+      oldValue: String(stockBefore),
+      newValue: String(stockAfter),
+      changedBy: user.name,
+      changedById: user.id,
+    });
+
+    await syncSupplyRequestsForItem(line.itemId, newStockStatus);
+  }
+
+  await updateDoc(reqRef, {
+    status: "resolved" as SupplyRequestStatus,
+    reviewedBy: user.id,
+    reviewedByName: user.name,
+    reviewedAt: serverTimestamp(),
+    resolvedAt: serverTimestamp(),
+  });
+
+  await logAudit({
+    table: "supply_requests",
+    recordId: requestId,
+    recordLabel: request.ticketNumber as string,
+    field: "status",
+    oldValue: request.status as string,
+    newValue: "resolved",
+    changedBy: user.name,
+    changedById: user.id,
+  });
+}
+
+// ─── SUPPLY REQUEST (admin reject) ────────────────────────────────────────────
 
 export async function rejectSupplyRequest(
   requestId: string,

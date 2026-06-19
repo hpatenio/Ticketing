@@ -118,8 +118,8 @@ export interface StockTransaction {
   itemId: string;
   itemCode: string;
   itemName: string;
-  type: "ticket_deduction" | "manual_adjustment" | "delivery";
-  quantityChange: number; // negative for deductions, positive for deliveries
+  type: "ticket_deduction" | "manual_adjustment" | "delivery" | "supply_request_fulfilled"; // ← added
+  quantityChange: number;
   stockBefore: number;
   stockAfter: number;
   pricePerUnit: number;
