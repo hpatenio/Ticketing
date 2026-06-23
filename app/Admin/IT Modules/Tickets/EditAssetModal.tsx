@@ -5,6 +5,7 @@ import { useTheme } from "../../../../theme/ThemeContext";
 import BadgeSelect from "../../../../components/common/BadgeSelect";
 import { updateTicket } from "../../../../Services/ticketService";
 import { logAuditBatch } from "../../../../Services/auditService";
+import { DropdownOption } from "../../../SuperAdmin/ManageColumnsModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,8 @@ export type TicketEditUpdates = {
   category: string;
   priority: string;
   status: string;
+  requesterId: string;
+  requesterName: string;
   assigneeId: string;
   assigneeName: string;
   dueDate: string;
@@ -23,6 +26,9 @@ interface Props {
   visible: boolean;
   selectedTicket: ConcernTicket | null;
   assigneeOptions: readonly { label: string; value: string }[];
+  categoryOptions: { label: string; value: string; badgeClass?: string }[];
+  priorityOptions: { label: string; value: string; badgeClass?: string }[];
+  statusOptions:   { label: string; value: string; badgeClass?: string }[];
   onClose: () => void;
   onSave: (ticketNumber: string, updates: TicketEditUpdates) => Promise<void>;
   onDelete?: (ticketNumber: string) => Promise<void>;
@@ -145,6 +151,25 @@ const parseDueDate = (raw: any): string => {
   if (raw instanceof Date) return raw.toISOString().split("T")[0];
   const d = new Date(raw);
   return isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
+};
+const parseReadableDate = (raw: any): string => {
+  if (!raw) return "—";
+  try {
+    const d =
+      typeof raw.toDate === "function"
+        ? raw.toDate()
+        : raw instanceof Date
+          ? raw
+          : new Date(raw);
+    if (isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  } catch {
+    return "—";
+  }
 };
 
 // ─── SearchableSelect ─────────────────────────────────────────────────────────
@@ -593,6 +618,9 @@ const EditTicketModal: React.FC<Props> = ({
   visible,
   selectedTicket,
   assigneeOptions,
+  categoryOptions, // ← add
+  priorityOptions, // ← add
+  statusOptions, // ← add
   onClose,
   onSave,
   onDelete,
@@ -611,6 +639,8 @@ const EditTicketModal: React.FC<Props> = ({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [requesterId, setRequesterId] = useState("");
+  const [requesterName, setRequesterName] = useState("");
   const oldValuesRef = useRef<TicketEditUpdates | null>(null);
 
   useEffect(() => {
@@ -634,6 +664,8 @@ const EditTicketModal: React.FC<Props> = ({
       category: selectedTicket.category ?? "",
       priority: selectedTicket.priority ?? "",
       status: selectedTicket.status ?? "",
+      requesterId: selectedTicket.requesterId ?? "", // ← add
+      requesterName: selectedTicket.requesterName ?? "", // ← add
       assigneeId: selectedTicket.assigneeId ?? "",
       assigneeName: selectedTicket.assigneeName ?? "",
       dueDate: parseDueDate(selectedTicket.dueDate),
@@ -644,6 +676,8 @@ const EditTicketModal: React.FC<Props> = ({
     setCategory(old.category);
     setPriority(old.priority);
     setStatus(old.status);
+    setRequesterId(old.requesterId);
+    setRequesterName(old.requesterName);
     setAssigneeId(old.assigneeId);
     setAssigneeName(old.assigneeName);
     setDueDate(old.dueDate);
@@ -675,6 +709,8 @@ const EditTicketModal: React.FC<Props> = ({
         category,
         priority,
         status,
+        requesterId: requesterId ?? "",
+        requesterName: requesterName ?? "",
         assigneeId: assigneeId ?? "",
         assigneeName: assigneeName ?? "",
         dueDate: parseDueDate(dueDate), // ← normalize whatever the input gave us
@@ -850,8 +886,9 @@ const EditTicketModal: React.FC<Props> = ({
               <BadgeSelect
                 value={category}
                 displayName={category || "—"}
-                options={CATEGORY_OPTIONS}
+                options={categoryOptions}
                 placeholder="Select category"
+                badgeWidth={150}
                 onChange={(val) => setCategory(val)}
                 className="w-full"
               />
@@ -860,7 +897,7 @@ const EditTicketModal: React.FC<Props> = ({
               <BadgeSelect
                 value={priority}
                 displayName={priority || "—"}
-                options={PRIORITY_OPTIONS}
+                options={priorityOptions}
                 placeholder="Select priority"
                 onChange={(val) => setPriority(val)}
                 className="w-full"
@@ -874,7 +911,7 @@ const EditTicketModal: React.FC<Props> = ({
               <BadgeSelect
                 value={status}
                 displayName={status || "—"}
-                options={STATUS_OPTIONS}
+                options={statusOptions}
                 placeholder="Select status"
                 onChange={(val) => setStatus(val)}
                 className="w-full"
@@ -899,6 +936,41 @@ const EditTicketModal: React.FC<Props> = ({
                   colorScheme: theme.mode === "dark" ? "dark" : "light",
                 }}
               />
+            </Field>
+          </div>
+
+          {/* Requester + Date Created */}
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Requester" icon={icons.assignee}>
+              <SearchableSelect
+                value={requesterId}
+                displayName={requesterName}
+                options={assigneeOptions as { label: string; value: string }[]}
+                placeholder="Search requester..."
+                onChange={(id, name) => {
+                  setRequesterId(id);
+                  setRequesterName(name === "—" ? "" : name);
+                }}
+              />
+            </Field>
+            <Field label="Date Created" icon={icons.date}>
+              <div
+                style={{
+                  width: "100%",
+                  padding: "0 10px",
+                  height: 38,
+                  fontSize: 13,
+                  borderRadius: 8,
+                  border: `1px solid ${theme.border}`,
+                  backgroundColor: theme.surfaceRaised ?? theme.background,
+                  color: theme.subtext,
+                  display: "flex",
+                  alignItems: "center",
+                  boxSizing: "border-box",
+                }}
+              >
+                {parseReadableDate(selectedTicket.dateCreated)}
+              </div>
             </Field>
           </div>
 

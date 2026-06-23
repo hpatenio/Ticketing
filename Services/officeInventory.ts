@@ -465,6 +465,7 @@ export async function submitSupplyRequest(payload: {
   await addDoc(collection(db, REQUESTS_COL), {
     ticketNumber,
     requestedBy: doc(db, "users", payload.requestedById),
+    requestedById: payload.requestedById,       
     requestedByName: payload.requestedByName,
     items: payload.items,
     status: "pending",

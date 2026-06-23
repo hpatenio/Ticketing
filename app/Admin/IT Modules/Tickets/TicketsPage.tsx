@@ -144,7 +144,8 @@ type SortKey =
   | "category"
   | "priority"
   | "status"
-  | "dueDate";
+  | "dueDate"
+  | "dateCreated";
 
 const PRIORITY_ORDER: Record<string, number> = { Low: 0, Medium: 1, High: 2 };
 const STATUS_ORDER: Record<string, number> = {
@@ -171,6 +172,8 @@ function getTicketValue(t: ConcernTicket, key: SortKey): string | number {
       return STATUS_ORDER[t.status] ?? 0;
     case "dueDate":
       return t.dueDate ? toDateString(t.dueDate) : "";
+    case "dateCreated": // ← add
+      return t.dateCreated ? toDateString(t.dateCreated) : "";
     default:
       return ((t as any)[key] ?? "").toString().toLowerCase();
   }
@@ -364,7 +367,10 @@ const SearchableSelect = ({
           />
           <ul className="inventory-scroll max-h-44 overflow-y-auto">
             {filtered.length === 0 ? (
-              <li style={{ color: theme.subtext }} className="px-3 py-2 text-xs">
+              <li
+                style={{ color: theme.subtext }}
+                className="px-3 py-2 text-xs"
+              >
                 No results
               </li>
             ) : (
@@ -411,7 +417,11 @@ type TicketRowProps = {
   categoryOptions: DropdownOption[];
   priorityOptions: DropdownOption[];
   statusOptions: DropdownOption[];
-  onUpdateField: (ticketNumber: string, field: string, value: any) => Promise<void>;
+  onUpdateField: (
+    ticketNumber: string,
+    field: string,
+    value: any,
+  ) => Promise<void>;
   onOpenDetails: (ticket: ConcernTicket) => void;
 };
 
@@ -428,7 +438,9 @@ const TicketRow = ({
   const { theme } = useTheme();
   const [dueDate, setDueDate] = useState(toDateString(ticket.dueDate));
   const [clickCount, setClickCount] = useState(0);
-  const [clickTimer, setClickTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const [clickTimer, setClickTimer] = useState<ReturnType<
+    typeof setTimeout
+  > | null>(null);
 
   useEffect(() => {
     setDueDate(toDateString(ticket.dueDate));
@@ -569,6 +581,13 @@ const TicketRow = ({
         />
       </td>
 
+      {/* Date Created */}
+      <td className="px-3 py-1.5 min-w-[110px]">
+        <span style={{ color: theme.subtext }} className="text-xs">
+          {ticket.dateCreated ? toDateString(ticket.dateCreated) : "—"}
+        </span>
+      </td>
+
       {/* Due Date */}
       <td className="px-3 py-1.5 min-w-[120px]">
         <input
@@ -595,6 +614,7 @@ const HEADERS: { label: string; key: SortKey }[] = [
   { label: "Category", key: "category" },
   { label: "Priority", key: "priority" },
   { label: "Status", key: "status" },
+  { label: "Date Created", key: "dateCreated" },
   { label: "Due Date", key: "dueDate" },
 ];
 
@@ -613,7 +633,7 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
     fields: [
       { key: "category", label: "Category", options: dropdownOptions.category },
       { key: "priority", label: "Priority", options: dropdownOptions.priority },
-      { key: "status",   label: "Status",   options: dropdownOptions.status   },
+      { key: "status", label: "Status", options: dropdownOptions.status },
     ],
     showDateRange: true,
     dateLabel: "Due Date",
@@ -625,7 +645,9 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
   const [search, setSearch] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editingTicket, setEditingTicket] = useState<ConcernTicket | null>(null);
+  const [editingTicket, setEditingTicket] = useState<ConcernTicket | null>(
+    null,
+  );
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [auditModal, setAuditModal] = useState<{
     recordId?: string;
@@ -636,10 +658,34 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
   const { employees, currentUserId, currentUserName } = useEmployees();
   const [manageColumnsVisible, setManageColumnsVisible] = useState(false);
   const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([
-    { id: "ticket_category", docId: "ticket_category", label: "Category", editable: true, options: [] },
-    { id: "ticket_priority", docId: "ticket_priority", label: "Priority", editable: true, options: [] },
-    { id: "ticket_status",   docId: "ticket_status",   label: "Status",   editable: true, options: [] },
-    { id: "assignee",        docId: "",                label: "Assignee", editable: false, options: [] },
+    {
+      id: "ticket_category",
+      docId: "ticket_category",
+      label: "Category",
+      editable: true,
+      options: [],
+    },
+    {
+      id: "ticket_priority",
+      docId: "ticket_priority",
+      label: "Priority",
+      editable: true,
+      options: [],
+    },
+    {
+      id: "ticket_status",
+      docId: "ticket_status",
+      label: "Status",
+      editable: true,
+      options: [],
+    },
+    {
+      id: "assignee",
+      docId: "",
+      label: "Assignee",
+      editable: false,
+      options: [],
+    },
   ]);
 
   // ─── Data loading ─────────────────────────────────────────────────────────
@@ -674,9 +720,12 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
         });
         setColumnConfigs((prev) =>
           prev.map((col) => {
-            if (col.id === "ticket_category") return { ...col, options: ticket.category };
-            if (col.id === "ticket_priority") return { ...col, options: ticket.priority };
-            if (col.id === "ticket_status")   return { ...col, options: ticket.status };
+            if (col.id === "ticket_category")
+              return { ...col, options: ticket.category };
+            if (col.id === "ticket_priority")
+              return { ...col, options: ticket.priority };
+            if (col.id === "ticket_status")
+              return { ...col, options: ticket.status };
             return col;
           }),
         );
@@ -747,7 +796,10 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
       await updateTicketField(ticketNumber, field, value);
       await loadTickets();
     } catch (err) {
-      console.error(`Unable to update ${field} for ticket ${ticketNumber}:`, err);
+      console.error(
+        `Unable to update ${field} for ticket ${ticketNumber}:`,
+        err,
+      );
     }
   };
 
@@ -808,7 +860,9 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
               }}
               className="px-3 py-1.5 text-left text-xs font-medium uppercase tracking-wide whitespace-nowrap border-b cursor-pointer select-none transition-colors"
               onMouseEnter={(e) => (e.currentTarget.style.color = theme.text)}
-              onMouseLeave={(e) => (e.currentTarget.style.color = theme.subtext)}
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.color = theme.subtext)
+              }
             >
               <span className="inline-flex items-center gap-1">
                 {label}
@@ -845,7 +899,7 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
           return (
             <tr key={ticket.ticketNumber}>
               <td
-                colSpan={7}
+                colSpan={8}
                 style={{ color: theme.dangerText }}
                 className="px-3 py-2 text-xs"
               >
@@ -932,59 +986,58 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
           </div>
         </div>
 
-{/* Row 2: Search bar (left) + Filter button (right) */}
-<div className="flex items-center gap-2 mb-3">
-  {/* Search */}
-  <div className="flex-1">
-    <div className="relative w-full max-w-md">
-      {/* Search Icon */}
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-        style={{ color: theme.subtext }}
-      >
-        <path d="m21 21-4.34-4.34" />
-        <circle cx="11" cy="11" r="8" />
-      </svg>
+        {/* Row 2: Search bar (left) + Filter button (right) */}
+        <div className="flex items-center gap-2 mb-3">
+          {/* Search */}
+          <div className="flex-1">
+            <div className="relative w-full max-w-md">
+              {/* Search Icon */}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                style={{ color: theme.subtext }}
+              >
+                <path d="m21 21-4.34-4.34" />
+                <circle cx="11" cy="11" r="8" />
+              </svg>
 
-      <input
-        type="text"
-        placeholder="Search tickets..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        style={{
-          backgroundColor: theme.inputBg,
-          borderColor: theme.inputBorder,
-          color: theme.inputText,
-        }}
-        className="w-full px-4 py-2.5 pl-9 text-sm border rounded-lg focus:outline-none"
-        onFocus={(e) =>
-          (e.currentTarget.style.borderColor = theme.inputBorderFocus)
-        }
-        onBlur={(e) =>
-          (e.currentTarget.style.borderColor = theme.inputBorder)
-        }
-      />
-    </div>
-  </div>
+              <input
+                type="text"
+                placeholder="Search tickets..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{
+                  backgroundColor: theme.inputBg,
+                  borderColor: theme.inputBorder,
+                  color: theme.inputText,
+                }}
+                className="w-full px-4 py-2.5 pl-9 text-sm border rounded-lg focus:outline-none"
+                onFocus={(e) =>
+                  (e.currentTarget.style.borderColor = theme.inputBorderFocus)
+                }
+                onBlur={(e) =>
+                  (e.currentTarget.style.borderColor = theme.inputBorder)
+                }
+              />
+            </div>
+          </div>
 
-  {/* Filter button */}
-  <TableFilterButton
-    btnRef={ticketFilter.filterBtnRef}
-    onClick={ticketFilter.handleFilterButtonClick}
-    activeCount={ticketFilter.activeCount}
-    hasActive={ticketFilter.hasActive()}
-  />
-</div>
-        
+          {/* Filter button */}
+          <TableFilterButton
+            btnRef={ticketFilter.filterBtnRef}
+            onClick={ticketFilter.handleFilterButtonClick}
+            activeCount={ticketFilter.activeCount}
+            hasActive={ticketFilter.hasActive()}
+          />
+        </div>
       </div>
 
       {/* ── Scrollable content ── */}
@@ -1023,9 +1076,17 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
         visible={ticketFilter.filterPanelVisible}
         config={{
           fields: [
-            { key: "category", label: "Category", options: dropdownOptions.category },
-            { key: "priority", label: "Priority", options: dropdownOptions.priority },
-            { key: "status",   label: "Status",   options: dropdownOptions.status   },
+            {
+              key: "category",
+              label: "Category",
+              options: dropdownOptions.category,
+            },
+            {
+              key: "priority",
+              label: "Priority",
+              options: dropdownOptions.priority,
+            },
+            { key: "status", label: "Status", options: dropdownOptions.status },
           ],
           showDateRange: true,
           dateLabel: "Due Date",
@@ -1051,6 +1112,9 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
         visible={editModalVisible}
         selectedTicket={editingTicket}
         assigneeOptions={assigneeOptions}
+        categoryOptions={dropdownOptions.category} // ← add
+        priorityOptions={dropdownOptions.priority} // ← add
+        statusOptions={dropdownOptions.status} // ← add
         onClose={() => setEditModalVisible(false)}
         onSave={async (ticketNumber, updates) => {
           await handleSaveEditedTicket(ticketNumber, updates);
@@ -1064,9 +1128,12 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
         columns={columnConfigs}
         onSave={(updated) => {
           setColumnConfigs(updated);
-          const cat = updated.find((c) => c.id === "ticket_category")?.options ?? [];
-          const pri = updated.find((c) => c.id === "ticket_priority")?.options ?? [];
-          const sta = updated.find((c) => c.id === "ticket_status")?.options ?? [];
+          const cat =
+            updated.find((c) => c.id === "ticket_category")?.options ?? [];
+          const pri =
+            updated.find((c) => c.id === "ticket_priority")?.options ?? [];
+          const sta =
+            updated.find((c) => c.id === "ticket_status")?.options ?? [];
           setDropdownOptions({ category: cat, priority: pri, status: sta });
         }}
       />

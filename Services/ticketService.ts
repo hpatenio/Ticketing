@@ -68,19 +68,15 @@ export const getAllTickets = async (): Promise<ConcernTicket[]> => {
   })) as ConcernTicket[];
 };
 
-export const getTicketsByRequester = async (
-  requesterId: string
-): Promise<ConcernTicket[]> => {
+// ticketService.ts — getTicketsByRequester
+export const getTicketsByRequester = async (requesterId: string): Promise<ConcernTicket[]> => {
   const q = query(
     collection(db, COLLECTION),
     where("requesterId", "==", requesterId),
-    orderBy("dateCreated", "desc")
+    // removed orderBy — MyTicketsPage sorts client-side
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((docSnap) => ({
-    id: docSnap.id,
-    ...docSnap.data(),
-  })) as ConcernTicket[];
+  return snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })) as ConcernTicket[];
 };
 
 // ─── UPDATE FULL TICKET (batch modal save) ─────────────────────────────────

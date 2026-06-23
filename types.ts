@@ -60,7 +60,7 @@ export interface ConcernTicket {
   requesterName: string;
   assigneeId:    string;
   assigneeName:  string;
-  category:      "CCTV" | "Licenses Accounts" | "Hardware" | "Email" | "Network" | "Maintenance" | "Medicine" | "Office Supplies" | "Software" | "Other";
+  category: string;
   priority:      "Low" | "Medium" | "High";
   status:        "Pending" | "In Progress" | "Resolved";
   details?:      string;

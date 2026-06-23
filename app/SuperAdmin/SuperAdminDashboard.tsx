@@ -23,7 +23,7 @@ import OfficeInventoryPage from "../Admin/OnM Modules/OfficeInventoryPage";
 
 // ─── Employee page imports ────────────────────────────────────────────────────
 import SubmitTicketPage from "../Employee/SubmitTicketPage";
-import MyTicketsPage from "../Admin/IT Modules/Tickets/TicketsPage";
+import MyTicketsPage from "../Employee/MyTicketsPage";
 import SupplyRequestsPage from "../Admin/OnM Modules/SupplyRequestsPage";
 import ActivityPage from "../Admin/OnM Modules/ActivityPage";
 import MonthlyReportPage from "../Admin/OnM Modules/MonthlyReportPage";
@@ -96,8 +96,10 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
         return <OfficeInventoryPage />;
       case "supplyrequest":
         return <SupplyRequestsPage user={user} />;
-        case "monthlyreport":
+      case "monthlyreport":
         return <MonthlyReportPage />;
+      case "mytickets":
+        return <MyTicketsPage user={user} />;
 
       // ─── Employee pages ────────────────────────────────────────────────────
       case "submitticket":

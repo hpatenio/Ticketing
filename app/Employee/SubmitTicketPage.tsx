@@ -4,29 +4,17 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  TextInput,
-  ActivityIndicator,
 } from "react-native";
 import { ADUser } from "../../types";
-import { addTicket } from "../../Services/ticketService";
 import { useTheme } from "../../theme/ThemeContext";
 import { ChevronLeft } from "lucide-react-native";
-import SupplyRequestModal from "./Modal/SupplyRequestModal"; // adjust path
+import SupplyRequestModal from "./Modal/SupplyRequestModal";
+import ITConcernModal from "./Modal/ITConcernModal"; // ← new
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type TicketType = "it" | "hr" | "supply";
 type Step = 1 | 2 | 3 | 4;
-
-const IT_CATEGORIES = [
-  "Hardware Issues",
-  "Software Issues",
-  "Network & Internet",
-  "Printer & Peripherals",
-  "Email & Account",
-  "System Access",
-  "Other IT Concerns",
-] as const;
 
 const HR_CATEGORIES = [
   "Overtime Filing",
@@ -38,58 +26,29 @@ const HR_CATEGORIES = [
 const PRIORITY_OPTIONS = ["Normal", "Urgent", "Critical"] as const;
 type PriorityValue = (typeof PRIORITY_OPTIONS)[number];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function parseDueDate(value: string): Date | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const iso = trimmed.includes("-") ? trimmed : trimmed.replace(/\//g, "-");
-  const parsed = new Date(iso);
-  if (!Number.isNaN(parsed.getTime())) return parsed;
-  const legacy = new Date(trimmed.replace(/-/g, "/"));
-  if (!Number.isNaN(legacy.getTime())) return legacy;
-  return null;
-}
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-type StepBarProps = {
-  step: Step;
-  theme: any;
-  primary: string;
-};
+type StepBarProps = { step: Step; theme: any; primary: string };
 
 function StepBar({ step, theme, primary }: StepBarProps) {
   const steps = ["Choose Type", "Fill Details", "Review", "Done"];
   return (
-    <View
-      style={{ flexDirection: "row", alignItems: "center", marginBottom: 28 }}
-    >
+    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 28 }}>
       {steps.map((label, i) => {
         const num = i + 1;
         const isDone = num < step;
         const isActive = num === step;
         return (
           <React.Fragment key={num}>
-            <View
-              style={{ alignItems: "center", flexDirection: "row", gap: 6 }}
-            >
+            <View style={{ alignItems: "center", flexDirection: "row", gap: 6 }}>
               <View
                 style={{
                   width: 28,
                   height: 28,
                   borderRadius: 14,
                   borderWidth: 2,
-                  borderColor: isDone
-                    ? "#10B981"
-                    : isActive
-                      ? primary
-                      : theme.border,
-                  backgroundColor: isDone
-                    ? "#10B981"
-                    : isActive
-                      ? primary
-                      : theme.surface,
+                  borderColor: isDone ? "#10B981" : isActive ? primary : theme.border,
+                  backgroundColor: isDone ? "#10B981" : isActive ? primary : theme.surface,
                   alignItems: "center",
                   justifyContent: "center",
                 }}
@@ -108,11 +67,7 @@ function StepBar({ step, theme, primary }: StepBarProps) {
                 style={{
                   fontFamily: "Outfit-SemiBold",
                   fontSize: 11,
-                  color: isDone
-                    ? "#10B981"
-                    : isActive
-                      ? primary
-                      : theme.subtext,
+                  color: isDone ? "#10B981" : isActive ? primary : theme.subtext,
                   flexShrink: 1,
                 }}
                 numberOfLines={1}
@@ -150,15 +105,7 @@ type TypeCardProps = {
 };
 
 function TypeCard({
-  icon,
-  title,
-  desc,
-  badge,
-  selected,
-  onPress,
-  accentColor,
-  accentBg,
-  theme,
+  icon, title, desc, badge, selected, onPress, accentColor, accentBg, theme,
 }: TypeCardProps) {
   return (
     <TouchableOpacity
@@ -210,13 +157,7 @@ function TypeCard({
             paddingVertical: 2,
           }}
         >
-          <Text
-            style={{
-              fontFamily: "Outfit-SemiBold",
-              fontSize: 10,
-              color: "#C2410C",
-            }}
-          >
+          <Text style={{ fontFamily: "Outfit-SemiBold", fontSize: 10, color: "#C2410C" }}>
             {badge}
           </Text>
         </View>
@@ -234,14 +175,7 @@ type SubOptProps = {
   fullWidth?: boolean;
 };
 
-function SubOpt({
-  label,
-  selected,
-  onPress,
-  theme,
-  primary,
-  fullWidth,
-}: SubOptProps) {
+function SubOpt({ label, selected, onPress, theme, primary, fullWidth }: SubOptProps) {
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -254,9 +188,7 @@ function SubOpt({
         borderWidth: 1.5,
         borderColor: selected ? primary : theme.border,
         borderRadius: 8,
-        backgroundColor: selected
-          ? (theme.bgActive ?? "#EEF2FF")
-          : "transparent",
+        backgroundColor: selected ? (theme.bgActive ?? "#EEF2FF") : "transparent",
         width: fullWidth ? "100%" : undefined,
         flex: fullWidth ? undefined : 1,
       }}
@@ -271,26 +203,14 @@ function SubOpt({
           backgroundColor: selected ? primary : "transparent",
         }}
       />
-      <Text
-        style={{
-          fontFamily: "Outfit",
-          fontSize: 13,
-          color: theme.textActive,
-          flexShrink: 1,
-        }}
-      >
+      <Text style={{ fontFamily: "Outfit", fontSize: 13, color: theme.textActive, flexShrink: 1 }}>
         {label}
       </Text>
     </TouchableOpacity>
   );
 }
 
-type FieldProps = {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-  theme: any;
-};
+type FieldProps = { label: string; required?: boolean; children: React.ReactNode; theme: any };
 
 function Field({ label, required, children, theme }: FieldProps) {
   return (
@@ -313,10 +233,7 @@ function Field({ label, required, children, theme }: FieldProps) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-type Props = {
-  user: ADUser;
-  onNavigate?: (key: string) => void;
-};
+type Props = { user: ADUser; onNavigate?: (key: string) => void };
 
 export default function SubmitTicketPage({ user, onNavigate }: Props) {
   const { theme } = useTheme();
@@ -325,14 +242,11 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
   const [step, setStep] = useState<Step>(1);
   const [ticketType, setTicketType] = useState<TicketType | null>(null);
   const [submittedId, setSubmittedId] = useState<string>("");
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // IT fields
-  const [itCategory, setItCategory] = useState<string>("");
-  const [itTitle, setItTitle] = useState("");
-  const [itDesc, setItDesc] = useState("");
-  const [itDevice, setItDevice] = useState("");
+  // Modal visibility
+  const [itModalVisible, setItModalVisible] = useState(false);
+  const [supplyModalVisible, setSupplyModalVisible] = useState(false);
 
   // HR fields
   const [hrCategory, setHrCategory] = useState<string>("Overtime Filing");
@@ -342,8 +256,6 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
   const [hrEndTime, setHrEndTime] = useState("");
   const [hrReason, setHrReason] = useState("");
   const [hrNotes, setHrNotes] = useState("");
-  const [supplyModalVisible, setSupplyModalVisible] = useState(false);
-  // Priority (review step)
   const [priority, setPriority] = useState<PriorityValue>("Normal");
 
   const inputStyle = {
@@ -356,10 +268,10 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
     fontFamily: "Outfit",
     fontSize: 13,
     color: theme.textActive,
-    marginTop: 0,
   };
 
-  // ─── Step 1: Choose Type ────────────────────────────────────────────────────
+  // ─── Step 1: Choose Type ──────────────────────────────────────────────────
+
   const renderStep1 = () => (
     <View>
       <View style={{ marginBottom: 20 }}>
@@ -377,23 +289,15 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
           New Ticket
         </Text>
         <Text
-          style={{
-            fontFamily: "Outfit-SemiBold",
-            fontSize: 20,
-            color: theme.textActive,
-            marginBottom: 4,
-          }}
+          style={{ fontFamily: "Outfit-SemiBold", fontSize: 20, color: theme.textActive, marginBottom: 4 }}
         >
           What do you need help with?
         </Text>
-        <Text
-          style={{ fontFamily: "Outfit", fontSize: 13, color: theme.subtext }}
-        >
+        <Text style={{ fontFamily: "Outfit", fontSize: 13, color: theme.subtext }}>
           Select the category for your request.
         </Text>
       </View>
 
-      {/* Type cards */}
       <View style={{ flexDirection: "row", gap: 12, marginBottom: 24 }}>
         <TypeCard
           icon="💻"
@@ -430,7 +334,14 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
 
       <TouchableOpacity
         onPress={() => {
-          if (ticketType) setStep(2);
+          if (!ticketType) return;
+          if (ticketType === "it") {
+            setItModalVisible(true);
+          } else if (ticketType === "supply") {
+            setSupplyModalVisible(true);
+          } else {
+            setStep(2);
+          }
         }}
         activeOpacity={ticketType ? 0.8 : 1}
         style={{
@@ -442,144 +353,15 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
           opacity: ticketType ? 1 : 0.4,
         }}
       >
-        <Text
-          style={{ fontFamily: "Outfit-SemiBold", fontSize: 13, color: "#fff" }}
-        >
+        <Text style={{ fontFamily: "Outfit-SemiBold", fontSize: 13, color: "#fff" }}>
           Continue →
         </Text>
       </TouchableOpacity>
     </View>
   );
 
-  // ─── Step 2a: IT Form ───────────────────────────────────────────────────────
-  const renderStep2IT = () => (
-    <View>
-      <BackButton onPress={() => setStep(1)} theme={theme} />
-      <View
-        style={{
-          backgroundColor: theme.surface,
-          borderWidth: 1.5,
-          borderColor: theme.border,
-          borderRadius: 12,
-          padding: 24,
-        }}
-      >
-        <Text
-          style={{
-            fontFamily: "Outfit-SemiBold",
-            fontSize: 17,
-            color: theme.textActive,
-            marginBottom: 4,
-          }}
-        >
-          💻 IT Concern
-        </Text>
-        <Text
-          style={{
-            fontFamily: "Outfit",
-            fontSize: 13,
-            color: theme.subtext,
-            marginBottom: 20,
-          }}
-        >
-          Select a category and describe your issue.
-        </Text>
+  // ─── Step 2: HR Form ──────────────────────────────────────────────────────
 
-        <Field label="IT Category" required theme={theme}>
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              gap: 8,
-              marginTop: 2,
-            }}
-          >
-            {IT_CATEGORIES.map((cat, idx) => (
-              <SubOpt
-                key={cat}
-                label={cat}
-                selected={itCategory === cat}
-                onPress={() => setItCategory(cat)}
-                theme={theme}
-                primary={primary}
-                fullWidth={idx === IT_CATEGORIES.length - 1}
-              />
-            ))}
-          </View>
-        </Field>
-
-        <Field label="Issue Title" required theme={theme}>
-          <TextInput
-            style={inputStyle}
-            placeholder="e.g. Cannot connect to Wi-Fi"
-            placeholderTextColor={theme.subtext}
-            value={itTitle}
-            onChangeText={setItTitle}
-          />
-        </Field>
-
-        <Field label="Description" required theme={theme}>
-          <TextInput
-            style={[inputStyle, { height: 100, textAlignVertical: "top" }]}
-            placeholder="Describe the problem in detail — what happened, when it started, what you've already tried…"
-            placeholderTextColor={theme.subtext}
-            multiline
-            value={itDesc}
-            onChangeText={setItDesc}
-          />
-        </Field>
-
-        <Field label="Affected Device / Asset (optional)" theme={theme}>
-          <TextInput
-            style={inputStyle}
-            placeholder="e.g. Dell Laptop — Asset Tag #0034"
-            placeholderTextColor={theme.subtext}
-            value={itDevice}
-            onChangeText={setItDevice}
-          />
-        </Field>
-
-        {error ? (
-          <Text
-            style={{
-              fontFamily: "Outfit",
-              color: "#EF4444",
-              fontSize: 13,
-              marginBottom: 8,
-            }}
-          >
-            {error}
-          </Text>
-        ) : null}
-
-        <View style={{ flexDirection: "row", gap: 10, marginTop: 6 }}>
-          <SecondaryBtn label="Back" onPress={() => setStep(1)} theme={theme} />
-          <PrimaryBtn
-            label="Review →"
-            onPress={() => {
-              setError("");
-              if (!itCategory) {
-                setError("Please select an IT category.");
-                return;
-              }
-              if (!itTitle.trim()) {
-                setError("Please enter an issue title.");
-                return;
-              }
-              if (!itDesc.trim()) {
-                setError("Please describe the issue.");
-                return;
-              }
-              setStep(3);
-            }}
-            primary={primary}
-          />
-        </View>
-      </View>
-    </View>
-  );
-
-  // ─── Step 2b: HR Form ───────────────────────────────────────────────────────
   const renderStep2HR = () => (
     <View>
       <BackButton onPress={() => setStep(1)} theme={theme} />
@@ -593,22 +375,12 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
         }}
       >
         <Text
-          style={{
-            fontFamily: "Outfit-SemiBold",
-            fontSize: 17,
-            color: theme.textActive,
-            marginBottom: 4,
-          }}
+          style={{ fontFamily: "Outfit-SemiBold", fontSize: 17, color: theme.textActive, marginBottom: 4 }}
         >
           📋 HR Concern
         </Text>
         <Text
-          style={{
-            fontFamily: "Outfit",
-            fontSize: 13,
-            color: theme.subtext,
-            marginBottom: 16,
-          }}
+          style={{ fontFamily: "Outfit", fontSize: 13, color: theme.subtext, marginBottom: 16 }}
         >
           Submit an HR-related request for review.
         </Text>
@@ -628,20 +400,13 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
         >
           <Text style={{ fontSize: 13, color: "#92400E" }}>
             ⚠️ This feature is in{" "}
-            <Text style={{ fontFamily: "Outfit-SemiBold" }}>draft</Text>. Some
-            options may change in future updates.
+            <Text style={{ fontFamily: "Outfit-SemiBold" }}>draft</Text>. Some options may
+            change in future updates.
           </Text>
         </View>
 
         <Field label="HR Category" required theme={theme}>
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              gap: 8,
-              marginTop: 2,
-            }}
-          >
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 2 }}>
             {HR_CATEGORIES.map((cat) => (
               <SubOpt
                 key={cat}
@@ -730,10 +495,7 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
                 style={{
                   paddingHorizontal: 13,
                   paddingVertical: 10,
-                  backgroundColor:
-                    hrReason === opt
-                      ? (theme.bgActive ?? "#EEF2FF")
-                      : "transparent",
+                  backgroundColor: hrReason === opt ? (theme.bgActive ?? "#EEF2FF") : "transparent",
                   borderBottomWidth: 0.5,
                   borderBottomColor: theme.border,
                 }}
@@ -764,14 +526,7 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
         </Field>
 
         {error ? (
-          <Text
-            style={{
-              fontFamily: "Outfit",
-              color: "#EF4444",
-              fontSize: 13,
-              marginBottom: 8,
-            }}
-          >
+          <Text style={{ fontFamily: "Outfit", color: "#EF4444", fontSize: 13, marginBottom: 8 }}>
             {error}
           </Text>
         ) : null}
@@ -782,14 +537,8 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
             label="Review →"
             onPress={() => {
               setError("");
-              if (!hrDate.trim()) {
-                setError("Please enter the overtime date.");
-                return;
-              }
-              if (!hrReason) {
-                setError("Please select a reason.");
-                return;
-              }
+              if (!hrDate.trim()) { setError("Please enter the overtime date."); return; }
+              if (!hrReason) { setError("Please select a reason."); return; }
               setStep(3);
             }}
             primary={primary}
@@ -799,42 +548,7 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
     </View>
   );
 
-  // ─── Step 2c: Supply (simple note, as supply data comes from inventory) ─────
-  const renderStep2Supply = () => (
-  <View>
-    <BackButton onPress={() => setStep(1)} theme={theme} />
-    <SupplyRequestModal
-      visible={supplyModalVisible}
-      onClose={() => { setSupplyModalVisible(false); setStep(1); }}
-      user={user}
-      onSuccess={(ticketNumber) => {
-        setSubmittedId(ticketNumber);
-        setStep(4);
-        setSupplyModalVisible(false);
-      }}
-    />
-    {/* Auto-open the modal when this step is reached */}
-    {!supplyModalVisible && (() => { setSupplyModalVisible(true); return null; })()}
-  </View>
-);
-
-  // ─── Step 3: Review ─────────────────────────────────────────────────────────
-  const typeNames: Record<TicketType, string> = {
-    it: "IT Concern",
-    hr: "HR Concern",
-    supply: "Office Supply Request",
-  };
-
-  const getCategoryLabel = () => {
-    if (ticketType === "it") return itCategory || "—";
-    if (ticketType === "hr") return hrCategory || "—";
-    return "Supply Request";
-  };
-
-  const getTitleLabel = () => {
-    if (ticketType === "hr") return hrCategory || "—";
-    return itTitle || "—";
-  };
+  // ─── Step 3: Review (HR only) ─────────────────────────────────────────────
 
   const renderStep3 = () => (
     <View>
@@ -849,43 +563,22 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
         }}
       >
         <Text
-          style={{
-            fontFamily: "Outfit-SemiBold",
-            fontSize: 17,
-            color: theme.textActive,
-            marginBottom: 4,
-          }}
+          style={{ fontFamily: "Outfit-SemiBold", fontSize: 17, color: theme.textActive, marginBottom: 4 }}
         >
           Review Your Ticket
         </Text>
-        <Text
-          style={{
-            fontFamily: "Outfit",
-            fontSize: 13,
-            color: theme.subtext,
-            marginBottom: 20,
-          }}
-        >
+        <Text style={{ fontFamily: "Outfit", fontSize: 13, color: theme.subtext, marginBottom: 20 }}>
           Double-check before submitting.
         </Text>
 
-        {/* Review rows */}
         {[
-          {
-            label: "Request Type",
-            value: ticketType ? typeNames[ticketType] : "—",
-          },
-          { label: "Category", value: getCategoryLabel() },
-          { label: "Title / Summary", value: getTitleLabel() },
+          { label: "Request Type", value: "HR Concern" },
+          { label: "Category", value: hrCategory },
+          { label: "Date", value: hrDate },
+          { label: "Duration", value: hrDuration ? `${hrDuration}h` : "—" },
+          { label: "Time", value: hrStartTime && hrEndTime ? `${hrStartTime} – ${hrEndTime}` : "—" },
+          { label: "Reason", value: hrReason || "—" },
           { label: "Submitted by", value: user.displayName },
-          {
-            label: "Date",
-            value: new Date().toLocaleDateString("en-US", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            }),
-          },
         ].map((row, i, arr) => (
           <View
             key={row.label}
@@ -897,13 +590,7 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
               borderBottomColor: theme.border,
             }}
           >
-            <Text
-              style={{
-                fontFamily: "Outfit",
-                fontSize: 13,
-                color: theme.subtext,
-              }}
-            >
+            <Text style={{ fontFamily: "Outfit", fontSize: 13, color: theme.subtext }}>
               {row.label}
             </Text>
             <Text
@@ -921,7 +608,6 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
           </View>
         ))}
 
-        {/* Priority */}
         <View style={{ marginTop: 20 }}>
           <Field label="Priority" theme={theme}>
             <View style={{ flexDirection: "row", gap: 8 }}>
@@ -935,8 +621,7 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
                     borderRadius: 8,
                     paddingVertical: 10,
                     alignItems: "center",
-                    backgroundColor:
-                      priority === opt ? primary : theme.background,
+                    backgroundColor: priority === opt ? primary : theme.background,
                     borderWidth: 1.5,
                     borderColor: priority === opt ? primary : theme.border,
                   }}
@@ -953,48 +638,25 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
                 </TouchableOpacity>
               ))}
             </View>
-            <Text
-              style={{
-                fontFamily: "Outfit",
-                fontSize: 11,
-                color: theme.subtext,
-                marginTop: 5,
-              }}
-            >
-              Use Urgent or Critical only if this significantly affects your
-              work.
-            </Text>
           </Field>
         </View>
 
         {error ? (
-          <Text
-            style={{
-              fontFamily: "Outfit",
-              color: "#EF4444",
-              fontSize: 13,
-              marginBottom: 8,
-            }}
-          >
+          <Text style={{ fontFamily: "Outfit", color: "#EF4444", fontSize: 13, marginBottom: 8 }}>
             {error}
           </Text>
         ) : null}
 
         <View style={{ flexDirection: "row", gap: 10, marginTop: 6 }}>
           <SecondaryBtn label="Back" onPress={() => setStep(2)} theme={theme} />
-          <PrimaryBtn
-            label={saving ? "Submitting…" : "Submit Ticket ✓"}
-            onPress={handleSubmit}
-            primary={primary}
-            disabled={saving}
-            loading={saving}
-          />
+          <PrimaryBtn label="Submit Ticket ✓" onPress={() => {}} primary={primary} />
         </View>
       </View>
     </View>
   );
 
-  // ─── Step 4: Done ───────────────────────────────────────────────────────────
+  // ─── Step 4: Done ─────────────────────────────────────────────────────────
+
   const renderStep4 = () => (
     <View
       style={{
@@ -1008,12 +670,7 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
     >
       <Text style={{ fontSize: 52, marginBottom: 16 }}>🎉</Text>
       <Text
-        style={{
-          fontFamily: "Outfit-SemiBold",
-          fontSize: 20,
-          color: theme.textActive,
-          marginBottom: 8,
-        }}
+        style={{ fontFamily: "Outfit-SemiBold", fontSize: 20, color: theme.textActive, marginBottom: 8 }}
       >
         Ticket Submitted!
       </Text>
@@ -1031,7 +688,6 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
         You'll receive a notification once it's assigned.
       </Text>
 
-      {/* Ticket ID chip */}
       <View
         style={{
           backgroundColor: theme.bgActive ?? "#EEF2FF",
@@ -1055,19 +711,8 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
         </Text>
       </View>
 
-      <View
-        style={{
-          flexDirection: "row",
-          gap: 10,
-          flexWrap: "wrap",
-          justifyContent: "center",
-        }}
-      >
-        <SecondaryBtn
-          label="Submit Another"
-          onPress={resetForm}
-          theme={theme}
-        />
+      <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
+        <SecondaryBtn label="Submit Another" onPress={resetForm} theme={theme} />
         {onNavigate && (
           <PrimaryBtn
             label="View My Tickets"
@@ -1079,95 +724,9 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
     </View>
   );
 
-  // ─── Submit handler ──────────────────────────────────────────────────────────
-  const handleSubmit = async () => {
-    setError("");
-    setSaving(true);
-    try {
-      const ticketNumber = `CT-${Date.now()}`;
-
-      let summary = "";
-      let details = "";
-      let category:
-        | "CCTV"
-        | "Licenses Accounts"
-        | "Hardware"
-        | "Email"
-        | "Network"
-        | "Maintenance"
-        | "Medicine"
-        | "Office Supplies"
-        | "Software"
-        | "Other" = "Other";
-      const ticketPriority: "Low" | "Medium" | "High" =
-        priority === "Normal"
-          ? "Low"
-          : priority === "Urgent"
-            ? "Medium"
-            : "High";
-
-      if (ticketType === "it") {
-        summary = itTitle.trim();
-        details = itDesc.trim();
-        category =
-          itCategory === "Hardware Issues"
-            ? "Hardware"
-            : itCategory === "Software Issues"
-              ? "Software"
-              : itCategory === "Network & Internet"
-                ? "Network"
-                : itCategory === "Printer & Peripherals"
-                  ? "Hardware"
-                  : itCategory === "Email & Account"
-                    ? "Email"
-                    : itCategory === "System Access"
-                      ? "Licenses Accounts"
-                      : "Other";
-      } else if (ticketType === "hr") {
-        summary = `${hrCategory} – ${hrDate}`;
-        details = `Duration: ${hrDuration}h | Time: ${hrStartTime}–${hrEndTime} | Reason: ${hrReason}${hrNotes ? " | Notes: " + hrNotes : ""}`;
-        category = "Other";
-      } else if (ticketType === "supply") {
-        summary = itTitle.trim();
-        details = itDesc.trim();
-        category = "Office Supplies";
-      }
-
-      await addTicket({
-        ticketNumber,
-        summary,
-        details,
-        requesterId: user.username,
-        requesterName: user.displayName ?? user.username,
-        assigneeId: "",
-        assigneeName: "",
-        category,
-        priority: ticketPriority,
-        status: "Pending",
-        dueDate: new Date(),
-      });
-
-      setSubmittedId(`#${ticketNumber}`);
-      setStep(4);
-    } catch (err: any) {
-      console.error("Ticket submit error:", err);
-      setError(
-        err?.message
-          ? `Unable to submit ticket: ${err.message}`
-          : "Unable to submit ticket. Please try again.",
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const resetForm = () => {
     setStep(1);
     setTicketType(null);
-    setItCategory("");
-    setItTitle("");
-    setItDesc("");
-    setItDevice("");
     setHrCategory("Overtime Filing");
     setHrDate("");
     setHrDuration("");
@@ -1180,14 +739,9 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
     setSubmittedId("");
   };
 
-  // ─── Render ──────────────────────────────────────────────────────────────────
   const renderCurrentStep = () => {
     if (step === 1) return renderStep1();
-    if (step === 2) {
-      if (ticketType === "it") return renderStep2IT();
-      if (ticketType === "hr") return renderStep2HR();
-      if (ticketType === "supply") return renderStep2Supply();
-    }
+    if (step === 2 && ticketType === "hr") return renderStep2HR();
     if (step === 3) return renderStep3();
     if (step === 4) return renderStep4();
     return null;
@@ -1203,6 +757,36 @@ export default function SubmitTicketPage({ user, onNavigate }: Props) {
         <StepBar step={step} theme={theme} primary={primary} />
         {renderCurrentStep()}
       </View>
+
+      {/* IT Concern Modal — same pattern as SupplyRequestModal */}
+      <ITConcernModal
+        visible={itModalVisible}
+        onClose={() => {
+          setItModalVisible(false);
+          setTicketType(null);
+        }}
+        user={user}
+        onSuccess={(ticketNum) => {
+          setSubmittedId(ticketNum);
+          setStep(4);
+          setItModalVisible(false);
+        }}
+      />
+
+      {/* Supply Request Modal */}
+      <SupplyRequestModal
+        visible={supplyModalVisible}
+        onClose={() => {
+          setSupplyModalVisible(false);
+          setTicketType(null);
+        }}
+        user={user}
+        onSuccess={(ticketNum) => {
+          setSubmittedId(ticketNum);
+          setStep(4);
+          setSupplyModalVisible(false);
+        }}
+      />
     </ScrollView>
   );
 }
@@ -1214,21 +798,10 @@ function BackButton({ onPress, theme }: { onPress: () => void; theme: any }) {
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-        marginBottom: 20,
-      }}
+      style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 20 }}
     >
       <ChevronLeft size={16} color={theme.subtext} />
-      <Text
-        style={{
-          fontFamily: "Outfit-SemiBold",
-          fontSize: 13,
-          color: theme.subtext,
-        }}
-      >
+      <Text style={{ fontFamily: "Outfit-SemiBold", fontSize: 13, color: theme.subtext }}>
         Back
       </Text>
     </TouchableOpacity>
@@ -1264,10 +837,7 @@ function PrimaryBtn({
         opacity: disabled ? 0.6 : 1,
       }}
     >
-      {loading && <ActivityIndicator size="small" color="#fff" />}
-      <Text
-        style={{ fontFamily: "Outfit-SemiBold", fontSize: 13, color: "#fff" }}
-      >
+      <Text style={{ fontFamily: "Outfit-SemiBold", fontSize: 13, color: "#fff" }}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -1296,15 +866,12 @@ function SecondaryBtn({
         borderColor: theme.border,
       }}
     >
-      <Text
-        style={{
-          fontFamily: "Outfit-SemiBold",
-          fontSize: 13,
-          color: theme.subtext,
-        }}
-      >
+      <Text style={{ fontFamily: "Outfit-SemiBold", fontSize: 13, color: theme.subtext }}>
         {label}
       </Text>
     </TouchableOpacity>
   );
 }
+
+// ─── TextInput import (needed for HR form) ────────────────────────────────────
+import { TextInput } from "react-native";
