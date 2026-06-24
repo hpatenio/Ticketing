@@ -124,8 +124,30 @@ const toSupplyRequest = (id: string, data: any): SupplyRequest => ({
   resolvedAt: data.resolvedAt instanceof Timestamp
     ? data.resolvedAt.toDate().toISOString()
     : (data.resolvedAt ?? null),
+  approvedAt: data.approvedAt ?? undefined,
+  approvedByName: data.approvedByName ?? undefined,
+  deliveredAt: data.deliveredAt ?? undefined,
+  deliveredByName: data.deliveredByName ?? undefined,
+  failedReason: data.failedReason ?? undefined,
+  failedAt: data.failedAt ?? undefined,
 });
 
+export async function markDelivered(id: string, byName: string) {
+  await updateDoc(doc(db, REQUESTS_COL, id), {   // ← REQUESTS_COL not "supplyRequests"
+    status: "resolved",
+    deliveredAt: new Date().toISOString(),
+    deliveredByName: byName,
+  });
+}
+
+export async function markFailedDelivery(id: string, reason: string, byName: string) {
+  await updateDoc(doc(db, REQUESTS_COL, id), {   // ← REQUESTS_COL not "supplyRequests"
+    status: "failed_delivery",
+    failedReason: reason,
+    deliveredByName: byName,
+    failedAt: new Date().toISOString(),
+  });
+}
 // ─── Reads ────────────────────────────────────────────────────────────────────
 
 export async function getAllInventoryItems(): Promise<OfficeInventoryItem[]> {
@@ -556,13 +578,14 @@ export async function approveSupplyRequest(requestId: string): Promise<void> {
     await syncSupplyRequestsForItem(line.itemId, newStockStatus);
   }
 
-  await updateDoc(reqRef, {
-    status: "resolved" as SupplyRequestStatus,
-    reviewedBy: user.id,
-    reviewedByName: user.name,
-    reviewedAt: serverTimestamp(),
-    resolvedAt: serverTimestamp(),
-  });
+ await updateDoc(reqRef, {
+  status: "out_for_delivery" as SupplyRequestStatus,
+  approvedByName: user.name,
+  approvedAt: new Date().toISOString(),
+  reviewedBy: user.id,
+  reviewedByName: user.name,
+  reviewedAt: serverTimestamp(),
+});
 
   await logAudit({
     table: "supply_requests",
@@ -643,12 +666,13 @@ export async function approveSupplyRequestPartial(
     await syncSupplyRequestsForItem(line.itemId, newStockStatus);
   }
 
-  await updateDoc(reqRef, {
-    status: "resolved" as SupplyRequestStatus,
+ await updateDoc(reqRef, {
+    status: "out_for_delivery" as SupplyRequestStatus,
+    approvedByName: user.name,
+    approvedAt: new Date().toISOString(),
     reviewedBy: user.id,
     reviewedByName: user.name,
     reviewedAt: serverTimestamp(),
-    resolvedAt: serverTimestamp(),
   });
 
   await logAudit({

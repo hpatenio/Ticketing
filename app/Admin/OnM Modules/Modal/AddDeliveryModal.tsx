@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTheme } from "../../../../theme/ThemeContext";
 import { addDelivery } from "../../../../Services/officeInventory";
-import { OfficeInventoryItem, } from "../../../../types";
+import { OfficeInventoryItem } from "../../../../types";
 
 
 
@@ -20,7 +20,6 @@ type DeliveryRow = {
   id: string;
   itemId: string;
   quantity: string;
-  price: string;
 };
 
 const todayStr = () => new Date().toISOString().split("T")[0];
@@ -30,7 +29,6 @@ const emptyRow = (): DeliveryRow => ({
   id: uid(),
   itemId: "",
   quantity: "",
-  price: "",
 });
 
 // ─── Searchable item picker ───────────────────────────────────────────────────
@@ -94,7 +92,6 @@ function ItemPicker({ items, value, onChange, inputStyle, theme }: ItemPickerPro
 
   return (
     <div ref={wrapRef} style={{ position: "relative", width: "100%" }}>
-      {/* Trigger — acts as both display and search input */}
       <div
         style={{
           width: "100%",
@@ -217,7 +214,6 @@ const AddDeliveryModal: React.FC<Props> = ({
   // ── Single-mode state ────────────────────────────────────────────────────
   const [quantity, setQuantity] = useState("");
   const [date, setDate] = useState(todayStr());
-  const [price, setPrice] = useState("");
   const [notes, setNotes] = useState("");
 
   // ── Bulk-mode state ──────────────────────────────────────────────────────
@@ -232,7 +228,6 @@ const AddDeliveryModal: React.FC<Props> = ({
     if (visible) {
       setQuantity("");
       setDate(todayStr());
-      setPrice(item ? String(item.pricePerUnit) : "");
       setNotes("");
       setBulkDate(todayStr());
       setBulkNotes("");
@@ -250,6 +245,12 @@ const AddDeliveryModal: React.FC<Props> = ({
     color: theme.inputText,
   };
 
+  // ── Computed total (single mode) ─────────────────────────────────────────
+  const singleTotal =
+    item && Number(quantity) > 0
+      ? (item.pricePerUnit * Number(quantity)).toFixed(2)
+      : null;
+
   // ── Bulk row helpers ─────────────────────────────────────────────────────
   const updateRow = (id: string, field: keyof DeliveryRow, val: string) =>
     setRows((prev) =>
@@ -261,15 +262,18 @@ const AddDeliveryModal: React.FC<Props> = ({
     setRows((prev) => (prev.length > 1 ? prev.filter((r) => r.id !== id) : prev));
 
   const handleRowItemChange = (rowId: string, itemId: string) => {
-    const selected = items.find((i) => i.id === itemId);
     setRows((prev) =>
-      prev.map((r) =>
-        r.id === rowId
-          ? { ...r, itemId, price: selected ? String(selected.pricePerUnit) : "" }
-          : r
-      )
+      prev.map((r) => (r.id === rowId ? { ...r, itemId } : r))
     );
   };
+
+  // ── Bulk computed total ───────────────────────────────────────────────────
+  const bulkTotal = rows.reduce((sum, r) => {
+    const selectedItem = items.find((i) => i.id === r.itemId);
+    const qty = Number(r.quantity);
+    if (selectedItem && qty > 0) return sum + selectedItem.pricePerUnit * qty;
+    return sum;
+  }, 0);
 
   // ── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
@@ -279,12 +283,10 @@ const AddDeliveryModal: React.FC<Props> = ({
       if (!item) return setError("Select an item.");
       const qty = Number(quantity);
       if (!qty || qty <= 0) return setError("Enter a quantity greater than 0.");
-      const unitPrice = Number(price);
-      if (!unitPrice || unitPrice <= 0) return setError("Enter a valid price per unit.");
 
       setSubmitting(true);
       try {
-        await addDelivery(item.id, qty, date, unitPrice, notes.trim());
+        await addDelivery(item.id, qty, date, item.pricePerUnit, notes.trim());
         onSuccess();
         onClose();
       } catch (err: any) {
@@ -299,16 +301,21 @@ const AddDeliveryModal: React.FC<Props> = ({
         if (!r.itemId) return setError(`Row ${i + 1}: select an item.`);
         if (!Number(r.quantity) || Number(r.quantity) <= 0)
           return setError(`Row ${i + 1}: enter a quantity greater than 0.`);
-        if (!Number(r.price) || Number(r.price) <= 0)
-          return setError(`Row ${i + 1}: enter a valid price per unit.`);
       }
 
       setSubmitting(true);
       try {
         await Promise.all(
-          rows.map((r) =>
-            addDelivery(r.itemId, Number(r.quantity), bulkDate, Number(r.price), bulkNotes.trim())
-          )
+          rows.map((r) => {
+            const selectedItem = items.find((i) => i.id === r.itemId)!;
+            return addDelivery(
+              r.itemId,
+              Number(r.quantity),
+              bulkDate,
+              selectedItem.pricePerUnit,
+              bulkNotes.trim(),
+            );
+          })
         );
         onSuccess();
         onClose();
@@ -330,7 +337,7 @@ const AddDeliveryModal: React.FC<Props> = ({
         style={{
           backgroundColor: theme.surface,
           borderColor: theme.border,
-          width: mode === "bulk" ? 580 : 420,
+          width: mode === "bulk" ? 520 : 420,
           maxWidth: "95vw",
           maxHeight: "90vh",
           display: "flex",
@@ -405,7 +412,6 @@ const AddDeliveryModal: React.FC<Props> = ({
                   onChange={(id) => {
                     const selected = items.find((i) => i.id === id) ?? null;
                     onSelectItem(selected);
-                    if (selected) setPrice(String(selected.pricePerUnit));
                   }}
                   inputStyle={inputStyle}
                   theme={theme}
@@ -433,18 +439,27 @@ const AddDeliveryModal: React.FC<Props> = ({
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1">
-                <label style={{ color: theme.subtext }} className="text-xs font-medium">Price per unit (₱)</label>
-                <input
-                  type="number" step="0.01" value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  placeholder="0.00" style={inputStyle}
-                  className="px-2.5 py-2 text-sm border rounded-md focus:outline-none"
-                />
-                <span style={{ color: theme.subtext }} className="text-[11px]">
-                  May differ from the item's current price — delivery total is auto-computed
-                </span>
-              </div>
+              {/* Auto-computed price summary */}
+              {item && (
+                <div
+                  style={{
+                    backgroundColor: theme.inputBg,
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: 8,
+                    padding: "10px 12px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span style={{ color: theme.subtext, fontSize: 12 }}>
+                    ₱{item.pricePerUnit.toFixed(2)} × {Number(quantity) || 0}
+                  </span>
+                  <span style={{ color: theme.text, fontSize: 13, fontWeight: 600 }}>
+                    Total: ₱{singleTotal ?? "0.00"}
+                  </span>
+                </div>
+              )}
 
               <div className="flex flex-col gap-1">
                 <label style={{ color: theme.subtext }} className="text-xs font-medium">Notes</label>
@@ -488,65 +503,92 @@ const AddDeliveryModal: React.FC<Props> = ({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1fr 90px 100px 32px",
+                  gridTemplateColumns: "1fr 90px 110px 32px",
                   gap: 8,
                   paddingBottom: 4,
                   borderBottom: `1px solid ${theme.border}`,
                 }}
               >
-                {["Item", "Qty", "Price / unit (₱)", ""].map((h) => (
+                {["Item", "Qty", "Subtotal", ""].map((h) => (
                   <span key={h} style={{ color: theme.subtext, fontSize: 11, fontWeight: 500 }}>{h}</span>
                 ))}
               </div>
 
               {/* Rows */}
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {rows.map((row, idx) => (
-                  <div
-                    key={row.id}
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 90px 100px 32px",
-                      gap: 8,
-                      alignItems: "center",
-                    }}
-                  >
-                    <ItemPicker
-                      items={items}
-                      value={row.itemId}
-                      onChange={(id) => handleRowItemChange(row.id, id)}
-                      inputStyle={inputStyle}
-                      theme={theme}
-                    />
-                    <input
-                      type="number" min="1" value={row.quantity}
-                      onChange={(e) => updateRow(row.id, "quantity", e.target.value)}
-                      placeholder="0"
-                      style={{ ...inputStyle, padding: "7px 8px", fontSize: 13, border: `1px solid ${inputStyle.borderColor}`, borderRadius: 6, outline: "none", width: "100%", boxSizing: "border-box" }}
-                    />
-                    <input
-                      type="number" step="0.01" value={row.price}
-                      onChange={(e) => updateRow(row.id, "price", e.target.value)}
-                      placeholder="0.00"
-                      style={{ ...inputStyle, padding: "7px 8px", fontSize: 13, border: `1px solid ${inputStyle.borderColor}`, borderRadius: 6, outline: "none", width: "100%", boxSizing: "border-box" }}
-                    />
-                    <button
-                      onClick={() => removeRow(row.id)}
-                      title="Remove row"
+                {rows.map((row) => {
+                  const selectedItem = items.find((i) => i.id === row.itemId);
+                  const qty = Number(row.quantity);
+                  const subtotal =
+                    selectedItem && qty > 0
+                      ? `₱${(selectedItem.pricePerUnit * qty).toFixed(2)}`
+                      : "—";
+
+                  return (
+                    <div
+                      key={row.id}
                       style={{
-                        width: 28, height: 28, borderRadius: 6,
-                        border: `1px solid ${theme.border}`,
-                        backgroundColor: "transparent",
-                        color: rows.length === 1 ? theme.subtext : "#f87171",
-                        cursor: rows.length === 1 ? "not-allowed" : "pointer",
-                        fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center",
+                        display: "grid",
+                        gridTemplateColumns: "1fr 90px 110px 32px",
+                        gap: 8,
+                        alignItems: "center",
                       }}
-                      disabled={rows.length === 1}
                     >
-                      ✕
-                    </button>
-                  </div>
-                ))}
+                      <ItemPicker
+                        items={items}
+                        value={row.itemId}
+                        onChange={(id) => handleRowItemChange(row.id, id)}
+                        inputStyle={inputStyle}
+                        theme={theme}
+                      />
+                      <input
+                        type="number" min="1" value={row.quantity}
+                        onChange={(e) => updateRow(row.id, "quantity", e.target.value)}
+                        placeholder="0"
+                        style={{
+                          ...inputStyle,
+                          padding: "7px 8px",
+                          fontSize: 13,
+                          border: `1px solid ${inputStyle.borderColor}`,
+                          borderRadius: 6,
+                          outline: "none",
+                          width: "100%",
+                          boxSizing: "border-box",
+                        }}
+                      />
+                      {/* Auto-computed subtotal (read-only) */}
+                      <div
+                        style={{
+                          padding: "7px 8px",
+                          fontSize: 13,
+                          color: subtotal === "—" ? theme.subtext : theme.text,
+                          fontWeight: subtotal === "—" ? 400 : 500,
+                          backgroundColor: theme.inputBg,
+                          border: `1px solid ${theme.border}`,
+                          borderRadius: 6,
+                          textAlign: "right",
+                        }}
+                      >
+                        {subtotal}
+                      </div>
+                      <button
+                        onClick={() => removeRow(row.id)}
+                        title="Remove row"
+                        style={{
+                          width: 28, height: 28, borderRadius: 6,
+                          border: `1px solid ${theme.border}`,
+                          backgroundColor: "transparent",
+                          color: rows.length === 1 ? theme.subtext : "#f87171",
+                          cursor: rows.length === 1 ? "not-allowed" : "pointer",
+                          fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center",
+                        }}
+                        disabled={rows.length === 1}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Add row */}
@@ -566,8 +608,24 @@ const AddDeliveryModal: React.FC<Props> = ({
                 + Add another item
               </button>
 
+              {/* Bulk grand total */}
+              {bulkTotal > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    paddingTop: 4,
+                    borderTop: `1px solid ${theme.border}`,
+                  }}
+                >
+                  <span style={{ color: theme.text, fontSize: 13, fontWeight: 600 }}>
+                    Grand total: ₱{bulkTotal.toFixed(2)}
+                  </span>
+                </div>
+              )}
+
               <span style={{ color: theme.subtext }} className="text-[11px]">
-                Each row is saved as a separate delivery. Prices default to the item's current unit price.
+                Prices are taken from each item's current unit price. Each row is saved as a separate delivery.
               </span>
             </>
           )}

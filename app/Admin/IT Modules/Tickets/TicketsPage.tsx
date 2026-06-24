@@ -11,6 +11,9 @@ import {
   getAllTickets,
   updateTicketField,
 } from "../../../../Services/ticketService";
+
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { db } from "../../../../firebase"; 
 import EditAssetModal from "./EditAssetModal";
 import AddAssetModal from "./AddAssetModal";
 import BadgeSelect from "../../../../components/common/BadgeSelect";
@@ -26,6 +29,8 @@ import {
   TableFilterButton,
   TableFilterPanel,
 } from "../../../../components/common/TableFilterPanel";
+
+
 
 // ─── Options ──────────────────────────────────────────────────────────────────
 
@@ -172,7 +177,7 @@ function getTicketValue(t: ConcernTicket, key: SortKey): string | number {
       return STATUS_ORDER[t.status] ?? 0;
     case "dueDate":
       return t.dueDate ? toDateString(t.dueDate) : "";
-    case "dateCreated": // ← add
+    case "dateCreated":
       return t.dateCreated ? toDateString(t.dateCreated) : "";
     default:
       return ((t as any)[key] ?? "").toString().toLowerCase();
@@ -198,6 +203,7 @@ function sortTickets(arr: ConcernTicket[], key: SortKey, dir: SortDir) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Returns an ISO date-only string — used for sorting and due date input value */
 const toDateString = (value: any): string => {
   if (!value) return "";
   if (typeof value.toDate === "function")
@@ -205,6 +211,25 @@ const toDateString = (value: any): string => {
   if (value instanceof Date) return value.toISOString().split("T")[0];
   const d = new Date(value);
   return isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
+};
+
+/** "Jun 24, 10:30 AM" — same format as supply requests page */
+const formatDateTime = (value: any): string => {
+  if (!value) return "—";
+  let d: Date;
+  if (typeof value.toDate === "function") {
+    d = value.toDate();
+  } else if (value instanceof Date) {
+    d = value;
+  } else {
+    d = new Date(value);
+  }
+  if (isNaN(d.getTime())) return "—";
+  return (
+    d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
+    ", " +
+    d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+  );
 };
 
 // ─── Sort icon ────────────────────────────────────────────────────────────────
@@ -581,10 +606,10 @@ const TicketRow = ({
         />
       </td>
 
-      {/* Date Created */}
-      <td className="px-3 py-1.5 min-w-[110px]">
-        <span style={{ color: theme.subtext }} className="text-xs">
-          {ticket.dateCreated ? toDateString(ticket.dateCreated) : "—"}
+      {/* Date Created — now shows date + time */}
+      <td className="px-3 py-1.5 min-w-[140px]">
+        <span style={{ color: theme.subtext }} className="text-xs whitespace-nowrap">
+          {formatDateTime(ticket.dateCreated)}
         </span>
       </td>
 
@@ -687,22 +712,34 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
       options: [],
     },
   ]);
+// ─── Data loading (real-time) ──────────────────────────────────────────────
+useEffect(() => {
+  setLoading(true);
 
-  // ─── Data loading ─────────────────────────────────────────────────────────
-  const loadTickets = async () => {
-    setLoading(true);
-    try {
-      setTickets(await getAllTickets());
-    } catch (err) {
-      console.error("Unable to load tickets", err);
-    } finally {
+  const q = query(
+    collection(db, "concern_tickets"),
+    orderBy("dateCreated", "desc")
+  );
+
+  const unsubscribe = onSnapshot(
+    q,
+    (snapshot) => {
+      const data = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as ConcernTicket[];
+      setTickets(data);
+      setLoading(false);
+    },
+    (err) => {
+      console.error("Real-time tickets listener error:", err);
       setLoading(false);
     }
-  };
+  );
 
-  useEffect(() => {
-    loadTickets().catch(console.error);
-  }, []);
+  // Clean up listener when component unmounts
+  return () => unsubscribe();
+}, []);
 
   useEffect(() => {
     getAllDropdownConfigs({
@@ -787,21 +824,21 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
   );
 
   // ─── Field update ─────────────────────────────────────────────────────────
-  const handleUpdateField = async (
-    ticketNumber: string,
-    field: string,
-    value: any,
-  ) => {
-    try {
-      await updateTicketField(ticketNumber, field, value);
-      await loadTickets();
-    } catch (err) {
-      console.error(
-        `Unable to update ${field} for ticket ${ticketNumber}:`,
-        err,
-      );
-    }
-  };
+ const handleUpdateField = async (
+  ticketNumber: string,
+  field: string,
+  value: any,
+) => {
+  try {
+    await updateTicketField(ticketNumber, field, value);
+    // No need to reload — onSnapshot will pick up the change automatically
+  } catch (err) {
+    console.error(
+      `Unable to update ${field} for ticket ${ticketNumber}:`,
+      err,
+    );
+  }
+};
 
   const openEditModal = (ticket: ConcernTicket) => {
     setEditingTicket(ticket);
@@ -822,7 +859,6 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
     },
   ) => {
     try {
-      await loadTickets();
     } catch (err) {
       console.error("Unable to refresh tickets:", err);
       throw err;
@@ -991,7 +1027,6 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
           {/* Search */}
           <div className="flex-1">
             <div className="relative w-full max-w-md">
-              {/* Search Icon */}
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="16"
@@ -1105,16 +1140,16 @@ export default function TicketsPage({ user, isSuperAdmin = false }: Props) {
         currentUserId={user?.username ?? currentUserId ?? ""}
         currentUserName={user?.username ?? currentUserName ?? ""}
         onClose={() => setModalVisible(false)}
-        onSuccess={loadTickets}
+         onSuccess={() => {}} // listener handles the update automatically
       />
 
       <EditAssetModal
         visible={editModalVisible}
         selectedTicket={editingTicket}
         assigneeOptions={assigneeOptions}
-        categoryOptions={dropdownOptions.category} // ← add
-        priorityOptions={dropdownOptions.priority} // ← add
-        statusOptions={dropdownOptions.status} // ← add
+        categoryOptions={dropdownOptions.category}
+        priorityOptions={dropdownOptions.priority}
+        statusOptions={dropdownOptions.status}
         onClose={() => setEditModalVisible(false)}
         onSave={async (ticketNumber, updates) => {
           await handleSaveEditedTicket(ticketNumber, updates);

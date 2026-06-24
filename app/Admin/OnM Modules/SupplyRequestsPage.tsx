@@ -6,33 +6,60 @@ import {
   approveSupplyRequest,
   approveSupplyRequestPartial,
   rejectSupplyRequest,
+  markDelivered,
+  markFailedDelivery,
 } from "../../../Services/officeInventory";
 import PartialApprovalModal from "./Modal/PartialApprovalModal";
+import { query, collection, orderBy, onSnapshot } from "firebase/firestore";
+import { db } from "../../../firebase";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type StatusFilter = "all" | "pending" | "awaiting_stock" | "resolved" | "rejected";
-
+type PageTab = "requests" | "deliveries";
+type StatusFilter =
+  | "all"
+  | "pending"
+  | "awaiting_stock"
+  | "out_for_delivery"
+  | "resolved"
+  | "failed_delivery"
+  | "rejected";
 type StockStatus = "available" | "low" | "out_of_stock";
 
-// ─── Status / badge config ───────────────────────────────────────────────────
+// ─── Status config ────────────────────────────────────────────────────────────
 
-const STATUS_TABS: { label: string; value: StatusFilter }[] = [
-  { label: "All", value: "all" },
-  { label: "Pending", value: "pending" },
-  { label: "Awaiting stock", value: "awaiting_stock" },
-  { label: "Resolved", value: "resolved" },
-  { label: "Rejected", value: "rejected" },
+const REQUEST_STATUS_TABS: { label: string; value: StatusFilter }[] = [
+  { label: "All",              value: "all" },
+  { label: "Pending",          value: "pending" },
+  { label: "Awaiting stock",   value: "awaiting_stock" },
+  { label: "Out for delivery", value: "out_for_delivery" },
+  { label: "Resolved",         value: "resolved" },      // ← changed from "Delivered"
+  { label: "Failed",           value: "failed_delivery" },
+  { label: "Rejected",         value: "rejected" },
 ];
 
-function statusBadgeClass(status: SupplyRequestStatus): string {
+const DELIVERY_STATUS_TABS: {
+  label: string;
+  value: "all" | "out_for_delivery" | "resolved" | "failed_delivery";
+}[] = [
+  { label: "All", value: "all" },
+  { label: "For delivery", value: "out_for_delivery" },
+  { label: "Delivered", value: "resolved" },
+  { label: "Failed", value: "failed_delivery" },
+];
+
+function statusBadgeClass(status: string): string {
   switch (status) {
     case "pending":
       return "bg-sky-100 text-sky-700";
     case "awaiting_stock":
       return "bg-amber-100 text-amber-700";
+    case "out_for_delivery":
+      return "bg-blue-100 text-blue-700";
     case "resolved":
       return "bg-emerald-100 text-emerald-700";
+    case "failed_delivery":
+      return "bg-rose-100 text-rose-700";
     case "rejected":
       return "bg-rose-100 text-rose-700";
     default:
@@ -40,14 +67,18 @@ function statusBadgeClass(status: SupplyRequestStatus): string {
   }
 }
 
-function statusLabel(status: SupplyRequestStatus): string {
+function statusLabel(status: string): string {
   switch (status) {
     case "pending":
       return "Pending";
     case "awaiting_stock":
       return "Awaiting stock";
-    case "resolved":
-      return "Resolved";
+    case "out_for_delivery":
+      return "Out for delivery";
+    case "delivered":
+      return "Delivered";
+    case "failed_delivery":
+      return "Failed delivery";
     case "rejected":
       return "Rejected";
     default:
@@ -91,12 +122,12 @@ function worstStockStatus(items: SupplyRequest["items"]): StockStatus {
 function getInitials(name: string): string {
   const parts = name.trim().split(" ").filter(Boolean);
   if (parts.length === 0) return "?";
-  const first = parts[0]?.[0] ?? "";
-  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
-  return (first + last).toUpperCase();
+  return (
+    (parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")
+  ).toUpperCase();
 }
 
-function formatDateFiled(iso: string): string {
+function formatDate(iso: string): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "—";
@@ -107,33 +138,27 @@ function formatDateFiled(iso: string): string {
   );
 }
 
-function itemSummary(items: SupplyRequest["items"]): {
-  primaryLabel: string;
-  extraCount: number;
-  qtyLabel: string;
-} {
-  if (items.length === 0) {
+function itemSummary(items: SupplyRequest["items"]) {
+  if (items.length === 0)
     return { primaryLabel: "—", extraCount: 0, qtyLabel: "—" };
-  }
   const first = items[0];
   return {
     primaryLabel: first.itemName,
     extraCount: items.length - 1,
     qtyLabel:
-      items.length === 1 ? String(first.quantityRequested) : `${items.length} items`,
+      items.length === 1
+        ? String(first.quantityRequested)
+        : `${items.length} items`,
   };
 }
 
-// ─── Reject reason modal ──────────────────────────────────────────────────────
+function effectiveStatus(r: SupplyRequest): string {
+  if (r.status === "pending" && worstStockStatus(r.items) === "out_of_stock")
+    return "awaiting_stock";
+  return r.status;
+}
 
-type RejectModalProps = {
-  visible: boolean;
-  ticketNumber: string;
-  onCancel: () => void;
-  onConfirm: (reason: string) => void;
-  submitting: boolean;
-  theme: any;
-};
+// ─── Reject modal ─────────────────────────────────────────────────────────────
 
 function RejectModal({
   visible,
@@ -142,22 +167,29 @@ function RejectModal({
   onConfirm,
   submitting,
   theme,
-}: RejectModalProps) {
+}: {
+  visible: boolean;
+  ticketNumber: string;
+  onCancel: () => void;
+  onConfirm: (reason: string) => void;
+  submitting: boolean;
+  theme: any;
+}) {
   const [reason, setReason] = useState("");
-
   useEffect(() => {
     if (visible) setReason("");
   }, [visible]);
-
   if (!visible) return null;
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div
         style={{ backgroundColor: theme.surface, borderColor: theme.border }}
         className="w-full max-w-sm rounded-xl border p-5"
       >
-        <h3 style={{ color: theme.text }} className="text-sm font-semibold mb-1">
+        <h3
+          style={{ color: theme.text }}
+          className="text-sm font-semibold mb-1"
+        >
           Reject request {ticketNumber}
         </h3>
         <p style={{ color: theme.subtext }} className="text-xs mb-3">
@@ -206,21 +238,154 @@ function RejectModal({
   );
 }
 
-// ─── View detail drawer ────────────────────────────────────────────────────────
+// ─── Failed delivery modal ────────────────────────────────────────────────────
 
-type DetailDrawerProps = {
+function FailedDeliveryModal({
+  visible,
+  ticketNumber,
+  onCancel,
+  onConfirm,
+  submitting,
+  theme,
+}: {
+  visible: boolean;
+  ticketNumber: string;
+  onCancel: () => void;
+  onConfirm: (reason: string) => void;
+  submitting: boolean;
+  theme: any;
+}) {
+  const [reason, setReason] = useState("");
+  useEffect(() => {
+    if (visible) setReason("");
+  }, [visible]);
+  if (!visible) return null;
+
+  const QUICK_REASONS = [
+    "Requester not available",
+    "Wrong location / floor",
+    "Requester refused delivery",
+    "Item damaged in transit",
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div
+        style={{ backgroundColor: theme.surface, borderColor: theme.border }}
+        className="w-full max-w-sm rounded-xl border p-5"
+      >
+        <h3
+          style={{ color: theme.text }}
+          className="text-sm font-semibold mb-1"
+        >
+          Mark delivery failed — {ticketNumber}
+        </h3>
+        <p style={{ color: theme.subtext }} className="text-xs mb-3">
+          Select a reason or type your own. The request will return to the queue
+          for re-delivery.
+        </p>
+        {/* Quick reason pills */}
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {QUICK_REASONS.map((q) => (
+            <button
+              key={q}
+              onClick={() => setReason(q)}
+              style={{
+                backgroundColor: reason === q ? theme.primary : theme.inputBg,
+                color: reason === q ? theme.primaryText : theme.subtext,
+                borderColor: theme.border,
+              }}
+              className="px-2.5 py-1 text-xs rounded-full border transition-colors"
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="Or describe what happened…"
+          style={{
+            backgroundColor: theme.inputBg,
+            borderColor: theme.inputBorder,
+            color: theme.inputText,
+          }}
+          className="w-full min-h-[70px] rounded-lg border px-3 py-2 text-sm focus:outline-none resize-none"
+        />
+        <div className="flex justify-end gap-2 mt-4">
+          <button
+            onClick={onCancel}
+            disabled={submitting}
+            style={{
+              backgroundColor: theme.surface,
+              color: theme.text,
+              borderColor: theme.border,
+            }}
+            className="px-3 py-2 text-sm font-medium rounded-lg border"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => reason.trim() && onConfirm(reason.trim())}
+            disabled={submitting || !reason.trim()}
+            style={{
+              backgroundColor: "#D97706",
+              color: "#fff",
+              opacity: submitting || !reason.trim() ? 0.6 : 1,
+            }}
+            className="px-3 py-2 text-sm font-medium rounded-lg"
+          >
+            {submitting ? "Saving…" : "Mark as failed"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Detail drawer ────────────────────────────────────────────────────────────
+
+function DetailDrawer({
+  request,
+  onClose,
+  theme,
+}: {
   request: SupplyRequest | null;
   onClose: () => void;
   theme: any;
-};
-
-function DetailDrawer({ request, onClose, theme }: DetailDrawerProps) {
+}) {
   if (!request) return null;
   const totalQty = request.items.reduce((s, i) => s + i.quantityRequested, 0);
-  const effStatus: SupplyRequestStatus =
-    request.status === "pending" && worstStockStatus(request.items) === "out_of_stock"
-      ? ("awaiting_stock" as SupplyRequestStatus)
-      : request.status;
+  const status = effectiveStatus(request);
+
+  const trail = [
+    {
+      label: "Filed by",
+      value: request.requestedByName,
+      at: request.createdAt,
+    },
+    request.approvedByName
+      ? {
+          label: "Approved by",
+          value: request.approvedByName,
+          at: request.approvedAt,
+        }
+      : null,
+    request.deliveredByName
+      ? {
+          label: "Delivered by",
+          value: request.deliveredByName,
+          at: request.deliveredAt,
+        }
+      : null,
+    request.reviewedByName && request.status === "rejected"
+      ? {
+          label: "Rejected by",
+          value: request.reviewedByName,
+          at: request.reviewedAt,
+        }
+      : null,
+  ].filter(Boolean) as { label: string; value: string; at?: string }[];
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -230,37 +395,52 @@ function DetailDrawer({ request, onClose, theme }: DetailDrawerProps) {
         className="relative w-full max-w-md h-full border-l overflow-y-auto"
       >
         <div
-          style={{ borderColor: theme.border }}
           className="flex items-center justify-between px-5 py-4 border-b sticky top-0"
+          style={{ backgroundColor: theme.surface, borderColor: theme.border }}
         >
           <div>
-            <p style={{ color: theme.subtext }} className="text-[11px] uppercase tracking-wide">
+            <p
+              style={{ color: theme.subtext }}
+              className="text-[11px] uppercase tracking-wide"
+            >
               Supply request
             </p>
-            <h2 style={{ color: theme.text }} className="text-base font-semibold">
+            <h2
+              style={{ color: theme.text }}
+              className="text-base font-semibold"
+            >
               {request.ticketNumber}
             </h2>
           </div>
-          <button onClick={onClose} style={{ color: theme.subtext }} className="text-xl leading-none">
+          <button
+            onClick={onClose}
+            style={{ color: theme.subtext }}
+            className="text-xl leading-none"
+          >
             ×
           </button>
         </div>
 
         <div className="p-5 space-y-5">
-          {/* Summary card */}
+          {/* Status badge */}
+          <span
+            className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-full ${statusBadgeClass(status)}`}
+          >
+            {statusLabel(status)}
+          </span>
+
+          {/* Summary */}
           <div
-            style={{ borderColor: theme.border, backgroundColor: theme.background }}
-            className="rounded-lg border p-4"
+            style={{
+              borderColor: theme.border,
+              backgroundColor: theme.background,
+            }}
+            className="rounded-lg border p-4 space-y-0"
           >
             {[
               { label: "Requested by", value: request.requestedByName },
-              { label: "Date filed", value: formatDateFiled(request.createdAt) },
-              {
-                label: "Status",
-                value: statusLabel(effStatus),
-                badge: statusBadgeClass(effStatus),
-              },
-              { label: "Total items", value: `${request.items.length}` },
+              { label: "Date filed", value: formatDate(request.createdAt) },
+              { label: "Total items", value: String(request.items.length) },
               { label: "Total qty", value: String(totalQty) },
             ].map((row, i, arr) => (
               <div
@@ -271,40 +451,52 @@ function DetailDrawer({ request, onClose, theme }: DetailDrawerProps) {
                 <span style={{ color: theme.subtext }} className="text-xs">
                   {row.label}
                 </span>
-                {row.badge ? (
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${row.badge}`}>
-                    {row.value}
-                  </span>
-                ) : (
-                  <span style={{ color: theme.text }} className="text-xs font-medium">
-                    {row.value}
-                  </span>
-                )}
+                <span
+                  style={{ color: theme.text }}
+                  className="text-xs font-medium"
+                >
+                  {row.value}
+                </span>
               </div>
             ))}
           </div>
 
           {/* Items */}
           <div>
-            <h3 style={{ color: theme.text }} className="text-sm font-semibold mb-2">
+            <h3
+              style={{ color: theme.text }}
+              className="text-sm font-semibold mb-2"
+            >
               Items ({request.items.length})
             </h3>
             <div className="space-y-2">
               {request.items.map((item, i) => (
                 <div
                   key={`${item.itemId}-${i}`}
-                  style={{ borderColor: theme.border, backgroundColor: theme.background }}
+                  style={{
+                    borderColor: theme.border,
+                    backgroundColor: theme.background,
+                  }}
                   className="flex items-center justify-between rounded-lg border px-3 py-2.5"
                 >
                   <div>
-                    <p style={{ color: theme.text }} className="text-sm font-medium">
+                    <p
+                      style={{ color: theme.text }}
+                      className="text-sm font-medium"
+                    >
                       {item.itemName}
                     </p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span style={{ color: theme.subtext }} className="text-xs">
+                      <span
+                        style={{ color: theme.subtext }}
+                        className="text-xs"
+                      >
                         {item.itemCode}
                       </span>
-                      <span style={{ color: theme.subtext }} className="text-xs">
+                      <span
+                        style={{ color: theme.subtext }}
+                        className="text-xs"
+                      >
                         ·
                       </span>
                       <span
@@ -314,7 +506,10 @@ function DetailDrawer({ request, onClose, theme }: DetailDrawerProps) {
                       </span>
                     </div>
                   </div>
-                  <span style={{ color: theme.primary }} className="text-sm font-semibold">
+                  <span
+                    style={{ color: theme.primary }}
+                    className="text-sm font-semibold"
+                  >
                     ×{item.quantityRequested}
                   </span>
                 </div>
@@ -323,9 +518,12 @@ function DetailDrawer({ request, onClose, theme }: DetailDrawerProps) {
           </div>
 
           {/* Notes */}
-          {request.notes ? (
+          {request.notes && (
             <div>
-              <h3 style={{ color: theme.text }} className="text-sm font-semibold mb-2">
+              <h3
+                style={{ color: theme.text }}
+                className="text-sm font-semibold mb-2"
+              >
                 Notes
               </h3>
               <p
@@ -339,53 +537,111 @@ function DetailDrawer({ request, onClose, theme }: DetailDrawerProps) {
                 {request.notes}
               </p>
             </div>
-          ) : null}
+          )}
 
           {/* Rejection reason */}
-          {request.status === "rejected" && request.rejectionReason ? (
+          {request.status === "rejected" && request.rejectionReason && (
             <div>
-              <h3 style={{ color: theme.text }} className="text-sm font-semibold mb-2">
+              <h3
+                style={{ color: theme.text }}
+                className="text-sm font-semibold mb-2"
+              >
                 Rejection reason
               </h3>
               <p className="text-sm rounded-lg border border-rose-200 bg-rose-50 text-rose-700 p-3 leading-relaxed">
                 {request.rejectionReason}
               </p>
             </div>
-          ) : null}
+          )}
 
-          {/* Review trail */}
-          {request.reviewedByName ? (
-            <p style={{ color: theme.subtext }} className="text-xs">
-              Reviewed by {request.reviewedByName}
-              {request.reviewedAt ? ` on ${formatDateFiled(request.reviewedAt)}` : ""}
-            </p>
-          ) : null}
+          {/* Failed delivery reason */}
+          {request.status === "failed_delivery" && request.failedReason && (
+            <div>
+              <h3
+                style={{ color: theme.text }}
+                className="text-sm font-semibold mb-2"
+              >
+                Failed delivery reason
+              </h3>
+              <p className="text-sm rounded-lg border border-amber-200 bg-amber-50 text-amber-700 p-3 leading-relaxed">
+                {request.failedReason}
+              </p>
+            </div>
+          )}
+
+          {/* Activity trail */}
+          {trail.length > 0 && (
+            <div>
+              <h3
+                style={{ color: theme.text }}
+                className="text-sm font-semibold mb-2"
+              >
+                Activity
+              </h3>
+              <div className="space-y-2">
+                {trail.map((t, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <div
+                      style={{ backgroundColor: theme.border }}
+                      className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"
+                    />
+                    <div>
+                      <span
+                        style={{ color: theme.text }}
+                        className="text-xs font-medium"
+                      >
+                        {t.label}:{" "}
+                      </span>
+                      <span
+                        style={{ color: theme.subtext }}
+                        className="text-xs"
+                      >
+                        {t.value}
+                      </span>
+                      {t.at && (
+                        <p
+                          style={{ color: theme.subtext }}
+                          className="text-[11px]"
+                        >
+                          {formatDate(t.at)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Row component ────────────────────────────────────────────────────────────
+// ─── Supply Request row ───────────────────────────────────────────────────────
 
-type RowProps = {
+function RequestRow({
+  request,
+  index,
+  onApprove,
+  onReject,
+  onView,
+  approvingId,
+  theme,
+}: {
   request: SupplyRequest;
   index: number;
-  onApprove: (request: SupplyRequest) => void;
-  onReject: (request: SupplyRequest) => void;
-  onView: (request: SupplyRequest) => void;
+  onApprove: (r: SupplyRequest) => void;
+  onReject: (r: SupplyRequest) => void;
+  onView: (r: SupplyRequest) => void;
   approvingId: string | null;
   theme: any;
-};
-
-function RequestRow({ request, index, onApprove, onReject, onView, approvingId, theme }: RowProps) {
+}) {
   const stock = worstStockStatus(request.items);
+  const status = effectiveStatus(request);
   const { primaryLabel, extraCount, qtyLabel } = itemSummary(request.items);
-  const effStatus: SupplyRequestStatus =
-    request.status === "pending" && stock === "out_of_stock"
-      ? ("awaiting_stock" as SupplyRequestStatus)
-      : request.status;
-  const isActionable = request.status === "pending" || request.status === "awaiting_stock";
+  const isPending =
+    request.status === "pending" || request.status === "awaiting_stock";
   const isApproving = approvingId === request.id;
 
   return (
@@ -404,7 +660,6 @@ function RequestRow({ request, index, onApprove, onReject, onView, approvingId, 
           #{request.ticketNumber.replace(/^SR-\d+-/, "")}
         </button>
       </td>
-
       <td className="px-3 py-3 min-w-[150px]">
         <div className="flex items-center gap-2">
           <span
@@ -423,7 +678,6 @@ function RequestRow({ request, index, onApprove, onReject, onView, approvingId, 
           </span>
         </div>
       </td>
-
       <td className="px-3 py-3 min-w-[180px]">
         <span style={{ color: theme.text }} className="text-sm font-medium">
           {primaryLabel}
@@ -434,39 +688,40 @@ function RequestRow({ request, index, onApprove, onReject, onView, approvingId, 
           </span>
         )}
       </td>
-
       <td className="px-3 py-3 whitespace-nowrap">
         <span style={{ color: theme.text }} className="text-sm">
           {qtyLabel}
         </span>
       </td>
-
       <td className="px-3 py-3 whitespace-nowrap">
         <span style={{ color: theme.subtext }} className="text-xs">
-          {formatDateFiled(request.createdAt)}
+          {formatDate(request.createdAt)}
         </span>
       </td>
-
       <td className="px-3 py-3 whitespace-nowrap">
-        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${stockBadgeClass(stock)}`}>
+        <span
+          className={`text-xs font-medium px-2.5 py-1 rounded-full ${stockBadgeClass(stock)}`}
+        >
           {stockLabel(stock)}
         </span>
       </td>
-
       <td className="px-3 py-3 whitespace-nowrap">
-        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusBadgeClass(effStatus)}`}>
-          {statusLabel(effStatus)}
+        <span
+          className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusBadgeClass(status)}`}
+        >
+          {statusLabel(status)}
         </span>
       </td>
-
       <td className="px-3 py-3 whitespace-nowrap text-right">
-        {isActionable ? (
+        {isPending ? (
           <div className="inline-flex items-center gap-1.5">
-            {/* Opens the partial-approval modal */}
             <button
               onClick={() => onApprove(request)}
               disabled={isApproving}
-              style={{ backgroundColor: theme.primary, color: theme.primaryText }}
+              style={{
+                backgroundColor: theme.primary,
+                color: theme.primaryText,
+              }}
               className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg disabled:opacity-60"
             >
               {isApproving ? "Approving…" : "✓ Approve"}
@@ -494,95 +749,292 @@ function RequestRow({ request, index, onApprove, onReject, onView, approvingId, 
   );
 }
 
+// ─── Delivery row ─────────────────────────────────────────────────────────────
+
+function DeliveryRow({
+  request,
+  index,
+  onDeliver,
+  onFail,
+  onView,
+  actionId,
+  theme,
+}: {
+  request: SupplyRequest;
+  index: number;
+  onDeliver: (r: SupplyRequest) => void;
+  onFail: (r: SupplyRequest) => void;
+  onView: (r: SupplyRequest) => void;
+  actionId: string | null;
+  theme: any;
+}) {
+  const { primaryLabel, extraCount, qtyLabel } = itemSummary(request.items);
+  const status = request.status;
+  const isActive = actionId === request.id;
+  const isForDelivery =
+    status === "out_for_delivery" || status === "failed_delivery";
+
+  return (
+    <tr
+      style={{
+        backgroundColor: index % 2 === 0 ? theme.surface : theme.background,
+        borderBottom: `1px solid ${theme.border}`,
+      }}
+    >
+      <td className="px-3 py-3 whitespace-nowrap">
+        <button
+          onClick={() => onView(request)}
+          style={{ color: theme.text }}
+          className="text-sm font-medium hover:opacity-70 transition-opacity"
+        >
+          #{request.ticketNumber.replace(/^SR-\d+-/, "")}
+        </button>
+      </td>
+      <td className="px-3 py-3 min-w-[150px]">
+        <div className="flex items-center gap-2">
+          <span
+            style={{
+              backgroundColor: theme.primary,
+              color: theme.primaryText,
+              width: 22,
+              height: 22,
+            }}
+            className="flex items-center justify-center rounded-full text-[10px] font-medium flex-shrink-0"
+          >
+            {getInitials(request.requestedByName)}
+          </span>
+          <span style={{ color: theme.text }} className="text-sm">
+            {request.requestedByName}
+          </span>
+        </div>
+      </td>
+      <td className="px-3 py-3 min-w-[180px]">
+        <span style={{ color: theme.text }} className="text-sm font-medium">
+          {primaryLabel}
+        </span>
+        {extraCount > 0 && (
+          <span style={{ color: theme.subtext }} className="text-xs ml-1.5">
+            +{extraCount} more
+          </span>
+        )}
+      </td>
+      <td className="px-3 py-3 whitespace-nowrap">
+        <span style={{ color: theme.text }} className="text-sm">
+          {qtyLabel}
+        </span>
+      </td>
+      <td className="px-3 py-3 whitespace-nowrap">
+        <span style={{ color: theme.subtext }} className="text-xs">
+          {formatDate(request.approvedAt ?? "")}
+        </span>
+      </td>
+      <td className="px-3 py-3 whitespace-nowrap">
+        <span
+          className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusBadgeClass(status)}`}
+        >
+          {statusLabel(status)}
+        </span>
+        {/* Show failed reason hint */}
+        {status === "failed_delivery" && request.failedReason && (
+          <p
+            style={{ color: theme.subtext }}
+            className="text-[11px] mt-0.5 max-w-[160px] truncate"
+          >
+            {request.failedReason}
+          </p>
+        )}
+      </td>
+      <td className="px-3 py-3 whitespace-nowrap text-right">
+        {isForDelivery ? (
+          <div className="inline-flex items-center gap-1.5">
+            <button
+              onClick={() => onDeliver(request)}
+              disabled={isActive}
+              style={{ backgroundColor: "#16a34a", color: "#fff" }}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg disabled:opacity-60"
+            >
+              {isActive ? "Saving…" : "✓ Delivered"}
+            </button>
+            <button
+              onClick={() => onFail(request)}
+              disabled={isActive}
+              style={{ backgroundColor: "#D97706", color: "#fff" }}
+              className="px-2.5 py-1.5 text-xs font-medium rounded-lg disabled:opacity-60"
+            >
+              ✕ Failed
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => onView(request)}
+            style={{ borderColor: theme.border, color: theme.text }}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg border"
+          >
+            👁 View
+          </button>
+        )}
+      </td>
+    </tr>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 type Props = { user?: ADUser };
 
-const HEADERS = [
+const REQUEST_HEADERS = [
   "Ticket #",
   "Requested by",
   "Item",
   "Qty",
   "Date filed",
   "Stock status",
-  "Ticket status",
+  "Status",
+  "",
+];
+const DELIVERY_HEADERS = [
+  "Ticket #",
+  "Deliver to",
+  "Item",
+  "Qty",
+  "Approved at",
+  "Status",
   "",
 ];
 
 export default function SupplyRequestsPage({ user }: Props) {
   const { theme } = useTheme();
 
+  const [pageTab, setPageTab] = useState<PageTab>("requests");
   const [requests, setRequests] = useState<SupplyRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [detailRequest, setDetailRequest] = useState<SupplyRequest | null>(null);
+  const [delivFilter, setDelivFilter] = useState<
+    "all" | "out_for_delivery" | "resolved" | "failed_delivery"
+  >("out_for_delivery");
+  const [detailRequest, setDetailRequest] = useState<SupplyRequest | null>(
+    null,
+  );
   const [rejectTarget, setRejectTarget] = useState<SupplyRequest | null>(null);
-
-  // ── Approval state ─────────────────────────────────────────────────────────
-  const [approvalTarget, setApprovalTarget] = useState<SupplyRequest | null>(null);
+  const [failTarget, setFailTarget] = useState<SupplyRequest | null>(null);
+  const [approvalTarget, setApprovalTarget] = useState<SupplyRequest | null>(
+    null,
+  );
   const [approvingId, setApprovingId] = useState<string | null>(null);
-
+  const [delivActionId, setDelivActionId] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState(false);
+  const [failing, setFailing] = useState(false);
   const [error, setError] = useState("");
 
-  const loadRequests = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await getAllSupplyRequests();
-      setRequests(data);
-    } catch (err) {
-      console.error("Unable to load supply requests:", err);
-      setError("Failed to load supply requests.");
-    } finally {
+ // REPLACE with:
+const loadRequests = useCallback(async () => {
+  const data = await getAllSupplyRequests();
+  setRequests(data);
+}, []);
+
+useEffect(() => {
+  setLoading(true);
+
+  const q = query(
+    collection(db, "supply_requests"),
+    orderBy("createdAt", "desc")
+  );
+
+  const unsubscribe = onSnapshot(
+    q,
+    async () => {
+      try {
+        // Re-use the existing service function so DocumentReference
+        // resolution and data shaping stays consistent
+        const data = await getAllSupplyRequests();
+        setRequests(data);
+      } catch (err) {
+        console.error(err);
+        setError("Failed to load supply requests.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    (err) => {
+      console.error("Real-time supply requests listener error:", err);
       setLoading(false);
     }
-  }, []);
+  );
 
-  useEffect(() => {
-    loadRequests();
-  }, [loadRequests]);
+  return () => unsubscribe();
+}, []);
 
-  const effectiveStatus = useCallback((r: SupplyRequest): SupplyRequestStatus => {
-    if (r.status === "pending" && worstStockStatus(r.items) === "out_of_stock") {
-      return "awaiting_stock" as SupplyRequestStatus;
-    }
-    return r.status;
-  }, []);
+  // ── Filtered lists ─────────────────────────────────────────────────────────
 
-  const filtered = useMemo(() => {
-    let result = requests;
-    if (statusFilter !== "all") {
-      result = result.filter((r) => effectiveStatus(r) === statusFilter);
-    }
+  const filteredRequests = useMemo(() => {
+    let r = requests;
+    if (statusFilter !== "all")
+      r = r.filter((x) => effectiveStatus(x) === statusFilter);
     const q = search.trim().toLowerCase();
-    if (q) {
-      result = result.filter((r) =>
-        [r.ticketNumber, r.requestedByName, ...r.items.map((i) => i.itemName), ...r.items.map((i) => i.itemCode)]
+    if (q)
+      r = r.filter((x) =>
+        [
+          x.ticketNumber,
+          x.requestedByName,
+          ...x.items.map((i) => i.itemName),
+          ...x.items.map((i) => i.itemCode),
+        ]
           .join(" ")
           .toLowerCase()
-          .includes(q)
+          .includes(q),
       );
-    }
-    return result;
-  }, [requests, statusFilter, search, effectiveStatus]);
+    return r;
+  }, [requests, statusFilter, search]);
 
-  const counts = useMemo(() => {
-    const c: Record<StatusFilter, number> = {
-      all: requests.length,
-      pending: 0,
-      awaiting_stock: 0,
-      resolved: 0,
-      rejected: 0,
-    };
+  const filteredDeliveries = useMemo(() => {
+    // filteredDeliveries
+    let r = requests.filter((x) =>
+      ["out_for_delivery", "resolved", "failed_delivery"].includes(x.status),
+    );
+    if (delivFilter !== "all") r = r.filter((x) => x.status === delivFilter);
+    const q = search.trim().toLowerCase();
+    if (q)
+      r = r.filter((x) =>
+        [x.ticketNumber, x.requestedByName, ...x.items.map((i) => i.itemName)]
+          .join(" ")
+          .toLowerCase()
+          .includes(q),
+      );
+    return r;
+  }, [requests, delivFilter, search]);
+
+  // ── Counts ─────────────────────────────────────────────────────────────────
+
+  const requestCounts = useMemo(() => {
+    const c: Record<string, number> = { all: requests.length };
     requests.forEach((r) => {
-      const s = effectiveStatus(r) as StatusFilter;
-      if (s in c) c[s] += 1;
+      const s = effectiveStatus(r);
+      c[s] = (c[s] ?? 0) + 1;
     });
     return c;
-  }, [requests, effectiveStatus]);
+  }, [requests]);
 
-  // ── Approve all (existing behaviour, fires from inside PartialApprovalModal) ──
+  const delivCounts = useMemo(() => {
+    const base = requests.filter((x) =>
+      ["out_for_delivery", "delivered", "failed_delivery"].includes(x.status),
+    );
+    return {
+      all: base.length,
+      out_for_delivery: base.filter((x) => x.status === "out_for_delivery")
+        .length,
+      resolved: base.filter((x) => x.status === "resolved").length,
+      failed_delivery: base.filter((x) => x.status === "failed_delivery")
+        .length,
+    };
+  }, [requests]);
+
+  const pendingDeliveryCount = requests.filter(
+    (x) => x.status === "out_for_delivery",
+  ).length;
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
+
   const handleApproveAll = async (request: SupplyRequest) => {
     setApprovingId(request.id);
     setError("");
@@ -591,16 +1043,15 @@ export default function SupplyRequestsPage({ user }: Props) {
       await loadRequests();
     } catch (err: any) {
       setError(err?.message ?? "Failed to approve request.");
-      throw err; // re-throw so the modal can surface it
+      throw err;
     } finally {
       setApprovingId(null);
     }
   };
 
-  // ── Approve partial (new, fires from inside PartialApprovalModal) ──────────
   const handleApprovePartial = async (
     requestId: string,
-    lines: { itemId: string; qtyToDispense: number }[]
+    lines: { itemId: string; qtyToDispense: number }[],
   ) => {
     setApprovingId(requestId);
     setError("");
@@ -630,9 +1081,46 @@ export default function SupplyRequestsPage({ user }: Props) {
     }
   };
 
+  const handleMarkDelivered = async (request: SupplyRequest) => {
+    setDelivActionId(request.id);
+    setError("");
+    try {
+      await markDelivered(request.id, user?.displayName ?? "Technician");
+      await loadRequests();
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to mark as delivered.");
+    } finally {
+      setDelivActionId(null);
+    }
+  };
+
+  const handleConfirmFailed = async (reason: string) => {
+    if (!failTarget) return;
+    setFailing(true);
+    setError("");
+    try {
+      await markFailedDelivery(
+        failTarget.id,
+        reason,
+        user?.displayName ?? "Technician",
+      );
+      setFailTarget(null);
+      await loadRequests();
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to update delivery status.");
+    } finally {
+      setFailing(false);
+    }
+  };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
-    <div style={{ backgroundColor: theme.background }} className="flex flex-col h-full overflow-hidden">
-      {/* ── Fixed top bar ── */}
+    <div
+      style={{ backgroundColor: theme.background }}
+      className="flex flex-col h-full overflow-hidden"
+    >
+      {/* ── Header ── */}
       <div className="flex-shrink-0 px-4 pt-4 pb-0">
         <div className="flex items-center justify-between gap-4 mb-3">
           <div>
@@ -640,12 +1128,46 @@ export default function SupplyRequestsPage({ user }: Props) {
               Supply requests
             </h1>
             <p style={{ color: theme.subtext }} className="text-xs mt-0.5">
-              Pending &amp; history · {filtered.length} of {requests.length}
+              {pageTab === "requests"
+                ? `${filteredRequests.length} of ${requests.length} requests`
+                : `${filteredDeliveries.length} deliveries`}
             </p>
           </div>
         </div>
 
-        {/* Search + status pills row */}
+        {/* ── Page tabs ── */}
+        <div
+          style={{ borderBottom: `1px solid ${theme.border}` }}
+          className="flex items-end gap-0 -mb-px mb-3"
+        >
+          {[
+            { label: "Supply Requests", value: "requests" as PageTab },
+            {
+              label: `Deliveries${pendingDeliveryCount > 0 ? ` (${pendingDeliveryCount})` : ""}`,
+              value: "deliveries" as PageTab,
+            },
+          ].map((tab) => {
+            const active = pageTab === tab.value;
+            return (
+              <button
+                key={tab.value}
+                onClick={() => setPageTab(tab.value)}
+                style={{
+                  color: active ? theme.primary : theme.subtext,
+                  borderBottom: active
+                    ? `2px solid ${theme.primary}`
+                    : "2px solid transparent",
+                  backgroundColor: "transparent",
+                }}
+                className="px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors focus:outline-none"
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── Search ── */}
         <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
           <div className="relative w-full max-w-md">
             <svg
@@ -666,7 +1188,7 @@ export default function SupplyRequestsPage({ user }: Props) {
             </svg>
             <input
               type="text"
-              placeholder="Search items…"
+              placeholder="Search…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={{
@@ -678,16 +1200,34 @@ export default function SupplyRequestsPage({ user }: Props) {
             />
           </div>
 
+          {/* Status filter pills */}
           <div
-            style={{ backgroundColor: theme.surfaceRaised, borderColor: theme.border }}
-            className="inline-flex items-center gap-1 p-1 rounded-lg border"
+            style={{
+              backgroundColor: theme.surfaceRaised,
+              borderColor: theme.border,
+            }}
+            className="inline-flex items-center gap-1 p-1 rounded-lg border flex-wrap"
           >
-            {STATUS_TABS.map((tab) => {
-              const active = statusFilter === tab.value;
+            {(pageTab === "requests"
+              ? REQUEST_STATUS_TABS
+              : DELIVERY_STATUS_TABS
+            ).map((tab) => {
+              const active =
+                pageTab === "requests"
+                  ? statusFilter === tab.value
+                  : delivFilter === tab.value;
+              const count =
+                pageTab === "requests"
+                  ? (requestCounts[tab.value] ?? 0)
+                  : (delivCounts[tab.value as keyof typeof delivCounts] ?? 0);
               return (
                 <button
                   key={tab.value}
-                  onClick={() => setStatusFilter(tab.value)}
+                  onClick={() =>
+                    pageTab === "requests"
+                      ? setStatusFilter(tab.value as StatusFilter)
+                      : setDelivFilter(tab.value as any)
+                  }
                   style={{
                     backgroundColor: active ? theme.primary : "transparent",
                     color: active ? theme.primaryText : theme.subtext,
@@ -695,23 +1235,23 @@ export default function SupplyRequestsPage({ user }: Props) {
                   className="px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors"
                 >
                   {tab.label}
-                  {tab.value !== "all" && counts[tab.value] > 0 ? (
-                    <span className="ml-1.5 opacity-70">{counts[tab.value]}</span>
-                  ) : null}
+                  {count > 0 && (
+                    <span className="ml-1 opacity-70">{count}</span>
+                  )}
                 </button>
               );
             })}
           </div>
         </div>
 
-        {error ? (
+        {error && (
           <div className="rounded-lg border border-rose-200 bg-rose-50 text-rose-700 text-xs px-3 py-2 mb-3">
             ⚠ {error}
           </div>
-        ) : null}
+        )}
       </div>
 
-      {/* ── Scrollable content ── */}
+      {/* ── Table ── */}
       {loading ? (
         <div className="flex flex-1 items-center justify-center py-20">
           <div
@@ -719,19 +1259,22 @@ export default function SupplyRequestsPage({ user }: Props) {
             className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin"
           />
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center py-20">
-          <p style={{ color: theme.subtext }} className="text-sm">
-            No supply requests found.
-          </p>
-        </div>
       ) : (
         <div className="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4">
-          <div style={{ borderColor: theme.border }} className="rounded-lg border">
-            <table className="min-w-full text-sm" style={{ borderCollapse: "collapse" }}>
+          <div
+            style={{ borderColor: theme.border }}
+            className="rounded-lg border"
+          >
+            <table
+              className="min-w-full text-sm"
+              style={{ borderCollapse: "collapse" }}
+            >
               <thead>
                 <tr>
-                  {HEADERS.map((h) => (
+                  {(pageTab === "requests"
+                    ? REQUEST_HEADERS
+                    : DELIVERY_HEADERS
+                  ).map((h) => (
                     <th
                       key={h}
                       style={{
@@ -750,25 +1293,58 @@ export default function SupplyRequestsPage({ user }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((request, index) => (
-                  <RequestRow
-                    key={request.id}
-                    request={request}
-                    index={index}
-                    onApprove={(r) => setApprovalTarget(r)}   // opens modal
-                    onReject={(r) => setRejectTarget(r)}
-                    onView={(r) => setDetailRequest(r)}
-                    approvingId={approvingId}
-                    theme={theme}
-                  />
-                ))}
+                {pageTab === "requests" ? (
+                  filteredRequests.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-3 py-10 text-center">
+                        <p style={{ color: theme.subtext }} className="text-sm">
+                          No requests found.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRequests.map((r, i) => (
+                      <RequestRow
+                        key={r.id}
+                        request={r}
+                        index={i}
+                        onApprove={(x) => setApprovalTarget(x)}
+                        onReject={(x) => setRejectTarget(x)}
+                        onView={(x) => setDetailRequest(x)}
+                        approvingId={approvingId}
+                        theme={theme}
+                      />
+                    ))
+                  )
+                ) : filteredDeliveries.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-10 text-center">
+                      <p style={{ color: theme.subtext }} className="text-sm">
+                        No deliveries found.
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredDeliveries.map((r, i) => (
+                    <DeliveryRow
+                      key={r.id}
+                      request={r}
+                      index={i}
+                      onDeliver={handleMarkDelivered}
+                      onFail={(x) => setFailTarget(x)}
+                      onView={(x) => setDetailRequest(x)}
+                      actionId={delivActionId}
+                      theme={theme}
+                    />
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {/* ── Partial approval modal ── */}
+      {/* ── Modals ── */}
       <PartialApprovalModal
         visible={approvalTarget !== null}
         request={approvalTarget}
@@ -778,16 +1354,27 @@ export default function SupplyRequestsPage({ user }: Props) {
         theme={theme}
       />
 
-      {/* ── Detail drawer ── */}
-      <DetailDrawer request={detailRequest} onClose={() => setDetailRequest(null)} theme={theme} />
+      <DetailDrawer
+        request={detailRequest}
+        onClose={() => setDetailRequest(null)}
+        theme={theme}
+      />
 
-      {/* ── Reject modal ── */}
       <RejectModal
         visible={rejectTarget !== null}
         ticketNumber={rejectTarget?.ticketNumber ?? ""}
         onCancel={() => setRejectTarget(null)}
         onConfirm={handleConfirmReject}
         submitting={rejecting}
+        theme={theme}
+      />
+
+      <FailedDeliveryModal
+        visible={failTarget !== null}
+        ticketNumber={failTarget?.ticketNumber ?? ""}
+        onCancel={() => setFailTarget(null)}
+        onConfirm={handleConfirmFailed}
+        submitting={failing}
         theme={theme}
       />
     </div>

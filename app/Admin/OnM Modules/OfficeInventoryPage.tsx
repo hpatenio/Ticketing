@@ -305,8 +305,8 @@ const OfficeInventoryPage: React.FC<Props> = ({
   const [activeFilter, setActiveFilter] =
     useState<InventoryFilter>(initialFilter);
   const [activeTab, setActiveTab] = useState<CategoryTab>("all");
-  const [sortKey, setSortKey] = useState<InventorySortKey | null>(null);
-  const [sortDir, setSortDir] = useState<SortDir>("default");
+const [sortKey, setSortKey] = useState<InventorySortKey | null>("name");
+const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const [addVisible, setAddVisible] = useState(false);
   const [editTarget, setEditTarget] = useState<OfficeInventoryItem | null>(
