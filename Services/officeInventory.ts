@@ -74,12 +74,14 @@ const toItem = (id: string, data: any): OfficeInventoryItem => ({
   lowStockThreshold: data.lowStockThreshold,
   inStockThreshold: data.inStockThreshold,
   isActive: data.isActive,
-  createdAt: data.createdAt instanceof Timestamp
-    ? data.createdAt.toDate().toISOString()
-    : data.createdAt ?? "",
-  updatedAt: data.updatedAt instanceof Timestamp
-    ? data.updatedAt.toDate().toISOString()
-    : data.updatedAt ?? "",
+  createdAt:
+    data.createdAt instanceof Timestamp
+      ? data.createdAt.toDate().toISOString()
+      : (data.createdAt ?? ""),
+  updatedAt:
+    data.updatedAt instanceof Timestamp
+      ? data.updatedAt.toDate().toISOString()
+      : (data.updatedAt ?? ""),
 });
 
 const toTransaction = (id: string, data: any): StockTransaction => ({
@@ -96,16 +98,19 @@ const toTransaction = (id: string, data: any): StockTransaction => ({
   reason: data.reason ?? "",
   performedByName: data.performedByName,
   transactionDate: data.transactionDate,
-  createdAt: data.createdAt instanceof Timestamp
-    ? data.createdAt.toDate().toISOString()
-    : data.createdAt ?? "",
+  createdAt:
+    data.createdAt instanceof Timestamp
+      ? data.createdAt.toDate().toISOString()
+      : (data.createdAt ?? ""),
 });
 
 const toSupplyRequest = (id: string, data: any): SupplyRequest => ({
   id,
   ticketNumber: data.ticketNumber,
   requestedById:
-    data.requestedBy && typeof data.requestedBy === "object" && "id" in data.requestedBy
+    data.requestedBy &&
+    typeof data.requestedBy === "object" &&
+    "id" in data.requestedBy
       ? data.requestedBy.id
       : (data.requestedById ?? ""),
   requestedByName: data.requestedByName,
@@ -115,15 +120,18 @@ const toSupplyRequest = (id: string, data: any): SupplyRequest => ({
   rejectionReason: data.rejectionReason ?? null,
   reviewedBy: data.reviewedBy ?? null,
   reviewedByName: data.reviewedByName ?? null,
-  reviewedAt: data.reviewedAt instanceof Timestamp
-    ? data.reviewedAt.toDate().toISOString()
-    : (data.reviewedAt ?? null),
-  createdAt: data.createdAt instanceof Timestamp
-    ? data.createdAt.toDate().toISOString()
-    : (data.createdAt ?? ""),
-  resolvedAt: data.resolvedAt instanceof Timestamp
-    ? data.resolvedAt.toDate().toISOString()
-    : (data.resolvedAt ?? null),
+  reviewedAt:
+    data.reviewedAt instanceof Timestamp
+      ? data.reviewedAt.toDate().toISOString()
+      : (data.reviewedAt ?? null),
+  createdAt:
+    data.createdAt instanceof Timestamp
+      ? data.createdAt.toDate().toISOString()
+      : (data.createdAt ?? ""),
+  resolvedAt:
+    data.resolvedAt instanceof Timestamp
+      ? data.resolvedAt.toDate().toISOString()
+      : (data.resolvedAt ?? null),
   approvedAt: data.approvedAt ?? undefined,
   approvedByName: data.approvedByName ?? undefined,
   deliveredAt: data.deliveredAt ?? undefined,
@@ -133,15 +141,21 @@ const toSupplyRequest = (id: string, data: any): SupplyRequest => ({
 });
 
 export async function markDelivered(id: string, byName: string) {
-  await updateDoc(doc(db, REQUESTS_COL, id), {   // ← REQUESTS_COL not "supplyRequests"
+  await updateDoc(doc(db, REQUESTS_COL, id), {
+    // ← REQUESTS_COL not "supplyRequests"
     status: "resolved",
     deliveredAt: new Date().toISOString(),
     deliveredByName: byName,
   });
 }
 
-export async function markFailedDelivery(id: string, reason: string, byName: string) {
-  await updateDoc(doc(db, REQUESTS_COL, id), {   // ← REQUESTS_COL not "supplyRequests"
+export async function markFailedDelivery(
+  id: string,
+  reason: string,
+  byName: string,
+) {
+  await updateDoc(doc(db, REQUESTS_COL, id), {
+    // ← REQUESTS_COL not "supplyRequests"
     status: "failed_delivery",
     failedReason: reason,
     deliveredByName: byName,
@@ -151,10 +165,7 @@ export async function markFailedDelivery(id: string, reason: string, byName: str
 // ─── Reads ────────────────────────────────────────────────────────────────────
 
 export async function getAllInventoryItems(): Promise<OfficeInventoryItem[]> {
-  const q = query(
-    collection(db, ITEMS_COL),
-    where("isActive", "==", true),
-  );
+  const q = query(collection(db, ITEMS_COL), where("isActive", "==", true));
   const snap = await getDocs(q);
   return snap.docs.map((d) => toItem(d.id, d.data()));
 }
@@ -178,10 +189,16 @@ export async function getAllStockTransactions(): Promise<StockTransaction[]> {
 
 // ─── CREATE ───────────────────────────────────────────────────────────────────
 
-export async function createInventoryItem(input: NewItemInput): Promise<OfficeInventoryItem> {
-  const existing = query(collection(db, ITEMS_COL), where("itemCode", "==", input.itemCode));
+export async function createInventoryItem(
+  input: NewItemInput,
+): Promise<OfficeInventoryItem> {
+  const existing = query(
+    collection(db, ITEMS_COL),
+    where("itemCode", "==", input.itemCode),
+  );
   const existingSnap = await getDocs(existing);
-  if (!existingSnap.empty) throw new Error(`Item code "${input.itemCode}" already exists.`);
+  if (!existingSnap.empty)
+    throw new Error(`Item code "${input.itemCode}" already exists.`);
 
   const lowStockThreshold = input.lowStockThreshold ?? 5;
   const inStockThreshold = input.inStockThreshold ?? 10;
@@ -239,7 +256,8 @@ export async function updateInventoryItem(
 
   const current = snap.data();
   const currentStock = current.currentStock as number;
-  const inStockThreshold = updates.inStockThreshold ?? (current.inStockThreshold as number);
+  const inStockThreshold =
+    updates.inStockThreshold ?? (current.inStockThreshold as number);
 
   const payload: Record<string, any> = {
     ...updates,
@@ -294,7 +312,9 @@ export async function archiveInventoryItem(id: string): Promise<void> {
 // Updates the stockStatusAtRequest snapshot on every pending/awaiting_stock
 // request line that references this item, so the UI reflects live stock.
 
-function mapStockStatusToRequestStatus(status: StockStatus): "available" | "low" | "out_of_stock" {
+function mapStockStatusToRequestStatus(
+  status: StockStatus,
+): "available" | "low" | "out_of_stock" {
   if (status === "out_of_stock") return "out_of_stock";
   if (status === "low_stock") return "low";
   return "available";
@@ -308,8 +328,15 @@ async function syncSupplyRequestsForItem(
 
   // FIX 1: query BOTH "pending" and "awaiting_stock" — either can have stale snapshots
   const [pendingSnap, awaitingSnap] = await Promise.all([
-    getDocs(query(collection(db, REQUESTS_COL), where("status", "==", "pending"))),
-    getDocs(query(collection(db, REQUESTS_COL), where("status", "==", "awaiting_stock"))),
+    getDocs(
+      query(collection(db, REQUESTS_COL), where("status", "==", "pending")),
+    ),
+    getDocs(
+      query(
+        collection(db, REQUESTS_COL),
+        where("status", "==", "awaiting_stock"),
+      ),
+    ),
   ]);
 
   const allDocs = [...pendingSnap.docs, ...awaitingSnap.docs];
@@ -323,7 +350,10 @@ async function syncSupplyRequestsForItem(
       // FIX 2: update any line whose snapshot differs — not just out_of_stock ones.
       // This means low → out_of_stock AND available → out_of_stock both work,
       // and restocking (out_of_stock → available) also propagates correctly.
-      if (line.itemId === itemId && line.stockStatusAtRequest !== mappedStatus) {
+      if (
+        line.itemId === itemId &&
+        line.stockStatusAtRequest !== mappedStatus
+      ) {
         changed = true;
         return { ...line, stockStatusAtRequest: mappedStatus };
       }
@@ -331,7 +361,9 @@ async function syncSupplyRequestsForItem(
     });
 
     if (changed) {
-      await updateDoc(doc(db, REQUESTS_COL, reqDoc.id), { items: updatedItems });
+      await updateDoc(doc(db, REQUESTS_COL, reqDoc.id), {
+        items: updatedItems,
+      });
     }
   }
 }
@@ -479,7 +511,10 @@ export async function submitSupplyRequest(payload: {
   const year = new Date().getFullYear();
 
   const countSnap = await getDocs(
-    query(collection(db, REQUESTS_COL), where("ticketNumber", ">=", `SR-${year}`))
+    query(
+      collection(db, REQUESTS_COL),
+      where("ticketNumber", ">=", `SR-${year}`),
+    ),
   );
   const nextNum = String(countSnap.size + 1).padStart(4, "0");
   const ticketNumber = `SR-${year}-${nextNum}`;
@@ -487,7 +522,7 @@ export async function submitSupplyRequest(payload: {
   await addDoc(collection(db, REQUESTS_COL), {
     ticketNumber,
     requestedBy: doc(db, "users", payload.requestedById),
-    requestedById: payload.requestedById,       
+    requestedById: payload.requestedById,
     requestedByName: payload.requestedByName,
     items: payload.items,
     status: "pending",
@@ -578,14 +613,14 @@ export async function approveSupplyRequest(requestId: string): Promise<void> {
     await syncSupplyRequestsForItem(line.itemId, newStockStatus);
   }
 
- await updateDoc(reqRef, {
-  status: "out_for_delivery" as SupplyRequestStatus,
-  approvedByName: user.name,
-  approvedAt: new Date().toISOString(),
-  reviewedBy: user.id,
-  reviewedByName: user.name,
-  reviewedAt: serverTimestamp(),
-});
+  await updateDoc(reqRef, {
+    status: "out_for_delivery" as SupplyRequestStatus,
+    approvedByName: user.name,
+    approvedAt: new Date().toISOString(),
+    reviewedBy: user.id,
+    reviewedByName: user.name,
+    reviewedAt: serverTimestamp(),
+  });
 
   await logAudit({
     table: "supply_requests",
@@ -666,7 +701,7 @@ export async function approveSupplyRequestPartial(
     await syncSupplyRequestsForItem(line.itemId, newStockStatus);
   }
 
- await updateDoc(reqRef, {
+  await updateDoc(reqRef, {
     status: "out_for_delivery" as SupplyRequestStatus,
     approvedByName: user.name,
     approvedAt: new Date().toISOString(),
@@ -688,7 +723,6 @@ export async function approveSupplyRequestPartial(
 }
 
 // ─── SUPPLY REQUEST (admin reject) ────────────────────────────────────────────
-
 export async function rejectSupplyRequest(
   requestId: string,
   reason: string,
@@ -708,6 +742,40 @@ export async function rejectSupplyRequest(
     reviewedAt: serverTimestamp(),
     resolvedAt: serverTimestamp(),
   });
+
+  // ── Log a transaction per item (no stock change — quantityChange: 0) ────────
+  const items: {
+    itemId: string;
+    itemName: string;
+    itemCode: string;
+    quantityRequested: number;
+  }[] = request.items ?? [];
+
+  for (const line of items) {
+    const itemRef = doc(db, ITEMS_COL, line.itemId);
+    const itemSnap = await getDoc(itemRef);
+    if (!itemSnap.exists()) continue;
+
+    const itemData = itemSnap.data();
+    const currentStock = itemData.currentStock as number;
+
+    await addDoc(collection(db, TX_COL), {
+      itemId: line.itemId,
+      itemCode: itemData.itemCode,
+      itemName: itemData.name,
+      type: "supply_request_rejected",
+      quantityChange: 0,
+      stockBefore: currentStock,
+      stockAfter: currentStock,
+      pricePerUnit: itemData.pricePerUnit,
+      totalAmount: 0,
+      reason: `Rejected SR ${request.ticketNumber}: ${reason}`,
+      performedByName: user.name,
+      transactionDate: new Date().toISOString().split("T")[0],
+      createdAt: serverTimestamp(),
+    });
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
 
   await logAudit({
     table: "supply_requests",

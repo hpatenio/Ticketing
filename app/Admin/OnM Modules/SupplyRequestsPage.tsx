@@ -29,13 +29,13 @@ type StockStatus = "available" | "low" | "out_of_stock";
 // ─── Status config ────────────────────────────────────────────────────────────
 
 const REQUEST_STATUS_TABS: { label: string; value: StatusFilter }[] = [
-  { label: "All",              value: "all" },
-  { label: "Pending",          value: "pending" },
-  { label: "Awaiting stock",   value: "awaiting_stock" },
+  { label: "All", value: "all" },
+  { label: "Pending", value: "pending" },
+  { label: "Awaiting stock", value: "awaiting_stock" },
   { label: "Out for delivery", value: "out_for_delivery" },
-  { label: "Resolved",         value: "resolved" },      // ← changed from "Delivered"
-  { label: "Failed",           value: "failed_delivery" },
-  { label: "Rejected",         value: "rejected" },
+  { label: "Resolved", value: "resolved" }, // ← changed from "Delivered"
+  { label: "Failed", value: "failed_delivery" },
+  { label: "Rejected", value: "rejected" },
 ];
 
 const DELIVERY_STATUS_TABS: {
@@ -47,6 +47,7 @@ const DELIVERY_STATUS_TABS: {
   { label: "Delivered", value: "resolved" },
   { label: "Failed", value: "failed_delivery" },
 ];
+
 
 function statusBadgeClass(status: string): string {
   switch (status) {
@@ -167,6 +168,7 @@ function RejectModal({
   onConfirm,
   submitting,
   theme,
+  zIndex = 50,
 }: {
   visible: boolean;
   ticketNumber: string;
@@ -174,6 +176,7 @@ function RejectModal({
   onConfirm: (reason: string) => void;
   submitting: boolean;
   theme: any;
+  zIndex?: number;
 }) {
   const [reason, setReason] = useState("");
   useEffect(() => {
@@ -181,7 +184,7 @@ function RejectModal({
   }, [visible]);
   if (!visible) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <div className="fixed inset-0 flex items-center justify-center bg-black/40 px-4" style={{ zIndex }}>
       <div
         style={{ backgroundColor: theme.surface, borderColor: theme.border }}
         className="w-full max-w-sm rounded-xl border p-5"
@@ -619,13 +622,14 @@ function DetailDrawer({
 }
 
 // ─── Supply Request row ───────────────────────────────────────────────────────
-
 function RequestRow({
   request,
   index,
   onApprove,
   onReject,
   onView,
+  onDeliver,
+  onFail,
   approvingId,
   theme,
 }: {
@@ -634,6 +638,8 @@ function RequestRow({
   onApprove: (r: SupplyRequest) => void;
   onReject: (r: SupplyRequest) => void;
   onView: (r: SupplyRequest) => void;
+  onDeliver: (r: SupplyRequest) => void;
+  onFail: (r: SupplyRequest) => void;
   approvingId: string | null;
   theme: any;
 }) {
@@ -733,6 +739,25 @@ function RequestRow({
               className="px-2.5 py-1.5 text-xs font-medium rounded-lg border disabled:opacity-60"
             >
               ✕
+            </button>
+          </div>
+        ) : request.status === "out_for_delivery" ? (
+          <div className="inline-flex items-center gap-1.5">
+            <button
+              onClick={() => onDeliver(request)}
+              disabled={isApproving}
+              style={{ backgroundColor: "#16a34a", color: "#fff" }}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg disabled:opacity-60"
+            >
+              {isApproving ? "Saving…" : "✓ Delivered"}
+            </button>
+            <button
+              onClick={() => onFail(request)}
+              disabled={isApproving}
+              style={{ backgroundColor: "#D97706", color: "#fff" }}
+              className="px-2.5 py-1.5 text-xs font-medium rounded-lg disabled:opacity-60"
+            >
+              ✕ Failed
             </button>
           </div>
         ) : (
@@ -880,7 +905,11 @@ function DeliveryRow({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-type Props = { user?: ADUser };
+type Props = {
+  user?: ADUser;
+  initialApprovalRequest?: SupplyRequest | null;
+  onApprovalModalOpened?: () => void;
+};
 
 const REQUEST_HEADERS = [
   "Ticket #",
@@ -902,7 +931,7 @@ const DELIVERY_HEADERS = [
   "",
 ];
 
-export default function SupplyRequestsPage({ user }: Props) {
+export default function SupplyRequestsPage({ user, initialApprovalRequest, onApprovalModalOpened }: Props) {
   const { theme } = useTheme();
 
   const [pageTab, setPageTab] = useState<PageTab>("requests");
@@ -927,43 +956,51 @@ export default function SupplyRequestsPage({ user }: Props) {
   const [failing, setFailing] = useState(false);
   const [error, setError] = useState("");
 
- // REPLACE with:
-const loadRequests = useCallback(async () => {
-  const data = await getAllSupplyRequests();
-  setRequests(data);
-}, []);
+  
+  // REPLACE with:
+  const loadRequests = useCallback(async () => {
+    const data = await getAllSupplyRequests();
+    setRequests(data);
+  }, []);
 
-useEffect(() => {
-  setLoading(true);
-
-  const q = query(
-    collection(db, "supply_requests"),
-    orderBy("createdAt", "desc")
-  );
-
-  const unsubscribe = onSnapshot(
-    q,
-    async () => {
-      try {
-        // Re-use the existing service function so DocumentReference
-        // resolution and data shaping stays consistent
-        const data = await getAllSupplyRequests();
-        setRequests(data);
-      } catch (err) {
-        console.error(err);
-        setError("Failed to load supply requests.");
-      } finally {
-        setLoading(false);
-      }
-    },
-    (err) => {
-      console.error("Real-time supply requests listener error:", err);
-      setLoading(false);
+  useEffect(() => {
+    if (initialApprovalRequest) {
+      setApprovalTarget(initialApprovalRequest);
+      onApprovalModalOpened?.();
     }
-  );
+  }, [initialApprovalRequest]);
 
-  return () => unsubscribe();
-}, []);
+  useEffect(() => {
+    setLoading(true);
+
+    const q = query(
+      collection(db, "supply_requests"),
+      orderBy("createdAt", "desc"),
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      async () => {
+        try {
+          // Re-use the existing service function so DocumentReference
+          // resolution and data shaping stays consistent
+          const data = await getAllSupplyRequests();
+          setRequests(data);
+        } catch (err) {
+          console.error(err);
+          setError("Failed to load supply requests.");
+        } finally {
+          setLoading(false);
+        }
+      },
+      (err) => {
+        console.error("Real-time supply requests listener error:", err);
+        setLoading(false);
+      },
+    );
+
+    return () => unsubscribe();
+  }, []);
 
   // ── Filtered lists ─────────────────────────────────────────────────────────
 
@@ -1112,6 +1149,13 @@ useEffect(() => {
       setFailing(false);
     }
   };
+
+const handleReject = (requestId: string) => {
+  const request = requests.find((r) => r.id === requestId);
+  if (!request) return;
+  setApprovalTarget(null);
+  setTimeout(() => setRejectTarget(request), 100);
+};
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -1311,6 +1355,8 @@ useEffect(() => {
                         onApprove={(x) => setApprovalTarget(x)}
                         onReject={(x) => setRejectTarget(x)}
                         onView={(x) => setDetailRequest(x)}
+                        onDeliver={handleMarkDelivered}
+                        onFail={(x) => setFailTarget(x)}
                         approvingId={approvingId}
                         theme={theme}
                       />
@@ -1351,6 +1397,7 @@ useEffect(() => {
         onClose={() => setApprovalTarget(null)}
         onApproveAll={handleApproveAll}
         onApprovePartial={handleApprovePartial}
+        onReject={handleReject} // add this
         theme={theme}
       />
 
@@ -1368,7 +1415,6 @@ useEffect(() => {
         submitting={rejecting}
         theme={theme}
       />
-
       <FailedDeliveryModal
         visible={failTarget !== null}
         ticketNumber={failTarget?.ticketNumber ?? ""}

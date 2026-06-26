@@ -27,6 +27,9 @@ import MyTicketsPage from "../Employee/MyTicketsPage";
 import SupplyRequestsPage from "../Admin/OnM Modules/SupplyRequestsPage";
 import ActivityPage from "../Admin/OnM Modules/ActivityPage";
 import MonthlyReportPage from "../Admin/OnM Modules/MonthlyReportPage";
+import OfficeDashboardPage, {
+  DashboardInventoryFilter,
+} from "../Admin/OnM Modules/OfficeDashboardPage";
 // import SupplyInventoryPage from "../Employee/SupplyInventoryPage";
 
 const ACTIVE_KEY_STORAGE = "superadmin_active_key";
@@ -40,8 +43,18 @@ type Props = {
 export default function SuperAdminDashboard({ user, onLogout }: Props) {
   const [activeKey, setActiveKey] = useState("dashboard");
   const [hydrated, setHydrated] = useState(false);
+
+  // ── IT Inventory filter (from ITInventorySummary dashboard cards) ──────────
   const [inventoryFilter, setInventoryFilter] =
     useState<InventoryFilter | null>(null);
+
+// ── Office Inventory filter (from OfficeDashboardPage KPI cards) ──────────
+  const [officeInventoryFilter, setOfficeInventoryFilter] =
+    useState<DashboardInventoryFilter>(null);
+
+  // ── Pending approval from dashboard "Details" button ──────────────────────
+  const [pendingApproval, setPendingApproval] = useState<import("../../types").SupplyRequest | null>(null);
+
   const { width } = useWindowDimensions();
   const { theme } = useTheme();
   const isMobile =
@@ -69,14 +82,43 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
 
   if (!hydrated) return null;
 
+  // ── IT Inventory filter navigate (from DashboardHome summary) ─────────────
   const handleFilterNavigate = (filter: InventoryFilter | null) => {
     setInventoryFilter(filter);
     setActiveKey("inventory");
   };
+// ── Office dashboard KPI card navigate ────────────────────────────────────
+  const handleOfficeDashboardNavigate = (
+    tab: "inventory" | "supply_requests" | "monthly_report" | "activity",
+    filter?: DashboardInventoryFilter,
+  ) => {
+    const keyMap = {
+      inventory:       "officeinventory",
+      supply_requests: "supplyrequest",
+      monthly_report:  "monthlyreport",
+      activity:        "activity",
+    } as const;
+
+    if (tab === "inventory") {
+      setOfficeInventoryFilter(filter ?? null);
+    }
+
+    setActiveKey(keyMap[tab]);
+  };
+
+  const handleOfficeDashboardNavigateWithPayload = (payload: {
+    tab: "inventory" | "supply_requests" | "monthly_report" | "activity";
+    approvalRequest?: import("../../types").SupplyRequest;
+  }) => {
+    if (payload.approvalRequest) {
+      setPendingApproval(payload.approvalRequest);
+    }
+    handleOfficeDashboardNavigate(payload.tab);
+  };
 
   const renderContent = () => {
     switch (activeKey) {
-      // ─── Admin pages ───────────────────────────────────────────────────────
+      // ─── IT pages ──────────────────────────────────────────────────────────
       case "inventory":
         return (
           <ITInventoryPage
@@ -92,22 +134,40 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
         return <UsersPage currentUser={user} />;
       case "audit":
         return <AuditTrailPage />;
+
+      case "officedashboard":
+        return (
+          <OfficeDashboardPage
+            user={user}
+            onNavigate={handleOfficeDashboardNavigate}
+            onNavigateWithPayload={handleOfficeDashboardNavigateWithPayload}
+          />
+        );
       case "officeinventory":
-        return <OfficeInventoryPage />;
-      case "supplyrequest":
-        return <SupplyRequestsPage user={user} />;
+        return (
+          <OfficeInventoryPage
+            initialFilter={officeInventoryFilter}
+            isSuperAdmin={true}
+          />
+        );
+ case "supplyrequest":
+        return (
+          <SupplyRequestsPage
+            user={user}
+            initialApprovalRequest={pendingApproval}
+            onApprovalModalOpened={() => setPendingApproval(null)}
+          />
+        );
       case "monthlyreport":
         return <MonthlyReportPage />;
-      case "mytickets":
-        return <MyTicketsPage user={user} />;
+      case "activity":
+        return <ActivityPage />;
 
       // ─── Employee pages ────────────────────────────────────────────────────
       case "submitticket":
         return <SubmitTicketPage user={user} onNavigate={setActiveKey} />;
       case "mytickets":
         return <MyTicketsPage user={user} />;
-      case "activity":
-        return <ActivityPage />;
 
       default:
         return (
@@ -118,24 +178,20 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
 
   const getTitle = () => {
     switch (activeKey) {
-      case "inventory":
-        return "IT Inventory";
-      case "consumables":
-        return "IT Consumables";
-      case "tickets":
-        return "Concern Tickets";
-      case "users":
-        return "User Accounts";
-      case "audit":
-        return "Audit Trail";
-      case "submitticket":
-        return "Submit Ticket";
-      case "mytickets":
-        return "My Tickets";
-      case "supplyinventory":
-        return "Supply Inventory";
-      default:
-        return "Dashboard";
+      case "inventory":        return "IT Inventory";
+      case "consumables":      return "IT Consumables";
+      case "tickets":          return "Concern Tickets";
+      case "users":            return "User Accounts";
+      case "audit":            return "Audit Trail";
+      case "officedashboard":  return "Office Dashboard";
+      case "officeinventory":  return "Office Supplies";
+      case "supplyrequest":    return "Supply Requests";
+      case "monthlyreport":    return "Monthly Report";
+      case "activity":         return "Activity";
+      case "submitticket":     return "Submit Ticket";
+      case "mytickets":        return "My Tickets";
+      case "supplyinventory":  return "Supply Inventory";
+      default:                 return "Dashboard";
     }
   };
 
@@ -154,7 +210,10 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
           user={user}
           activeKey={activeKey}
           onNavigate={(key) => {
+            // Clear IT inventory filter when leaving that page
             if (key !== "inventory") setInventoryFilter(null);
+            // Clear office inventory filter when leaving that page
+            if (key !== "officeinventory") setOfficeInventoryFilter(null);
             setActiveKey(key);
           }}
           onLogout={onLogout}
@@ -185,6 +244,7 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
             activeKey={activeKey}
             onNavigate={(key) => {
               if (key !== "inventory") setInventoryFilter(null);
+              if (key !== "officeinventory") setOfficeInventoryFilter(null);
               setActiveKey(key);
             }}
           />

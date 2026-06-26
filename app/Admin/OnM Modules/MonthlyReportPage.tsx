@@ -426,8 +426,10 @@ export default function MonthlyReportPage({ user }: Props) {
   }, [monthlyRows]);
 
   const filteredRows = useMemo(() => {
-    if (activeTab === "all") return monthlyRows;
-    return monthlyRows.filter((r) => r.category === activeTab);
+    const rows = activeTab === "all"
+      ? monthlyRows
+      : monthlyRows.filter((r) => r.category === activeTab);
+    return [...rows].sort((a, b) => a.name.localeCompare(b.name));
   }, [monthlyRows, activeTab]);
 
   const kpi = useMemo(() => {

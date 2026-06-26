@@ -40,6 +40,12 @@ const ACTION_CONFIG: Record<
     text: "#92400e",
     border: "#fde68a",
   },
+  supply_request_rejected: {
+  label: "Rejected",
+  bg: "#fee2e2",
+  text: "#b91c1c",
+  border: "#fecaca",
+},
 };
 
 function getActionConfig(type: string) {
@@ -59,6 +65,7 @@ const ACTION_FILTER_OPTIONS = [
   { label: "Manual adjustment", value: "manual_adjustment" },
   { label: "Supply request approved", value: "supply_request_fulfilled" },
   { label: "Ticket deduction", value: "ticket_deduction" },
+  { label: "Supply request rejected", value: "supply_request_rejected" },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

@@ -7,6 +7,7 @@ import {
   Platform,
   Animated,
   Easing,
+  ScrollView,
 } from "react-native";
 import {
   getNavColors,
@@ -33,13 +34,25 @@ type SidebarProps = {
 const COLLAPSED_W = 64;
 const EXPANDED_W = 220;
 
+// Theme cycle order
+const THEME_CYCLE = ["light", "dark", "system"] as const;
+type ThemeMode = (typeof THEME_CYCLE)[number];
+
+const THEME_META: Record<
+  ThemeMode,
+  { label: string; Icon: typeof Sun; next: ThemeMode }
+> = {
+  light: { label: "Light", Icon: Sun, next: "dark" },
+  dark: { label: "Dark", Icon: Moon, next: "system" },
+  system: { label: "System", Icon: Monitor, next: "light" },
+};
+
 export default function Sidebar({
   user,
   activeKey,
   onNavigate,
   onLogout,
 }: SidebarProps) {
-  // ── Always start expanded; hover events are kept but won't collapse ──────
   const [expanded, setExpanded] = useState(true);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
@@ -51,7 +64,6 @@ export default function Sidebar({
   const permissionItems = getPermissionItemsForEmployee(user);
   const hasPermissions = permissionItems.length > 0;
 
-  // ── Start at EXPANDED_W so labels are visible immediately ────────────────
   const animatedWidth = useRef(new Animated.Value(EXPANDED_W)).current;
   const animatedExpand = useRef(new Animated.Value(1)).current;
 
@@ -82,8 +94,6 @@ export default function Sidebar({
     ]).start();
   };
 
-  // Hover handlers are kept intact so the feature can be re-enabled later,
-  // but they no-op while the sidebar is locked open.
   const handleExpand = () => {
     if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
     hoverTimeout.current = setTimeout(() => {
@@ -94,7 +104,7 @@ export default function Sidebar({
 
   const handleCollapse = () => {
     if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
-    // ── Collapse disabled — remove these two lines to re-enable ─────────
+    // Collapse disabled — remove these two lines to re-enable
     // setExpanded(false);
     // setSettingsOpen(false);
     // animateSidebar(COLLAPSED_W);
@@ -115,11 +125,14 @@ export default function Sidebar({
     onLogout();
   };
 
-  const themeOptions = [
-    { mode: "light" as const, label: "Light", Icon: Sun },
-    { mode: "dark" as const, label: "Dark", Icon: Moon },
-    { mode: "system" as const, label: "System", Icon: Monitor },
-  ];
+  // Cycle to the next theme mode on each press
+  const handleThemeCycle = () => {
+    const next = THEME_META[themeMode as ThemeMode]?.next ?? "light";
+    setThemeMode(next);
+  };
+
+  const currentTheme = THEME_META[themeMode as ThemeMode] ?? THEME_META.system;
+  const ThemeIcon = currentTheme.Icon;
 
   // Reusable nav item renderer
   const renderNavItem = (item: NavItem) => {
@@ -261,8 +274,13 @@ export default function Sidebar({
           </Animated.Text>
         </TouchableOpacity>
 
-        {/* Main nav items + Access section */}
-        <View style={{ flex: 1, paddingVertical: 12 }}>
+        {/* ── Scrollable nav area ── */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingVertical: 12 }}
+          showsVerticalScrollIndicator={false}
+          // On web, show a thin scrollbar only on hover via CSS (see note below)
+        >
           {sections.map((section, sIdx) => (
             <View
               key={sIdx}
@@ -297,7 +315,7 @@ export default function Sidebar({
             </View>
           ))}
 
-          {/* Access section — only shown for employees with at least 1 permission */}
+          {/* Access section */}
           {hasPermissions && (
             <View
               style={{
@@ -324,57 +342,9 @@ export default function Sidebar({
               {permissionItems.map(renderNavItem)}
             </View>
           )}
-        </View>
+        </ScrollView>
 
-        {/* Logout button */}
-        <View
-          style={{
-            borderTopWidth: 0.5,
-            borderTopColor: theme.navBorder,
-            paddingTop: 0,
-          }}
-        >
-          <TouchableOpacity
-            onPress={() => setLogoutModalVisible(true)}
-            activeOpacity={0.7}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 12,
-              marginHorizontal: 8,
-              marginBottom: 8,
-              paddingHorizontal: 12,
-              paddingVertical: 10,
-              borderRadius: 10,
-            }}
-          >
-            <View
-              style={{
-                flexShrink: 0,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <LogOut color="#f87171" size={22} />
-            </View>
-            <Animated.Text
-              numberOfLines={1}
-              style={{
-                fontFamily: "Outfit",
-                fontSize: 15.5,
-                letterSpacing: -0.1,
-                color: "#f87171",
-                opacity: labelOpacity,
-                transform: [{ translateX: labelTranslateX }],
-                flexShrink: 1,
-              }}
-            >
-              Log out
-            </Animated.Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Theme popout */}
+        {/* ── Settings popout (theme cycle + logout) ── */}
         {settingsOpen && (
           <View
             style={{
@@ -387,57 +357,76 @@ export default function Sidebar({
               overflow: "hidden",
             }}
           >
-            {themeOptions.map(({ mode, label, Icon }, i) => {
-              const isSelected = themeMode === mode;
-              return (
-                <TouchableOpacity
-                  key={mode}
-                  onPress={() => setThemeMode(mode)}
-                  activeOpacity={0.7}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 10,
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    backgroundColor: isSelected
-                      ? theme.bgActive
-                      : "transparent",
-                    borderTopWidth: i === 0 ? 0 : 0.5,
-                    borderTopColor: theme.navBorder,
-                  }}
-                >
-                  <Icon
-                    color={isSelected ? theme.iconActive : theme.iconInactive}
-                    size={16}
-                  />
-                  <Text
-                    style={{
-                      fontFamily: isSelected ? "Outfit-SemiBold" : "Outfit",
-                      fontSize: 13.5,
-                      color: isSelected ? theme.textActive : theme.textInactive,
-                      flex: 1,
-                    }}
-                  >
-                    {label}
-                  </Text>
-                  {isSelected && (
-                    <View
-                      style={{
-                        width: 7,
-                        height: 7,
-                        borderRadius: 999,
-                        backgroundColor: theme.iconActive,
-                      }}
-                    />
-                  )}
-                </TouchableOpacity>
-              );
-            })}
+            {/* Single cycling theme row */}
+            <TouchableOpacity
+              onPress={handleThemeCycle}
+              activeOpacity={0.7}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 10,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+              }}
+            >
+              <ThemeIcon color={theme.iconActive} size={16} />
+              <Text
+                style={{
+                  fontFamily: "Outfit-SemiBold",
+                  fontSize: 13.5,
+                  color: theme.textActive,
+                  flex: 1,
+                }}
+              >
+                {currentTheme.label}
+              </Text>
+              {/* Small dot to indicate it's a cycle button */}
+              <View
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: 999,
+                  backgroundColor: theme.iconActive,
+                }}
+              />
+            </TouchableOpacity>
+
+            {/* Divider */}
+            <View
+              style={{ height: 0.5, backgroundColor: theme.navBorder, marginHorizontal: 0 }}
+            />
+
+            {/* Logout row */}
+            <TouchableOpacity
+              onPress={() => {
+                setSettingsOpen(false);
+                setLogoutModalVisible(true);
+              }}
+              activeOpacity={0.7}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 10,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+              }}
+            >
+              <LogOut color="#f87171" size={16} />
+              <Text
+                style={{
+                  fontFamily: "Outfit",
+                  fontSize: 13.5,
+                  color: "#f87171",
+                  flex: 1,
+                }}
+              >
+                Log out
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
 
-        {/* User footer */}
+        {/* ── User footer ── */}
         <View
           style={{
             borderTopWidth: 0.5,
@@ -500,7 +489,7 @@ export default function Sidebar({
             </Text>
           </Animated.View>
 
-          {/* Settings icon — visible only when expanded */}
+          {/* Settings gear — visible only when expanded */}
           <Animated.View style={{ opacity: labelOpacity }}>
             <TouchableOpacity
               onPress={() => setSettingsOpen((prev) => !prev)}

@@ -346,6 +346,38 @@ export const AuditIcon: React.FC<{ color: string; size?: number }> = ({
 
 // ─── Office section icons ─────────────────────────────────────────────────────
 
+// ── NEW: Office Dashboard icon ────────────────────────────────────────────────
+export const OfficeDashboardIcon: React.FC<{ color: string; size?: number }> = ({
+  color,
+  size = 20,
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    {/* Top-left: solid filled square (primary) */}
+    <Rect x="3" y="3" width="7" height="7" rx="1.5" fill={color} />
+    {/* Top-right: bar chart bars */}
+    <Rect x="14" y="8" width="2.5" height="2" rx="0.5" fill={color} opacity="0.9" />
+    <Rect x="17" y="5" width="2.5" height="5" rx="0.5" fill={color} opacity="0.9" />
+    <Rect x="11" y="6" width="2.5" height="4" rx="0.5" fill={color} opacity="0.9" />
+    {/* Bottom-left: trend line */}
+    <Path
+      d="M4 18l3-3 2.5 2 3-3.5"
+      stroke={color}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    {/* Bottom-right: donut ring */}
+    <Circle cx="18" cy="18" r="3.5" stroke={color} strokeWidth="2" opacity="0.7" />
+    <Path
+      d="M18 14.5v1.8"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      opacity="0.9"
+    />
+  </Svg>
+);
+
 export const OfficeSuppliesIcon: React.FC<{ color: string; size?: number }> = ({
   color,
   size = 20,
@@ -471,19 +503,19 @@ export const MENU_BY_ROLE: Record<string, NavSection[]> = {
     {
       sectionLabel: "Office Supplies",
       items: [
-        { key: "officeinventory", label: "Office Supplies", icon: OfficeSuppliesIcon },
-        { key: "supplyrequest",   label: "Supply Request",  icon: SupplyRequestIcon  },
-        { key: "monthlyreport",   label: "Monthly Report",  icon: MonthlyReportIcon  },
-        { key: "activity",        label: "Activity",        icon: ActivityIcon       },
+        { key: "officedashboard", label: "Dashboard",       icon: OfficeDashboardIcon }, // ← NEW
+        { key: "officeinventory", label: "Office Supplies", icon: OfficeSuppliesIcon  },
+        { key: "supplyrequest",   label: "Supply Request",  icon: SupplyRequestIcon   },
+        { key: "monthlyreport",   label: "Monthly Report",  icon: MonthlyReportIcon   },
+        { key: "activity",        label: "Activity",        icon: ActivityIcon        },
       ],
     },
-    // ↓ Employee-side nav items added for superadmin
     {
       sectionLabel: "Employee",
       items: [
-        { key: "submitticket",    label: "Submit Ticket",   icon: SubmitTicketIcon },
-        { key: "mytickets",       label: "My Tickets",      icon: MyTicketsIcon    },
-        { key: "supplyinventory", label: "Supply Inventory", icon: SuppliesIcon    },
+        { key: "submitticket",    label: "Submit Ticket",    icon: SubmitTicketIcon },
+        { key: "mytickets",       label: "My Tickets",       icon: MyTicketsIcon    },
+        { key: "supplyinventory", label: "Supply Inventory", icon: SuppliesIcon     },
       ],
     },
   ],
@@ -504,10 +536,11 @@ export const MENU_BY_ROLE: Record<string, NavSection[]> = {
     {
       sectionLabel: "Office Supplies",
       items: [
-        { key: "officeinventory", label: "Office Supplies", icon: OfficeSuppliesIcon },
-        { key: "supplyrequest",   label: "Supply Request",  icon: SupplyRequestIcon  },
-        { key: "monthlyreport",   label: "Monthly Report",  icon: MonthlyReportIcon  },
-        { key: "activity",        label: "Activity",        icon: ActivityIcon       },
+        { key: "officedashboard", label: "Dashboard",       icon: OfficeDashboardIcon }, // ← NEW
+        { key: "officeinventory", label: "Office Supplies", icon: OfficeSuppliesIcon  },
+        { key: "supplyrequest",   label: "Supply Request",  icon: SupplyRequestIcon   },
+        { key: "monthlyreport",   label: "Monthly Report",  icon: MonthlyReportIcon   },
+        { key: "activity",        label: "Activity",        icon: ActivityIcon        },
       ],
     },
   ],

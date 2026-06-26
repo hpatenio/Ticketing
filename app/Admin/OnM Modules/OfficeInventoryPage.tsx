@@ -598,41 +598,7 @@ const [sortDir, setSortDir] = useState<SortDir>("asc");
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setAuditModal({})}
-              style={{
-                backgroundColor: theme.surface,
-                color: theme.text,
-                borderColor: theme.border,
-              }}
-              className="px-3 py-2 text-sm font-medium rounded-lg border whitespace-nowrap"
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = theme.bgHover)
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = theme.surface)
-              }
-            >
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{
-                  display: "inline",
-                  verticalAlign: "middle",
-                  marginRight: 5,
-                }}
-              >
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
-              Audit Trail
-            </button>
+            
 
             <button
               onClick={() => {

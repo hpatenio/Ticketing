@@ -6,9 +6,9 @@ import { getAllInventoryItems } from "../../../../Services/officeInventory";
 
 type FulfillmentLine = {
   item: SupplyRequestItem;
-  liveStock: number;        // current stock from inventory
-  qtyToDispense: number;    // admin-editable, capped at min(requested, liveStock)
-  skipped: boolean;         // admin toggled skip
+  liveStock: number; // current stock from inventory
+  qtyToDispense: number; // admin-editable, capped at min(requested, liveStock)
+  skipped: boolean; // admin toggled skip
 };
 
 type Props = {
@@ -17,6 +17,7 @@ type Props = {
   onClose: () => void;
   onApproveAll: (request: SupplyRequest) => Promise<void>;
   onApprovePartial: (requestId: string, lines: { itemId: string; qtyToDispense: number }[]) => Promise<void>;
+  onReject: (requestId: string) => void; // ← void, not Promise<void>
   theme: any;
 };
 
@@ -27,9 +28,9 @@ function clamp(val: number, min: number, max: number) {
 }
 
 function stockColor(stock: number, requested: number): string {
-  if (stock <= 0) return "#f87171";           // red
-  if (stock < requested) return "#fb923c";    // orange
-  return "#34d399";                           // green
+  if (stock <= 0) return "#f87171"; // red
+  if (stock < requested) return "#fb923c"; // orange
+  return "#34d399"; // green
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -40,6 +41,7 @@ const PartialApprovalModal: React.FC<Props> = ({
   onClose,
   onApproveAll,
   onApprovePartial,
+  onReject, // add this
   theme,
 }) => {
   const [lines, setLines] = useState<FulfillmentLine[]>([]);
@@ -86,10 +88,10 @@ const PartialApprovalModal: React.FC<Props> = ({
   const activeLines = lines.filter((l) => !l.skipped);
   const hasAnyActive = activeLines.length > 0;
   const allFullyFulfilled = lines.every(
-    (l) => l.skipped || l.qtyToDispense === l.item.quantityRequested
+    (l) => l.skipped || l.qtyToDispense === l.item.quantityRequested,
   );
   const somePartial = lines.some(
-    (l) => !l.skipped && l.qtyToDispense < l.item.quantityRequested
+    (l) => !l.skipped && l.qtyToDispense < l.item.quantityRequested,
   );
   const someSkipped = lines.some((l) => l.skipped);
 
@@ -102,8 +104,8 @@ const PartialApprovalModal: React.FC<Props> = ({
         const qty = isNaN(parsed)
           ? 0
           : clamp(parsed, 0, Math.min(l.item.quantityRequested, l.liveStock));
-        return { ...l, qtyToDispense: qty, skipped: qty === 0 };
-      })
+        return { ...l, qtyToDispense: qty };
+      }),
     );
   };
 
@@ -117,7 +119,7 @@ const PartialApprovalModal: React.FC<Props> = ({
           return { ...l, skipped: false, qtyToDispense: max > 0 ? max : 0 };
         }
         return { ...l, skipped: true, qtyToDispense: 0 };
-      })
+      }),
     );
   };
 
@@ -144,7 +146,10 @@ const PartialApprovalModal: React.FC<Props> = ({
         request.id,
         lines
           .filter((l) => !l.skipped && l.qtyToDispense > 0)
-          .map((l) => ({ itemId: l.item.itemId, qtyToDispense: l.qtyToDispense }))
+          .map((l) => ({
+            itemId: l.item.itemId,
+            qtyToDispense: l.qtyToDispense,
+          })),
       );
       onClose();
     } catch (err: any) {
@@ -153,6 +158,9 @@ const PartialApprovalModal: React.FC<Props> = ({
       setSubmitting(false);
     }
   };
+  const handleReject = () => {
+  onReject(request.id);
+};
 
   // ── Styles ─────────────────────────────────────────────────────────────────
   const input: React.CSSProperties = {
@@ -165,7 +173,9 @@ const PartialApprovalModal: React.FC<Props> = ({
     <div
       className="fixed inset-0 z-[110] flex items-center justify-center"
       style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
         style={{
@@ -185,24 +195,36 @@ const PartialApprovalModal: React.FC<Props> = ({
           className="flex items-start justify-between px-5 py-4 border-b"
         >
           <div>
-            <p style={{ color: theme.subtext }} className="text-[11px] uppercase tracking-wide mb-0.5">
+            <p
+              style={{ color: theme.subtext }}
+              className="text-[11px] uppercase tracking-wide mb-0.5"
+            >
               Approve request
             </p>
             <h2 style={{ color: theme.text }} className="text-sm font-semibold">
               {request.ticketNumber}
-              <span style={{ color: theme.subtext }} className="font-normal ml-2">
+              <span
+                style={{ color: theme.subtext }}
+                className="font-normal ml-2"
+              >
                 · {request.requestedByName}
               </span>
             </h2>
           </div>
-          <button onClick={onClose} style={{ color: theme.subtext }} className="text-lg leading-none mt-0.5">
+          <button
+            onClick={onClose}
+            style={{ color: theme.subtext }}
+            className="text-lg leading-none mt-0.5"
+          >
             ✕
           </button>
         </div>
 
         {/* ── Body ── */}
-        <div style={{ overflowY: "auto", flex: 1 }} className="px-5 py-4 flex flex-col gap-3">
-
+        <div
+          style={{ overflowY: "auto", flex: 1 }}
+          className="px-5 py-4 flex flex-col gap-3"
+        >
           {/* Info callout */}
           <div
             style={{
@@ -212,8 +234,10 @@ const PartialApprovalModal: React.FC<Props> = ({
             }}
             className="rounded-lg border px-3 py-2.5 text-xs leading-relaxed"
           >
-            Adjust quantities per item based on available stock. Skipped items won't be deducted.
-            Use <strong style={{ color: theme.text }}>Approve all</strong> to fulfill every item at the requested qty (same as before).
+            Adjust quantities per item based on available stock. Skipped items
+            won't be deducted. Use{" "}
+            <strong style={{ color: theme.text }}>Approve all</strong> to
+            fulfill every item at the requested qty (same as before).
           </div>
 
           {error && (
@@ -245,7 +269,11 @@ const PartialApprovalModal: React.FC<Props> = ({
                 {["Item", "Requested", "In stock", "Dispense", ""].map((h) => (
                   <span
                     key={h}
-                    style={{ color: theme.subtext, fontSize: 11, fontWeight: 500 }}
+                    style={{
+                      color: theme.subtext,
+                      fontSize: 11,
+                      fontWeight: 500,
+                    }}
                   >
                     {h}
                   </span>
@@ -256,7 +284,8 @@ const PartialApprovalModal: React.FC<Props> = ({
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {lines.map((line) => {
                   const isOutOfStock = line.liveStock <= 0;
-                  const isShortStock = line.liveStock < line.item.quantityRequested;
+                  const isShortStock =
+                    line.liveStock < line.item.quantityRequested;
 
                   return (
                     <div
@@ -290,7 +319,13 @@ const PartialApprovalModal: React.FC<Props> = ({
                       </div>
 
                       {/* Requested qty */}
-                      <span style={{ color: theme.text, fontSize: 13, textAlign: "center" as const }}>
+                      <span
+                        style={{
+                          color: theme.text,
+                          fontSize: 13,
+                          textAlign: "center" as const,
+                        }}
+                      >
                         {line.item.quantityRequested}
                       </span>
 
@@ -299,18 +334,35 @@ const PartialApprovalModal: React.FC<Props> = ({
                         style={{
                           fontSize: 12,
                           fontWeight: 600,
-                          color: stockColor(line.liveStock, line.item.quantityRequested),
+                          color: stockColor(
+                            line.liveStock,
+                            line.item.quantityRequested,
+                          ),
                           textAlign: "center" as const,
                         }}
                       >
                         {line.liveStock}
                         {isShortStock && !isOutOfStock && (
-                          <span style={{ fontSize: 10, fontWeight: 400, display: "block", color: "#fb923c" }}>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 400,
+                              display: "block",
+                              color: "#fb923c",
+                            }}
+                          >
                             short
                           </span>
                         )}
                         {isOutOfStock && (
-                          <span style={{ fontSize: 10, fontWeight: 400, display: "block", color: "#f87171" }}>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 400,
+                              display: "block",
+                              color: "#f87171",
+                            }}
+                          >
                             none
                           </span>
                         )}
@@ -320,11 +372,16 @@ const PartialApprovalModal: React.FC<Props> = ({
                       <input
                         type="number"
                         min={0}
-                        max={Math.min(line.item.quantityRequested, line.liveStock)}
+                        max={Math.min(
+                          line.item.quantityRequested,
+                          line.liveStock,
+                        )}
                         value={line.skipped ? "" : line.qtyToDispense}
                         placeholder={line.skipped ? "—" : "0"}
                         disabled={line.skipped || isOutOfStock}
-                        onChange={(e) => updateQty(line.item.itemId, e.target.value)}
+                        onChange={(e) =>
+                          updateQty(line.item.itemId, e.target.value)
+                        }
                         style={{
                           ...input,
                           padding: "5px 6px",
@@ -343,13 +400,17 @@ const PartialApprovalModal: React.FC<Props> = ({
                       <button
                         onClick={() => toggleSkip(line.item.itemId)}
                         disabled={isOutOfStock}
-                        title={line.skipped ? "Include this item" : "Skip this item"}
+                        title={
+                          line.skipped ? "Include this item" : "Skip this item"
+                        }
                         style={{
                           width: 28,
                           height: 28,
                           borderRadius: 6,
                           border: `1px solid ${theme.border}`,
-                          backgroundColor: line.skipped ? theme.background : "transparent",
+                          backgroundColor: line.skipped
+                            ? theme.background
+                            : "transparent",
                           color: line.skipped ? theme.primary : "#f87171",
                           cursor: isOutOfStock ? "not-allowed" : "pointer",
                           fontSize: 13,
@@ -377,9 +438,13 @@ const PartialApprovalModal: React.FC<Props> = ({
                 >
                   <div className="flex items-center justify-between">
                     <span style={{ color: theme.subtext, fontSize: 12 }}>
-                      {activeLines.length} of {lines.length} item{lines.length !== 1 ? "s" : ""} will be dispensed
+                      {activeLines.length} of {lines.length} item
+                      {lines.length !== 1 ? "s" : ""} will be dispensed
                       {somePartial && (
-                        <span style={{ color: "#fb923c" }}> (partial quantities)</span>
+                        <span style={{ color: "#fb923c" }}>
+                          {" "}
+                          (partial quantities)
+                        </span>
                       )}
                     </span>
                     <span style={{ color: theme.subtext, fontSize: 12 }}>
@@ -388,7 +453,11 @@ const PartialApprovalModal: React.FC<Props> = ({
                         {activeLines.reduce((s, l) => s + l.qtyToDispense, 0)}
                       </strong>
                       {" / "}
-                      {lines.reduce((s, l) => s + l.item.quantityRequested, 0)} requested
+                      {lines.reduce(
+                        (s, l) => s + l.item.quantityRequested,
+                        0,
+                      )}{" "}
+                      requested
                     </span>
                   </div>
                 </div>
@@ -402,21 +471,38 @@ const PartialApprovalModal: React.FC<Props> = ({
           style={{ borderColor: theme.border }}
           className="flex items-center justify-between gap-2 px-5 py-3.5 border-t"
         >
-          <button
-            onClick={onClose}
-            disabled={submitting}
-            style={{
-              backgroundColor: theme.surface,
-              color: theme.text,
-              borderColor: theme.border,
-            }}
-            className="px-3.5 py-2 text-sm font-medium rounded-lg border"
-          >
-            Cancel
-          </button>
-
+          {/* Left: Cancel + Reject */}
           <div className="flex items-center gap-2">
-            {/* Approve all — fulfills at requested qty, bypasses the modal logic */}
+            <button
+              onClick={onClose}
+              disabled={submitting}
+              style={{
+                backgroundColor: theme.surface,
+                color: theme.text,
+                borderColor: theme.border,
+              }}
+              className="px-3.5 py-2 text-sm font-medium rounded-lg border"
+            >
+              Cancel
+            </button>
+
+            <button
+              onClick={handleReject}
+              disabled={submitting || loading}
+              style={{
+                backgroundColor: "transparent",
+                color: "#ef4444",
+                borderColor: "#fca5a5",
+                opacity: submitting || loading ? 0.6 : 1,
+              }}
+              className="px-3.5 py-2 text-sm font-medium rounded-lg border"
+            >
+              {submitting ? "Saving…" : "Reject"}
+            </button>
+          </div>
+
+          {/* Right: Approve all + Approve with adjustments */}
+          <div className="flex items-center gap-2">
             <button
               onClick={handleApproveAll}
               disabled={submitting || loading}
@@ -432,7 +518,6 @@ const PartialApprovalModal: React.FC<Props> = ({
               {submitting ? "Saving…" : "Approve all"}
             </button>
 
-            {/* Approve with custom qtys */}
             <button
               onClick={handleApprovePartial}
               disabled={submitting || loading || !hasAnyActive}
@@ -446,8 +531,8 @@ const PartialApprovalModal: React.FC<Props> = ({
               {submitting
                 ? "Saving…"
                 : someSkipped || somePartial
-                ? "Approve with adjustments"
-                : "Approve"}
+                  ? "Approve with adjustments"
+                  : "Approve"}
             </button>
           </div>
         </div>
