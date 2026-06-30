@@ -12,8 +12,6 @@ import {
 import {
   getNavColors,
   getNavSectionsForUser,
-  getNavItemsForUser,
-  getPermissionItemsForEmployee,
   NavItem,
 } from "./NavItems";
 import { useTheme } from "../../theme/ThemeContext";
@@ -34,17 +32,13 @@ type SidebarProps = {
 const COLLAPSED_W = 64;
 const EXPANDED_W = 220;
 
-// Theme cycle order
 const THEME_CYCLE = ["light", "dark", "system"] as const;
 type ThemeMode = (typeof THEME_CYCLE)[number];
 
-const THEME_META: Record<
-  ThemeMode,
-  { label: string; Icon: typeof Sun; next: ThemeMode }
-> = {
-  light: { label: "Light", Icon: Sun, next: "dark" },
-  dark: { label: "Dark", Icon: Moon, next: "system" },
-  system: { label: "System", Icon: Monitor, next: "light" },
+const THEME_META: Record<ThemeMode, { label: string; Icon: typeof Sun; next: ThemeMode }> = {
+  light:  { label: "Light",  Icon: Sun,     next: "dark"   },
+  dark:   { label: "Dark",   Icon: Moon,    next: "system" },
+  system: { label: "System", Icon: Monitor, next: "light"  },
 };
 
 export default function Sidebar({
@@ -53,23 +47,41 @@ export default function Sidebar({
   onNavigate,
   onLogout,
 }: SidebarProps) {
-  const [expanded, setExpanded] = useState(true);
-  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  const [expanded, setExpanded]               = useState(true);
+  const [hoveredKey, setHoveredKey]           = useState<string | null>(null);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen]       = useState(false);
 
   const { theme, themeMode, setThemeMode } = useTheme();
   const C = getNavColors(theme);
-  const sections = getNavSectionsForUser(user);
-  const permissionItems = getPermissionItemsForEmployee(user);
-  const hasPermissions = permissionItems.length > 0;
 
-  const animatedWidth = useRef(new Animated.Value(EXPANDED_W)).current;
+  // ✅ Normalize permissions so undefined fields default to false
+  //    This ensures officeSupplies (and any future key) always evaluates correctly
+ const normalizedUser: ADUser = {
+  ...user,
+  permissions: {
+    itAccess:
+      Boolean(user.permissions?.itAccess) ||
+      Boolean(user.permissions?.itInventory) ||
+      Boolean(user.permissions?.consumables) ||
+      Boolean(user.permissions?.tickets),
+    itInventory:    user.permissions?.itInventory    ?? false,
+    consumables:    user.permissions?.consumables    ?? false,
+    tickets:        user.permissions?.tickets        ?? false,
+    officeSupplies: Boolean(
+      user.permissions?.officeSupplies || (user.permissions as any)?.officesupplies,
+    ),
+  },
+};
+
+  const sections = getNavSectionsForUser(normalizedUser);
+
+  const animatedWidth  = useRef(new Animated.Value(EXPANDED_W)).current;
   const animatedExpand = useRef(new Animated.Value(1)).current;
 
-  const labelOpacity = animatedExpand;
+  const labelOpacity    = animatedExpand;
   const labelTranslateX = animatedExpand.interpolate({
-    inputRange: [0, 1],
+    inputRange:  [0, 1],
     outputRange: [-6, 0],
   });
 
@@ -87,7 +99,7 @@ export default function Sidebar({
       Animated.timing(animatedExpand, {
         toValue: expandTo,
         duration: expandTo === 1 ? 180 : 120,
-        delay: expandTo === 1 ? 60 : 0,
+        delay:    expandTo === 1 ? 60  : 0,
         easing: Easing.out(Easing.ease),
         useNativeDriver: true,
       }),
@@ -104,7 +116,7 @@ export default function Sidebar({
 
   const handleCollapse = () => {
     if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
-    // Collapse disabled — remove these two lines to re-enable
+    // Collapse disabled — uncomment to re-enable:
     // setExpanded(false);
     // setSettingsOpen(false);
     // animateSidebar(COLLAPSED_W);
@@ -125,7 +137,6 @@ export default function Sidebar({
     onLogout();
   };
 
-  // Cycle to the next theme mode on each press
   const handleThemeCycle = () => {
     const next = THEME_META[themeMode as ThemeMode]?.next ?? "light";
     setThemeMode(next);
@@ -134,18 +145,16 @@ export default function Sidebar({
   const currentTheme = THEME_META[themeMode as ThemeMode] ?? THEME_META.system;
   const ThemeIcon = currentTheme.Icon;
 
-  // Reusable nav item renderer
+  // ─── Nav item renderer ───────────────────────────────────────────────────────
   const renderNavItem = (item: NavItem) => {
-    const isActive = item.key === activeKey;
+    const isActive  = item.key === activeKey;
     const isHovered = hoveredKey === item.key;
     const Icon = item.icon;
 
     const navItemWebProps =
       Platform.OS === "web"
         ? {
-            onMouseEnter: () => {
-              if (!isActive) setHoveredKey(item.key);
-            },
+            onMouseEnter: () => { if (!isActive) setHoveredKey(item.key); },
             onMouseLeave: () => setHoveredKey(null),
           }
         : {};
@@ -188,13 +197,7 @@ export default function Sidebar({
             }}
           />
         )}
-        <View
-          style={{
-            flexShrink: 0,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
+        <View style={{ flexShrink: 0, alignItems: "center", justifyContent: "center" }}>
           <Icon color={isActive ? C.iconActive : C.iconInactive} size={23} />
         </View>
         <Animated.Text
@@ -230,7 +233,7 @@ export default function Sidebar({
         }}
         {...webHoverProps}
       >
-        {/* Logo */}
+        {/* ── Logo ── */}
         <TouchableOpacity
           activeOpacity={1}
           onPress={() => {
@@ -274,12 +277,11 @@ export default function Sidebar({
           </Animated.Text>
         </TouchableOpacity>
 
-        {/* ── Scrollable nav area ── */}
+        {/* ── Scrollable nav ── */}
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingVertical: 12 }}
           showsVerticalScrollIndicator={false}
-          // On web, show a thin scrollbar only on hover via CSS (see note below)
         >
           {sections.map((section, sIdx) => (
             <View
@@ -314,37 +316,9 @@ export default function Sidebar({
               {section.items.map(renderNavItem)}
             </View>
           ))}
-
-          {/* Access section */}
-          {hasPermissions && (
-            <View
-              style={{
-                marginTop: 8,
-                borderTopWidth: 0.5,
-                borderTopColor: theme.navBorder,
-                paddingTop: 8,
-              }}
-            >
-              <Animated.Text
-                style={{
-                  fontFamily: "Outfit-SemiBold",
-                  fontSize: 10,
-                  letterSpacing: 0.8,
-                  color: C.textInactive,
-                  textTransform: "uppercase",
-                  paddingHorizontal: 20,
-                  paddingBottom: 4,
-                  opacity: labelOpacity,
-                }}
-              >
-                Access
-              </Animated.Text>
-              {permissionItems.map(renderNavItem)}
-            </View>
-          )}
         </ScrollView>
 
-        {/* ── Settings popout (theme cycle + logout) ── */}
+        {/* ── Settings popout ── */}
         {settingsOpen && (
           <View
             style={{
@@ -357,69 +331,27 @@ export default function Sidebar({
               overflow: "hidden",
             }}
           >
-            {/* Single cycling theme row */}
             <TouchableOpacity
               onPress={handleThemeCycle}
               activeOpacity={0.7}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 10,
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-              }}
+              style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 10 }}
             >
               <ThemeIcon color={theme.iconActive} size={16} />
-              <Text
-                style={{
-                  fontFamily: "Outfit-SemiBold",
-                  fontSize: 13.5,
-                  color: theme.textActive,
-                  flex: 1,
-                }}
-              >
+              <Text style={{ fontFamily: "Outfit-SemiBold", fontSize: 13.5, color: theme.textActive, flex: 1 }}>
                 {currentTheme.label}
               </Text>
-              {/* Small dot to indicate it's a cycle button */}
-              <View
-                style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: 999,
-                  backgroundColor: theme.iconActive,
-                }}
-              />
+              <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: theme.iconActive }} />
             </TouchableOpacity>
 
-            {/* Divider */}
-            <View
-              style={{ height: 0.5, backgroundColor: theme.navBorder, marginHorizontal: 0 }}
-            />
+            <View style={{ height: 0.5, backgroundColor: theme.navBorder }} />
 
-            {/* Logout row */}
             <TouchableOpacity
-              onPress={() => {
-                setSettingsOpen(false);
-                setLogoutModalVisible(true);
-              }}
+              onPress={() => { setSettingsOpen(false); setLogoutModalVisible(true); }}
               activeOpacity={0.7}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 10,
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-              }}
+              style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 10 }}
             >
               <LogOut color="#f87171" size={16} />
-              <Text
-                style={{
-                  fontFamily: "Outfit",
-                  fontSize: 13.5,
-                  color: "#f87171",
-                  flex: 1,
-                }}
-              >
+              <Text style={{ fontFamily: "Outfit", fontSize: 13.5, color: "#f87171", flex: 1 }}>
                 Log out
               </Text>
             </TouchableOpacity>
@@ -438,26 +370,18 @@ export default function Sidebar({
             overflow: "hidden",
           }}
         >
-          {/* Avatar */}
           <View
             style={{
-              width: 32,
-              height: 32,
-              borderRadius: 999,
+              width: 32, height: 32, borderRadius: 999,
               backgroundColor: theme.iconActive,
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
+              alignItems: "center", justifyContent: "center", flexShrink: 0,
             }}
           >
-            <Text
-              style={{ fontFamily: "Outfit-Bold", color: "#fff", fontSize: 13 }}
-            >
+            <Text style={{ fontFamily: "Outfit-Bold", color: "#fff", fontSize: 13 }}>
               {user.displayName?.charAt(0) ?? "U"}
             </Text>
           </View>
 
-          {/* Name + role */}
           <Animated.View
             style={{
               opacity: labelOpacity,
@@ -468,38 +392,22 @@ export default function Sidebar({
           >
             <Text
               numberOfLines={1}
-              style={{
-                fontFamily: "Outfit-SemiBold",
-                fontSize: 12.5,
-                color: theme.textActive,
-                lineHeight: 17,
-              }}
+              style={{ fontFamily: "Outfit-SemiBold", fontSize: 12.5, color: theme.textActive, lineHeight: 17 }}
             >
               {user.displayName}
             </Text>
-            <Text
-              style={{
-                fontFamily: "Outfit",
-                fontSize: 11,
-                color: theme.textInactive,
-                textTransform: "capitalize",
-              }}
-            >
+            <Text style={{ fontFamily: "Outfit", fontSize: 11, color: theme.textInactive, textTransform: "capitalize" }}>
               {user.role}
             </Text>
           </Animated.View>
 
-          {/* Settings gear — visible only when expanded */}
           <Animated.View style={{ opacity: labelOpacity }}>
             <TouchableOpacity
               onPress={() => setSettingsOpen((prev) => !prev)}
               activeOpacity={0.7}
               style={{
-                width: 28,
-                height: 28,
-                borderRadius: 8,
-                alignItems: "center",
-                justifyContent: "center",
+                width: 28, height: 28, borderRadius: 8,
+                alignItems: "center", justifyContent: "center",
                 backgroundColor: settingsOpen ? theme.bgActive : "transparent",
               }}
             >

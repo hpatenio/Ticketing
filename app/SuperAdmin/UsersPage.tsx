@@ -8,23 +8,27 @@ import {
   TextInput,
 } from "react-native";
 import { loadUsers as loadADUsers, clearEmployeeUsers } from "./utils/adUsers";
-import { collection, doc, getDocs, updateDoc } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDocs,
+  setDoc,
+  updateDoc,
+} from "firebase/firestore";
 import { db } from "../../firebase";
 import { ADUser } from "../../types";
 import { useTheme } from "../../theme/ThemeContext";
 import { UserPermissions } from "../../types";
 
 type EnrichedUser = ADUser & { hasLoggedIn: boolean };
+type Props = { currentUser: ADUser };
 
-type Props = {
-  currentUser: ADUser;
-};
+// ✅ Cache stores username + permissions
+let employeeUsersCache:
+  | { username: string; permissions: UserPermissions }[]
+  | null = null;
 
-function getRoleStyle(role: string): {
-  bg: string;
-  text: string;
-  label: string;
-} {
+function getRoleStyle(role: string) {
   switch (role) {
     case "superadmin":
       return { bg: "#1e3a5f", text: "#93c5fd", label: "Super Admin" };
@@ -39,9 +43,7 @@ function getInitials(displayName: string): string {
   const parts = displayName.trim().split(/\s+/);
   if (parts.length === 0) return "?";
   if (parts.length === 1) return parts[0][0].toUpperCase();
-  const first = parts[0][0];
-  const last = parts[parts.length - 1][0];
-  return `${first}${last}`.toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
 export default function UsersPage({ currentUser }: Props) {
@@ -54,31 +56,19 @@ export default function UsersPage({ currentUser }: Props) {
   const [search, setSearch] = useState("");
   const [lastSynced, setLastSynced] = useState<string>("");
   const [clearing, setClearing] = useState(false);
-  // Add this near the top with other state
   const [permissionUser, setPermissionUser] = useState<EnrichedUser | null>(
     null,
   );
   const [savingPermissions, setSavingPermissions] = useState(false);
+
   const PERMISSION_LABELS: {
     key: keyof EnrichedUser["permissions"];
     label: string;
   }[] = [
-    { key: "itInventory", label: "IT Inventory" },
-    { key: "consumables", label: "Consumables" },
-    { key: "tickets", label: "Tickets" },
+    { key: "itAccess", label: "IT Access" },
+    { key: "officeSupplies", label: "Office Supplies" },
   ];
 
-  async function handleClearAndResync() {
-    setClearing(true);
-    try {
-      await clearEmployeeUsers();
-      await fetchUsers(true);
-    } catch (err) {
-      console.error("Clear error:", err);
-    } finally {
-      setClearing(false);
-    }
-  }
   const [roleFilter, setRoleFilter] = useState<
     "all" | "superadmin" | "admin" | "employee"
   >("all");
@@ -89,9 +79,8 @@ export default function UsersPage({ currentUser }: Props) {
 
   useEffect(() => {
     let result = users;
-    if (roleFilter !== "all") {
+    if (roleFilter !== "all")
       result = result.filter((u) => u.role === roleFilter);
-    }
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -103,15 +92,47 @@ export default function UsersPage({ currentUser }: Props) {
     }
     setFiltered(result);
   }, [search, roleFilter, users]);
+
   async function savePermissions(
     user: EnrichedUser,
     permissions: UserPermissions,
   ) {
     setSavingPermissions(true);
     try {
-      const docId = user.displayName || user.username;
-      await updateDoc(doc(db, "employee_users", docId), { permissions });
-      // Update local state so UI reflects change immediately
+      const usernameKey = user.username.toLowerCase().trim();
+      const documentIds = Array.from(
+        new Set(
+          [usernameKey, (user.displayName || user.username).trim()].filter(
+            Boolean,
+          ),
+        ),
+      );
+
+      const payload = {
+        username: usernameKey,
+        displayName: user.displayName,
+        email: user.email || `${usernameKey}@ocgbim.com`,
+        department: user.department ?? "",
+        title: user.title ?? "",
+        phone: user.phone ?? "",
+        permissions,
+      };
+
+      await Promise.all(
+        documentIds.map((docId) =>
+          setDoc(doc(db, "employee_users", docId), payload, { merge: true }),
+        ),
+      );
+
+      // ✅ Update cache in-place instead of just nulling it
+      if (employeeUsersCache) {
+        const key = usernameKey;
+        const idx = employeeUsersCache.findIndex((u) => u.username === key);
+        if (idx !== -1) {
+          employeeUsersCache[idx] = { ...employeeUsersCache[idx], permissions };
+        }
+      }
+
       setUsers((prev) =>
         prev.map((u) =>
           u.username === user.username ? { ...u, permissions } : u,
@@ -124,36 +145,126 @@ export default function UsersPage({ currentUser }: Props) {
       setSavingPermissions(false);
     }
   }
-  async function fetchUsers(forceSync = false) {
-    if (forceSync) {
-      setSyncing(true);
-    } else {
-      setLoading(true);
+
+  async function handleClearAndResync() {
+    setClearing(true);
+    employeeUsersCache = null;
+    try {
+      await clearEmployeeUsers();
+      await fetchUsers(true, true); // ← second arg = resetRoles
+    } catch (err) {
+      console.error("Clear error:", err);
+    } finally {
+      setClearing(false);
     }
+  }
+
+  async function fetchUsers(forceSync = false, resetRoles = false) {
+    // ← NEW param
+    forceSync ? setSyncing(true) : setLoading(true);
     setError("");
 
     try {
-      const { users: adUsers, synced } = await loadADUsers(forceSync);
-      console.log(
-        synced ? "✅ Synced from AD" : "⚡ Loaded from Firestore cache",
+      const { users: adUsers, synced } = await loadADUsers(
+        forceSync,
+        resetRoles,
+      ); // ← pass through
+      // ...rest unchanged
+      // Deduplicate by username just in case AD has duplicates
+      const deduped = Array.from(
+        new Map(
+          adUsers.map((u) => [u.username.toLowerCase().trim(), u]),
+        ).values(),
       );
 
-      if (synced) {
-        setLastSynced(new Date().toLocaleTimeString());
+      // adUsers from loadADUsers already have correct permissions + role from Firestore
+      // We only need to determine hasLoggedIn (whether they exist in employee_users)
+      if (!employeeUsersCache || forceSync) {
+        const snap = await getDocs(collection(db, "employee_users"));
+        const mergedMap = new Map<
+          string,
+          { username: string; permissions: UserPermissions }
+        >();
+
+        snap.docs.forEach((d) => {
+          const username = d.data().username?.toLowerCase().trim() ?? "";
+          if (!username) return;
+
+          const p = d.data().permissions ?? {};
+          const permissions = {
+            itAccess:
+              Boolean(p.itAccess) ||
+              Boolean(p.itInventory) ||
+              Boolean(p.consumables) ||
+              Boolean(p.tickets),
+            itInventory: Boolean(p.itInventory),
+            consumables: Boolean(p.consumables),
+            tickets: Boolean(p.tickets),
+            officeSupplies:
+              Boolean(p.officeSupplies) || Boolean(p.officesupplies),
+          };
+
+          const existing = mergedMap.get(username);
+          if (!existing) {
+            mergedMap.set(username, { username, permissions });
+            return;
+          }
+
+          existing.permissions = {
+            itAccess: existing.permissions.itAccess || permissions.itAccess,
+            itInventory:
+              existing.permissions.itInventory || permissions.itInventory,
+            consumables:
+              existing.permissions.consumables || permissions.consumables,
+            tickets: existing.permissions.tickets || permissions.tickets,
+            officeSupplies:
+              existing.permissions.officeSupplies || permissions.officeSupplies,
+          };
+        });
+
+        employeeUsersCache = Array.from(mergedMap.values());
+        console.log(
+          `📦 Read ${employeeUsersCache.length} user records from employee_users`,
+        );
+      } else {
+        console.log("⚡ Using cached employee_users — 0 Firestore reads");
       }
 
-      // Check who has logged in
-      const snap = await getDocs(collection(db, "employee_users"));
-      const loggedInUsernames = new Set<string>();
-      snap.forEach((doc) => {
-        const username = doc.data().username?.toLowerCase().trim();
-        if (username) loggedInUsernames.add(username);
-      });
+      const firestoreMap = new Map(
+        employeeUsersCache.map((u) => [u.username, u]),
+      );
 
-      const enriched: EnrichedUser[] = adUsers.map((u) => ({
-        ...u,
-        hasLoggedIn: loggedInUsernames.has(u.username.toLowerCase().trim()),
-      }));
+      const enriched: EnrichedUser[] = deduped.map((u) => {
+        const key = u.username.toLowerCase().trim();
+        const firestoreUser = firestoreMap.get(key);
+        return {
+          ...u,
+          hasLoggedIn: !!firestoreUser,
+          // ✅ Firestore permissions win — adUsers already has them from loadADUsers
+          permissions: {
+            itAccess:
+              firestoreUser?.permissions?.itAccess ??
+              u.permissions?.itAccess ??
+              false,
+            itInventory:
+              firestoreUser?.permissions?.itInventory ??
+              u.permissions?.itInventory ??
+              false,
+            consumables:
+              firestoreUser?.permissions?.consumables ??
+              u.permissions?.consumables ??
+              false,
+            tickets:
+              firestoreUser?.permissions?.tickets ??
+              u.permissions?.tickets ??
+              false,
+            officeSupplies:
+              firestoreUser?.permissions?.officeSupplies ??
+              u.permissions?.officeSupplies ??
+              false,
+          },
+        };
+      });
 
       setUsers(enriched);
     } catch (err) {
@@ -165,6 +276,8 @@ export default function UsersPage({ currentUser }: Props) {
     }
   }
 
+  // ... rest of your JSX stays exactly the same
+
   const totalSuperAdmin = users.filter((u) => u.role === "superadmin").length;
   const totalAdmin = users.filter((u) => u.role === "admin").length;
   const totalEmployee = users.filter((u) => u.role === "employee").length;
@@ -173,7 +286,7 @@ export default function UsersPage({ currentUser }: Props) {
   const roleTabs: Array<{ key: typeof roleFilter; label: string }> = [
     { key: "all", label: `All (${users.length})` },
     { key: "superadmin", label: `Super Admin (${totalSuperAdmin})` },
-    { key: "admin", label: `Admin (${totalAdmin})` },
+    // { key: "admin", label: `Admin (${totalAdmin})` },
     { key: "employee", label: `Employee (${totalEmployee})` },
   ];
 
@@ -630,22 +743,20 @@ export default function UsersPage({ currentUser }: Props) {
             </Text>
 
             {/* Toggles */}
-            {(["itInventory", "consumables", "tickets"] as const).map((key) => {
+            {(["itAccess", "officeSupplies"] as const).map((key) => {
               const labels: Record<
                 string,
                 { label: string; description: string }
               > = {
-                itInventory: {
-                  label: "IT Inventory",
-                  description: "Access to IT inventory assets",
+                itAccess: {
+                  label: "IT Access",
+                  description:
+                    "Shows Tickets, IT Inventory, Consumables under IT section",
                 },
-                consumables: {
-                  label: "Consumables",
-                  description: "Access to printer consumables",
-                },
-                tickets: {
-                  label: "Tickets",
-                  description: "Access to concern tickets",
+                officeSupplies: {
+                  label: "Office Supplies",
+                  description:
+                    "Shows full Office Supplies section in the sidebar",
                 },
               };
               const granted = permissionUser.permissions?.[key] ?? false;

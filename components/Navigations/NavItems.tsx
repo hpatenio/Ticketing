@@ -505,7 +505,7 @@ export const MENU_BY_ROLE: Record<string, NavSection[]> = {
       items: [
         { key: "officedashboard", label: "Dashboard",       icon: OfficeDashboardIcon }, // ← NEW
         { key: "officeinventory", label: "Office Supplies", icon: OfficeSuppliesIcon  },
-        { key: "supplyrequest",   label: "Supply Request",  icon: SupplyRequestIcon   },
+        // { key: "supplyrequest",   label: "Supply Request",  icon: SupplyRequestIcon   },
         { key: "monthlyreport",   label: "Monthly Report",  icon: MonthlyReportIcon   },
         { key: "activity",        label: "Activity",        icon: ActivityIcon        },
       ],
@@ -538,7 +538,7 @@ export const MENU_BY_ROLE: Record<string, NavSection[]> = {
       items: [
         { key: "officedashboard", label: "Dashboard",       icon: OfficeDashboardIcon }, // ← NEW
         { key: "officeinventory", label: "Office Supplies", icon: OfficeSuppliesIcon  },
-        { key: "supplyrequest",   label: "Supply Request",  icon: SupplyRequestIcon   },
+        // { key: "supplyrequest",   label: "Supply Request",  icon: SupplyRequestIcon   },
         { key: "monthlyreport",   label: "Monthly Report",  icon: MonthlyReportIcon   },
         { key: "activity",        label: "Activity",        icon: ActivityIcon        },
       ],
@@ -556,17 +556,67 @@ export const MENU_BY_ROLE: Record<string, NavSection[]> = {
   ],
 };
 
+// In NavItems.tsx — replace getNavSectionsForUser
+
 export function getNavSectionsForUser(user: {
   role: string;
   permissions?: {
+     itAccess?: boolean;  
     itInventory?: boolean;
     consumables?: boolean;
     tickets?: boolean;
+    officeSupplies?: boolean;
+    officesupplies?: boolean;
   };
 }): NavSection[] {
   if (user.role === "superadmin") return MENU_BY_ROLE.superadmin;
   if (user.role === "admin") return MENU_BY_ROLE.admin;
-  if (user.role === "employee") return MENU_BY_ROLE.employee;
+
+  if (user.role === "employee") {
+  const baseSection: NavSection = {
+    items: [
+      { key: "dashboard",       label: "Dashboard",        icon: DashboardIcon    },
+      { key: "submitticket",    label: "Submit Ticket",    icon: SubmitTicketIcon },
+      { key: "mytickets",       label: "My Tickets",       icon: MyTicketsIcon    },
+      { key: "supplyinventory", label: "Supply Inventory", icon: SuppliesIcon     },
+    ],
+  };
+
+  // IT section — only if at least one IT permission is granted
+ const itItems: NavItem[] = user.permissions?.itAccess
+  ? [
+      { key: "tickets",     label: "Tickets",        icon: TicketsIcon     },
+      { key: "inventory",   label: "IT Inventory",   icon: InventoryIcon   },
+      { key: "consumables", label: "IT Consumables", icon: ConsumablesIcon },
+    ]
+  : [];
+
+  const hasOfficeSuppliesAccess = Boolean(
+    user.permissions?.officeSupplies || user.permissions?.officesupplies,
+  );
+
+  // Office Supplies section — all 5 items, shown only if toggle is on
+  const officeItems: NavItem[] = hasOfficeSuppliesAccess
+    ? [
+        { key: "officedashboard", label: "Dashboard",       icon: OfficeDashboardIcon },
+        { key: "officeinventory", label: "Office Supplies", icon: OfficeSuppliesIcon  },
+        // { key: "supplyrequest",   label: "Supply Request",  icon: SupplyRequestIcon   },
+        { key: "monthlyreport",   label: "Monthly Report",  icon: MonthlyReportIcon   },
+        { key: "activity",        label: "Activity",        icon: ActivityIcon        },
+      ]
+    : [];
+
+  const sections: NavSection[] = [baseSection];
+
+  if (itItems.length > 0)
+    sections.push({ sectionLabel: "IT", items: itItems });
+
+  if (officeItems.length > 0)
+    sections.push({ sectionLabel: "Office Supplies", items: officeItems });
+
+  return sections;
+}
+
   return [];
 }
 

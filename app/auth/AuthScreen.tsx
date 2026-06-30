@@ -9,16 +9,20 @@ import {
   Platform,
   Animated,
   Image,
-  Dimensions,
+  useWindowDimensions,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { db } from "../../firebase";
 import {
   collection,
+  deleteDoc,
   doc,
+  DocumentData,
+  DocumentReference,
   getDocs,
   query,
   setDoc,
+  Timestamp,
   where,
 } from "firebase/firestore";
 import { logout } from "./Logout";
@@ -28,6 +32,10 @@ import Svg, { Path, Circle } from "react-native-svg";
 
 const BACKEND_URL = "http://10.10.100.112:3000";
 const STORAGE_KEY = "AD_USER_DATA";
+
+// ─── Responsive breakpoints ─────────────────────────────────────────────────
+const MOBILE_BREAKPOINT = 768; // below this: stack, hide right panel
+const SMALL_MOBILE_BREAKPOINT = 380; // below this: tighten paddings/fonts further
 
 function getRoleStyle(role: UserRole): {
   bg: string;
@@ -54,10 +62,20 @@ async function validateWithAD(username: string, password: string) {
 async function fetchUserDataFromFirestore(
   username: string,
 ): Promise<{ role: UserRole; permissions: UserPermissions }> {
+  // ── TEMPORARY: hardcoded superadmin bypass until Firestore limit resets ──
+  const SUPERADMIN_USERNAMES = ["hpatenio"]; // add other usernames if needed
+  if (SUPERADMIN_USERNAMES.includes(username.toLowerCase().trim())) {
+    return {
+      role: "superadmin",
+      permissions: { itAccess: true, itInventory: true, consumables: true, tickets: true, officeSupplies: true },
+    };
+  }
   const DEFAULT_PERMISSIONS: UserPermissions = {
+     itAccess: false, 
     itInventory: false,
     consumables: false,
     tickets: false,
+    officeSupplies: false
   };
   try {
     const q = query(
@@ -67,14 +85,40 @@ async function fetchUserDataFromFirestore(
     const snapshot = await getDocs(q);
     if (snapshot.empty)
       return { role: "employee", permissions: DEFAULT_PERMISSIONS };
-    const data = snapshot.docs[0].data();
+
+    const mergedPermissions = snapshot.docs.reduce<UserPermissions>(
+  (acc, docSnap) => {
+    const data = docSnap.data();
+    const p = data.permissions ?? {};
     return {
-      role: (data.role as UserRole) ?? "employee",
-      permissions: {
-        itInventory: data.permissions?.itInventory ?? false,
-        consumables: data.permissions?.consumables ?? false,
-        tickets: data.permissions?.tickets ?? false,
-      },
+      itAccess:
+        acc.itAccess ||
+        Boolean(p.itAccess) ||
+        Boolean(p.itInventory) ||
+        Boolean(p.consumables) ||
+        Boolean(p.tickets),
+      itInventory: acc.itInventory || Boolean(p.itInventory),
+      consumables: acc.consumables || Boolean(p.consumables),
+      tickets: acc.tickets || Boolean(p.tickets),
+      officeSupplies:
+        acc.officeSupplies ||
+        Boolean(p.officeSupplies) ||
+        Boolean(p.officesupplies),
+    };
+  },
+  { ...DEFAULT_PERMISSIONS },
+);
+
+    const role = snapshot.docs.reduce<UserRole>((bestRole, docSnap) => {
+      const candidateRole = docSnap.data().role as UserRole | undefined;
+      if (candidateRole === "superadmin") return "superadmin";
+      if (bestRole !== "superadmin" && candidateRole === "admin") return "admin";
+      return bestRole;
+    }, "employee");
+
+    return {
+      role,
+      permissions: mergedPermissions,
     };
   } catch (err) {
     console.error("Firestore user data fetch error:", err);
@@ -84,22 +128,19 @@ async function fetchUserDataFromFirestore(
 
 async function saveUserToFirestore(user: ADUser): Promise<void> {
   try {
-    const q = query(
-      collection(db, "employee_users"),
-      where("username", "==", user.username.toLowerCase().trim()),
+    // ✅ setDoc with merge: only writes if fields don't exist, no read needed
+    await setDoc(
+      doc(db, 'employee_users', user.username.toLowerCase().trim()),
+      {
+        username: user.username.toLowerCase().trim(),
+        displayName: user.displayName,
+        email: user.email || `${user.username}@ocgbim.com`,
+        department: user.department ?? "",
+        title: user.title ?? "",
+        phone: user.phone ?? "",
+      },
+      { merge: true } // ← won't touch role/permissions if they already exist
     );
-    const snapshot = await getDocs(q);
-    if (!snapshot.empty) return;
-    await setDoc(doc(db, "employee_users", user.displayName || user.username), {
-      username: user.username.toLowerCase().trim(),
-      displayName: user.displayName,
-      email: user.email || `${user.username}@ocgbim.com`,
-      department: user.department ?? "",
-      title: user.title ?? "",
-      phone: user.phone ?? "",
-      role: "employee",
-      permissions: { itInventory: false, consumables: false, tickets: false },
-    });
   } catch (err) {
     console.error("Firestore save error:", err);
   }
@@ -125,7 +166,7 @@ async function handleSignIn(
     title: adUser?.title ?? "",
     phone: adUser?.phone ?? "",
     role: "employee",
-    permissions: { itInventory: false, consumables: false, tickets: false },
+    permissions: { itAccess: false, itInventory: false, consumables: false, tickets: false, officeSupplies: false},
   };
   await saveUserToFirestore(user);
   const { role, permissions } = await fetchUserDataFromFirestore(username);
@@ -145,6 +186,7 @@ function FloatingInput({
   onTogglePassword,
   onSubmitEditing,
   theme,
+  compact,
 }: {
   label: string;
   value: string;
@@ -155,6 +197,7 @@ function FloatingInput({
   onTogglePassword?: () => void;
   onSubmitEditing?: () => void;
   theme: any;
+  compact?: boolean;
 }) {
   const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
   const [focused, setFocused] = useState(false);
@@ -185,10 +228,10 @@ function FloatingInput({
         borderWidth: 1.5,
         borderColor: focused ? theme.iconActive : theme.border,
         borderRadius: 12,
-        paddingHorizontal: 14,
+        paddingHorizontal: compact ? 12 : 14,
         paddingTop: 20,
         paddingBottom: 8,
-        marginBottom: 16,
+        marginBottom: compact ? 12 : 16,
         backgroundColor: theme.background,
         position: "relative",
         height: 56,
@@ -198,7 +241,7 @@ function FloatingInput({
       <Animated.Text
         style={{
           position: "absolute",
-          left: 14,
+          left: compact ? 12 : 14,
           top: labelTop,
           fontSize: labelSize,
           color: labelColor,
@@ -454,6 +497,7 @@ function IllustrationGraphic({ color }: { color: string }) {
 }
 
 // ─── Teal Minimal Right Panel ──────────────────────────────────────────────────
+// Hidden entirely below the mobile breakpoint to give the form full width.
 function RightPanel({ theme }: { theme: any }) {
   if (Platform.OS !== "web") return null;
 
@@ -509,7 +553,7 @@ function RightPanel({ theme }: { theme: any }) {
       ))}
 
       <View style={{ width: "100%", marginBottom: 32, alignItems: "center" }}>
-        <View style={{ width: 400 }}>
+        <View style={{ width: 400, maxWidth: "100%" }}>
           <IllustrationGraphic
             color={theme.mode === "dark" ? theme.primary : "#ffffff"}
           />
@@ -638,6 +682,13 @@ type Props = {
 
 export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
   const { theme, themeMode, setThemeMode } = useTheme();
+  const { width } = useWindowDimensions();
+
+  // ── Responsive flags ──
+  const isMobile = width < MOBILE_BREAKPOINT;
+  const isSmallMobile = width < SMALL_MOBILE_BREAKPOINT;
+  const showRightPanel = Platform.OS === "web" && !isMobile;
+
   const [restoring, setRestoring] = useState(true);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -649,18 +700,24 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
   const handleToggleTheme = () => {
     setThemeMode(theme.mode === "dark" ? "light" : "dark");
   };
-
   useEffect(() => {
     const restoreUser = async () => {
       try {
         const saved = await AsyncStorage.getItem(STORAGE_KEY);
         if (saved) {
           const parsedUser = JSON.parse(saved);
-          const { role, permissions } = await fetchUserDataFromFirestore(
-            parsedUser.username,
-          );
-          parsedUser.role = role;
-          parsedUser.permissions = permissions;
+
+          // ✅ Role and permissions are already in AsyncStorage from login
+          // Only re-fetch from Firestore if they're missing
+          if (!parsedUser.role || !parsedUser.permissions) {
+            const { role, permissions } = await fetchUserDataFromFirestore(
+              parsedUser.username,
+            );
+            parsedUser.role = role;
+            parsedUser.permissions = permissions;
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsedUser));
+          }
+
           setUser(parsedUser);
           onLoginSuccess(parsedUser);
         }
@@ -689,6 +746,16 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
       if (response.success && response.user) {
         setUser(response.user);
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(response.user));
+
+        // ── NEW: write session doc so Firestore rules can verify login ──
+        await setDoc(doc(db, "sessions", response.user.username), {
+          username: response.user.username,
+          displayName: response.user.displayName,
+          role: response.user.role,
+          loggedInAt: Timestamp.now(),
+          expiresAt: Timestamp.fromMillis(Date.now() + 8 * 60 * 60 * 1000),
+        });
+
         onLoginSuccess(response.user);
       } else {
         setError(response.message || "Login failed. Please try again.");
@@ -706,13 +773,18 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
     setPassword("");
     setError("");
     try {
+      // ── NEW: delete session doc on logout ──
+      const saved = await AsyncStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const u = JSON.parse(saved);
+        await deleteDoc(doc(db, "sessions", u.username));
+      }
       await AsyncStorage.removeItem(STORAGE_KEY);
       onLogout();
     } catch (err) {
       console.error("Logout storage clear error:", err);
     }
   };
-
   if (restoring) {
     return (
       <View
@@ -738,14 +810,16 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
         backgroundColor: theme.background,
       }}
     >
-      {/* ── Left panel (unchanged) ── */}
+      {/* ── Left panel ── */}
       <ScrollView
         style={{ flex: 1, backgroundColor: theme.background }}
         contentContainerStyle={{
           flexGrow: 1,
           alignItems: "center",
           justifyContent: "center",
-          padding: 32,
+          // Tighter padding on mobile so the form isn't cramped against the edges
+          padding: isSmallMobile ? 16 : isMobile ? 24 : 32,
+          paddingTop: isMobile ? 64 : 32, // leave room for the theme toggle button
         }}
         keyboardShouldPersistTaps="handled"
       >
@@ -754,11 +828,11 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
           onPress={handleToggleTheme}
           style={{
             position: "absolute",
-            top: 20,
-            right: 20,
-            width: 38,
-            height: 38,
-            borderRadius: 19,
+            top: isSmallMobile ? 12 : 20,
+            right: isSmallMobile ? 12 : 20,
+            width: isSmallMobile ? 34 : 38,
+            height: isSmallMobile ? 34 : 38,
+            borderRadius: isSmallMobile ? 17 : 19,
             backgroundColor: theme.surface,
             borderWidth: 1,
             borderColor: theme.border,
@@ -794,14 +868,15 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
           </Svg>
         </TouchableOpacity>
 
-        <View style={{ width: "100%", maxWidth: 560 }}>
+        <View style={{ width: "100%", maxWidth: isMobile ? 420 : 560 }}>
           {/* Logo */}
           <View
             style={{
               flexDirection: "row",
               alignItems: "center",
               gap: 12,
-              marginBottom: 36,
+              marginBottom: isSmallMobile ? 24 : isMobile ? 28 : 36,
+              justifyContent: isMobile ? "center" : "flex-start",
             }}
           >
             <Image
@@ -810,7 +885,10 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
                   ? require("../../components/icons/SDB LOGO - japanese 1 white.png")
                   : require("../../components/icons/SDB LOGO - japanese 1 black.png")
               }
-              style={{ width: 220, height: 72 }}
+              style={{
+                width: isSmallMobile ? 160 : isMobile ? 190 : 220,
+                height: isSmallMobile ? 52 : isMobile ? 62 : 72,
+              }}
               resizeMode="contain"
             />
           </View>
@@ -821,15 +899,22 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
               <Text
                 style={{
                   color: theme.text,
-                  fontSize: 22,
+                  fontSize: isSmallMobile ? 19 : 22,
                   fontWeight: "700",
                   marginBottom: 4,
+                  textAlign: isMobile ? "center" : "left",
                 }}
               >
                 Welcome, {user.displayName.split(" ")[0]}! 👋
               </Text>
 
-              <View style={{ flexDirection: "row", marginBottom: 16 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  marginBottom: 16,
+                  justifyContent: isMobile ? "center" : "flex-start",
+                }}
+              >
                 <View
                   style={{
                     backgroundColor: getRoleStyle(user.role).bg,
@@ -858,7 +943,7 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
                   borderWidth: 1,
                   borderColor: theme.border,
                   borderRadius: 14,
-                  padding: 16,
+                  padding: isSmallMobile ? 12 : 16,
                   marginBottom: 14,
                   gap: 10,
                 }}
@@ -883,6 +968,8 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
                       style={{
                         flexDirection: "row",
                         justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: 4,
                       }}
                     >
                       <Text style={{ color: theme.subtext, fontSize: 11 }}>
@@ -893,6 +980,7 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
                           color: theme.text,
                           fontSize: 11,
                           fontWeight: "600",
+                          textAlign: "right",
                         }}
                       >
                         {row.value}
@@ -922,6 +1010,7 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
                   flexDirection: "row",
                   alignItems: "center",
                   gap: 8,
+                  flexWrap: "wrap",
                 }}
               >
                 <View
@@ -932,7 +1021,7 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
                     backgroundColor: "#4ade80",
                   }}
                 />
-                <Text style={{ color: BRAND, fontSize: 11 }}>
+                <Text style={{ color: BRAND, fontSize: 11, flexShrink: 1 }}>
                   Connected to AD + Firestore · ocgbim.com
                 </Text>
               </View>
@@ -961,15 +1050,21 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
               <Text
                 style={{
                   color: theme.text,
-                  fontSize: 26,
+                  fontSize: isSmallMobile ? 22 : 26,
                   fontWeight: "700",
                   marginBottom: 4,
+                  textAlign: isMobile ? "center" : "left",
                 }}
               >
                 Sign in
               </Text>
               <Text
-                style={{ color: theme.subtext, fontSize: 13, marginBottom: 24 }}
+                style={{
+                  color: theme.subtext,
+                  fontSize: 13,
+                  marginBottom: isSmallMobile ? 20 : 24,
+                  textAlign: isMobile ? "center" : "left",
+                }}
               >
                 Sign in with your computer login
               </Text>
@@ -997,6 +1092,7 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
                 value={username}
                 onChangeText={setUsername}
                 theme={theme}
+                compact={isSmallMobile}
               />
 
               <FloatingInput
@@ -1009,6 +1105,7 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
                 onTogglePassword={() => setPwVisible((v) => !v)}
                 onSubmitEditing={handleLogin}
                 theme={theme}
+                compact={isSmallMobile}
               />
 
               <TouchableOpacity
@@ -1051,8 +1148,8 @@ export default function AuthScreen({ onLoginSuccess, onLogout }: Props) {
         </View>
       </ScrollView>
 
-      {/* ── Right panel (Teal Minimal) ── */}
-      <RightPanel theme={theme} />
+      {/* ── Right panel (Teal Minimal) — hidden on mobile/narrow web views ── */}
+      {showRightPanel && <RightPanel theme={theme} />}
     </View>
   );
 }

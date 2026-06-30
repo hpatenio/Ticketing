@@ -1,11 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
-//@ts-ignore 
+//@ts-ignore
 import { createPortal } from "react-dom";
 import { useTheme } from "../../../../theme/ThemeContext";
 import { addDelivery } from "../../../../Services/officeInventory";
 import { OfficeInventoryItem } from "../../../../types";
-
-
 
 type Props = {
   visible: boolean;
@@ -41,7 +39,13 @@ type ItemPickerProps = {
   theme: any;
 };
 
-function ItemPicker({ items, value, onChange, inputStyle, theme }: ItemPickerProps) {
+function ItemPicker({
+  items,
+  value,
+  onChange,
+  inputStyle,
+  theme,
+}: ItemPickerProps) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
@@ -55,7 +59,7 @@ function ItemPicker({ items, value, onChange, inputStyle, theme }: ItemPickerPro
     ? items.filter(
         (i) =>
           i.name.toLowerCase().includes(query.toLowerCase()) ||
-          i.itemCode.toLowerCase().includes(query.toLowerCase())
+          i.itemCode.toLowerCase().includes(query.toLowerCase()),
       )
     : items;
 
@@ -81,7 +85,10 @@ function ItemPicker({ items, value, onChange, inputStyle, theme }: ItemPickerPro
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (!wrapRef.current?.contains(target) && !popoverRef.current?.contains(target)) {
+      if (
+        !wrapRef.current?.contains(target) &&
+        !popoverRef.current?.contains(target)
+      ) {
         setOpen(false);
         setQuery("");
       }
@@ -109,7 +116,13 @@ function ItemPicker({ items, value, onChange, inputStyle, theme }: ItemPickerPro
           ref={inputRef}
           type="text"
           placeholder="Select an item…"
-          value={open ? query : selected ? `${selected.name} (${selected.itemCode})` : ""}
+          value={
+            open
+              ? query
+              : selected
+                ? `${selected.name} (${selected.itemCode})`
+                : ""
+          }
           onChange={(e) => {
             setQuery(e.target.value);
             if (!open) openDropdown();
@@ -131,7 +144,12 @@ function ItemPicker({ items, value, onChange, inputStyle, theme }: ItemPickerPro
             border: "none",
             outline: "none",
             fontSize: 13,
-            color: selected && !open ? inputStyle.color : open ? inputStyle.color : theme.subtext,
+            color:
+              selected && !open
+                ? inputStyle.color
+                : open
+                  ? inputStyle.color
+                  : theme.subtext,
             cursor: "text",
             minWidth: 0,
           }}
@@ -151,9 +169,23 @@ function ItemPicker({ items, value, onChange, inputStyle, theme }: ItemPickerPro
               overflow: "hidden",
             }}
           >
-            <ul style={{ maxHeight: 200, overflowY: "auto", margin: 0, padding: 0, listStyle: "none" }}>
+            <ul
+              style={{
+                maxHeight: 200,
+                overflowY: "auto",
+                margin: 0,
+                padding: 0,
+                listStyle: "none",
+              }}
+            >
               {filtered.length === 0 ? (
-                <li style={{ padding: "10px 12px", fontSize: 12, color: theme.subtext }}>
+                <li
+                  style={{
+                    padding: "10px 12px",
+                    fontSize: 12,
+                    color: theme.subtext,
+                  }}
+                >
                   No items match.
                 </li>
               ) : (
@@ -177,24 +209,27 @@ function ItemPicker({ items, value, onChange, inputStyle, theme }: ItemPickerPro
                       alignItems: "center",
                       gap: 6,
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = theme.bgHover)}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.backgroundColor = theme.bgHover)
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.backgroundColor = "transparent")
+                    }
                   >
                     <span>{i.name}</span>
-                    <span style={{ color: theme.subtext, fontSize: 11 }}>{i.itemCode}</span>
+                    <span style={{ color: theme.subtext, fontSize: 11 }}>
+                      {i.itemCode}
+                    </span>
                   </li>
                 ))
               )}
             </ul>
           </div>,
-          document.body
+          document.body,
         )}
     </div>
   );
 }
-
-
-
 
 // ─── Main modal ───────────────────────────────────────────────────────────────
 
@@ -254,17 +289,17 @@ const AddDeliveryModal: React.FC<Props> = ({
   // ── Bulk row helpers ─────────────────────────────────────────────────────
   const updateRow = (id: string, field: keyof DeliveryRow, val: string) =>
     setRows((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, [field]: val } : r))
+      prev.map((r) => (r.id === id ? { ...r, [field]: val } : r)),
     );
 
   const addRow = () => setRows((prev) => [...prev, emptyRow()]);
   const removeRow = (id: string) =>
-    setRows((prev) => (prev.length > 1 ? prev.filter((r) => r.id !== id) : prev));
+    setRows((prev) =>
+      prev.length > 1 ? prev.filter((r) => r.id !== id) : prev,
+    );
 
   const handleRowItemChange = (rowId: string, itemId: string) => {
-    setRows((prev) =>
-      prev.map((r) => (r.id === rowId ? { ...r, itemId } : r))
-    );
+    setRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, itemId } : r)));
   };
 
   // ── Bulk computed total ───────────────────────────────────────────────────
@@ -315,7 +350,7 @@ const AddDeliveryModal: React.FC<Props> = ({
               selectedItem.pricePerUnit,
               bulkNotes.trim(),
             );
-          })
+          }),
         );
         onSuccess();
         onClose();
@@ -329,7 +364,9 @@ const AddDeliveryModal: React.FC<Props> = ({
 
   return (
     <div
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       style={{ backgroundColor: "rgba(0,0,0,0.35)" }}
       className="fixed inset-0 z-[100] flex items-center justify-center"
     >
@@ -351,7 +388,10 @@ const AddDeliveryModal: React.FC<Props> = ({
           className="flex items-center justify-between px-5 py-4 border-b"
         >
           <div className="flex items-center gap-3">
-            <span style={{ color: theme.text }} className="text-sm font-semibold">
+            <span
+              style={{ color: theme.text }}
+              className="text-sm font-semibold"
+            >
               Record delivery
             </span>
 
@@ -369,7 +409,10 @@ const AddDeliveryModal: React.FC<Props> = ({
               {(["single", "bulk"] as const).map((m) => (
                 <button
                   key={m}
-                  onClick={() => { setMode(m); setError(null); }}
+                  onClick={() => {
+                    setMode(m);
+                    setError(null);
+                  }}
                   style={{
                     padding: "3px 10px",
                     fontSize: 11,
@@ -388,13 +431,20 @@ const AddDeliveryModal: React.FC<Props> = ({
             </div>
           </div>
 
-          <button onClick={onClose} style={{ color: theme.subtext }} className="text-lg leading-none">
+          <button
+            onClick={onClose}
+            style={{ color: theme.subtext }}
+            className="text-lg leading-none"
+          >
             ✕
           </button>
         </div>
 
         {/* Body */}
-        <div style={{ overflowY: "auto", flex: 1 }} className="px-5 py-4 flex flex-col gap-3.5">
+        <div
+          style={{ overflowY: "auto", flex: 1 }}
+          className="px-5 py-4 flex flex-col gap-3.5"
+        >
           {error && (
             <div className="text-xs px-3 py-2 rounded-md bg-red-50 text-red-700 border border-red-200">
               {error}
@@ -405,7 +455,12 @@ const AddDeliveryModal: React.FC<Props> = ({
           {mode === "single" && (
             <>
               <div className="flex flex-col gap-1">
-                <label style={{ color: theme.subtext }} className="text-xs font-medium">Item</label>
+                <label
+                  style={{ color: theme.subtext }}
+                  className="text-xs font-medium"
+                >
+                  Item
+                </label>
                 <ItemPicker
                   items={items}
                   value={item?.id ?? ""}
@@ -420,20 +475,45 @@ const AddDeliveryModal: React.FC<Props> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
-                  <label style={{ color: theme.subtext }} className="text-xs font-medium">Quantity delivered</label>
+                  <label
+                    style={{ color: theme.subtext }}
+                    className="text-xs font-medium"
+                  >
+                    Quantity delivered
+                  </label>
                   <input
-                    type="number" min="1" value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    placeholder="0" style={inputStyle}
+                    type="number"
+                    min="1"
+                    max="999999"
+                    value={quantity}
+                    onChange={(e) =>
+                      setQuantity(
+                        String(
+                          Math.min(999999, Math.max(1, Number(e.target.value))),
+                        ),
+                      )
+                    }
+                    placeholder="0"
+                    style={inputStyle}
                     className="px-2.5 py-2 text-sm border rounded-md focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label style={{ color: theme.subtext }} className="text-xs font-medium">Date of delivery</label>
+                  <label
+                    style={{ color: theme.subtext }}
+                    className="text-xs font-medium"
+                  >
+                    Date of delivery
+                  </label>
                   <input
-                    type="date" value={date}
+                    type="date"
+                    value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    style={inputStyle}
+                    style={{
+                      color: theme.text,
+                      colorScheme: theme.mode === "dark" ? "dark" : "light",
+                      backgroundColor: "transparent",
+                    }}
                     className="px-2.5 py-2 text-sm border rounded-md focus:outline-none"
                   />
                 </div>
@@ -455,16 +535,24 @@ const AddDeliveryModal: React.FC<Props> = ({
                   <span style={{ color: theme.subtext, fontSize: 12 }}>
                     ₱{item.pricePerUnit.toFixed(2)} × {Number(quantity) || 0}
                   </span>
-                  <span style={{ color: theme.text, fontSize: 13, fontWeight: 600 }}>
+                  <span
+                    style={{ color: theme.text, fontSize: 13, fontWeight: 600 }}
+                  >
                     Total: ₱{singleTotal ?? "0.00"}
                   </span>
                 </div>
               )}
 
               <div className="flex flex-col gap-1">
-                <label style={{ color: theme.subtext }} className="text-xs font-medium">Notes</label>
+                <label
+                  style={{ color: theme.subtext }}
+                  className="text-xs font-medium"
+                >
+                  Notes
+                </label>
                 <textarea
-                  value={notes} onChange={(e) => setNotes(e.target.value)}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
                   placeholder="Supplier name, delivery reference number, etc."
                   style={inputStyle}
                   className="px-2.5 py-2 text-sm border rounded-md focus:outline-none min-h-[60px] resize-y"
@@ -479,18 +567,30 @@ const AddDeliveryModal: React.FC<Props> = ({
               {/* Shared date + notes */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
-                  <label style={{ color: theme.subtext }} className="text-xs font-medium">Date of delivery</label>
+                  <label
+                    style={{ color: theme.subtext }}
+                    className="text-xs font-medium"
+                  >
+                    Date of delivery
+                  </label>
                   <input
-                    type="date" value={bulkDate}
+                    type="date"
+                    value={bulkDate}
                     onChange={(e) => setBulkDate(e.target.value)}
                     style={inputStyle}
                     className="px-2.5 py-2 text-sm border rounded-md focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label style={{ color: theme.subtext }} className="text-xs font-medium">Notes (applies to all)</label>
+                  <label
+                    style={{ color: theme.subtext }}
+                    className="text-xs font-medium"
+                  >
+                    Notes (applies to all)
+                  </label>
                   <input
-                    type="text" value={bulkNotes}
+                    type="text"
+                    value={bulkNotes}
                     onChange={(e) => setBulkNotes(e.target.value)}
                     placeholder="Supplier, reference…"
                     style={inputStyle}
@@ -510,7 +610,16 @@ const AddDeliveryModal: React.FC<Props> = ({
                 }}
               >
                 {["Item", "Qty", "Subtotal", ""].map((h) => (
-                  <span key={h} style={{ color: theme.subtext, fontSize: 11, fontWeight: 500 }}>{h}</span>
+                  <span
+                    key={h}
+                    style={{
+                      color: theme.subtext,
+                      fontSize: 11,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {h}
+                  </span>
                 ))}
               </div>
 
@@ -542,8 +651,12 @@ const AddDeliveryModal: React.FC<Props> = ({
                         theme={theme}
                       />
                       <input
-                        type="number" min="1" value={row.quantity}
-                        onChange={(e) => updateRow(row.id, "quantity", e.target.value)}
+                        type="number"
+                        min="1"
+                        value={row.quantity}
+                        onChange={(e) =>
+                          updateRow(row.id, "quantity", e.target.value)
+                        }
                         placeholder="0"
                         style={{
                           ...inputStyle,
@@ -575,12 +688,17 @@ const AddDeliveryModal: React.FC<Props> = ({
                         onClick={() => removeRow(row.id)}
                         title="Remove row"
                         style={{
-                          width: 28, height: 28, borderRadius: 6,
+                          width: 28,
+                          height: 28,
+                          borderRadius: 6,
                           border: `1px solid ${theme.border}`,
                           backgroundColor: "transparent",
                           color: rows.length === 1 ? theme.subtext : "#f87171",
                           cursor: rows.length === 1 ? "not-allowed" : "pointer",
-                          fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 14,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
                         }}
                         disabled={rows.length === 1}
                       >
@@ -618,14 +736,17 @@ const AddDeliveryModal: React.FC<Props> = ({
                     borderTop: `1px solid ${theme.border}`,
                   }}
                 >
-                  <span style={{ color: theme.text, fontSize: 13, fontWeight: 600 }}>
+                  <span
+                    style={{ color: theme.text, fontSize: 13, fontWeight: 600 }}
+                  >
                     Grand total: ₱{bulkTotal.toFixed(2)}
                   </span>
                 </div>
               )}
 
               <span style={{ color: theme.subtext }} className="text-[11px]">
-                Prices are taken from each item's current unit price. Each row is saved as a separate delivery.
+                Prices are taken from each item's current unit price. Each row
+                is saved as a separate delivery.
               </span>
             </>
           )}
@@ -638,7 +759,11 @@ const AddDeliveryModal: React.FC<Props> = ({
         >
           <button
             onClick={onClose}
-            style={{ backgroundColor: theme.surface, color: theme.text, borderColor: theme.border }}
+            style={{
+              backgroundColor: theme.surface,
+              color: theme.text,
+              borderColor: theme.border,
+            }}
             className="px-3.5 py-2 text-sm font-medium rounded-lg border"
           >
             Cancel
@@ -646,14 +771,18 @@ const AddDeliveryModal: React.FC<Props> = ({
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            style={{ backgroundColor: theme.primary, color: theme.primaryText, opacity: submitting ? 0.6 : 1 }}
+            style={{
+              backgroundColor: theme.primary,
+              color: theme.primaryText,
+              opacity: submitting ? 0.6 : 1,
+            }}
             className="px-3.5 py-2 text-sm font-medium rounded-lg"
           >
             {submitting
               ? "Saving…"
               : mode === "bulk"
-              ? `Save ${rows.length} deliver${rows.length === 1 ? "y" : "ies"}`
-              : "Save delivery"}
+                ? `Save ${rows.length} deliver${rows.length === 1 ? "y" : "ies"}`
+                : "Save delivery"}
           </button>
         </div>
       </div>

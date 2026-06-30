@@ -16,6 +16,8 @@ export type UserPermissions = {
   itInventory: boolean;
   consumables: boolean;
   tickets: boolean;
+  officeSupplies: boolean;
+  itAccess: boolean;    
 };
 export interface ITInventory {
   id: string;

@@ -26,21 +26,24 @@ import {
   getAllStockTransactions,
   getAllSupplyRequests,
 } from "../../../Services/officeInventory";
-import { query, collection, orderBy, onSnapshot } from "firebase/firestore";
+import { query, collection, orderBy, onSnapshot, limit } from "firebase/firestore";
 import { db } from "../../../firebase";
 import PartialApprovalModal from "./Modal/PartialApprovalModal"; // adjust path as needed
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+// Only the four real navigation targets
 type NavTarget =
   | "inventory"
   | "supply_requests"
   | "monthly_report"
   | "activity";
 
+// NavPayload extends with the extra "inventory_deliver" only for onNavigateWithPayload
 export type NavPayload = {
-  tab: NavTarget;
+  tab: NavTarget | "inventory_deliver";
   approvalRequest?: SupplyRequest;
+  deliverItem?: OfficeInventoryItem;
 };
 
 // Matches the InventoryFilter type in OfficeInventoryPage
@@ -57,11 +60,24 @@ type Props = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function toISOString(val: any): string {
+  if (!val) return "";
+  // Firestore Timestamp has .toDate()
+  if (typeof val?.toDate === "function") return val.toDate().toISOString();
+  // Already a string
+  if (typeof val === "string") return val;
+  // JS Date
+  if (val instanceof Date) return val.toISOString();
+  return "";
+}
+
 function formatPeso(amount: number): string {
   return `₱${amount.toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
-function formatDateTime(iso: string): string {
+function formatDateTime(val: any): string {
+  if (!val) return "—";
+  const iso = toISOString(val);
   if (!iso) return "—";
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "—";
@@ -79,6 +95,7 @@ function getInitials(name: string): string {
     (parts[0][0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")
   ).toUpperCase();
 }
+let _dismissedAlertSignature: string | null = null;
 
 const AVATAR_COLORS = [
   { bg: "#dbeafe", text: "#1e40af" },
@@ -246,25 +263,43 @@ function SectionHeader({
 }
 
 // ─── Alert Banner ─────────────────────────────────────────────────────────────
-
 function AlertBanner({
   items,
   pendingCount,
   onViewRequests,
   theme,
+  dismissedSignature,
+  onDismiss,
 }: {
   items: OfficeInventoryItem[];
   pendingCount: number;
   onViewRequests?: () => void;
   theme: any;
+  dismissedSignature: string | null;
+  onDismiss: (signature: string) => void;
 }) {
   const outOfStockWithPending = items.filter(
     (i) => i.stockStatus === "out_of_stock",
   );
   if (outOfStockWithPending.length === 0 || pendingCount === 0) return null;
 
+  // Build a stable signature from the current alert state
+  const signature =
+    outOfStockWithPending
+      .map((i) => i.id)
+      .sort()
+      .join(",") + `|${pendingCount}`;
+
+  // If this exact alert was already dismissed, hide it
+  if (dismissedSignature === signature) return null;
+
   const firstName = outOfStockWithPending[0].name;
   const extra = outOfStockWithPending.length - 1;
+
+  const handleViewRequests = () => {
+    onDismiss(signature);
+    onViewRequests?.();
+  };
 
   return (
     <div
@@ -297,7 +332,7 @@ function AlertBanner({
       </div>
       {onViewRequests && (
         <button
-          onClick={onViewRequests}
+          onClick={handleViewRequests}
           style={{ borderColor: "#fcd34d", color: "#92400e" }}
           className="text-xs font-medium px-3 py-1.5 rounded-lg border whitespace-nowrap flex-shrink-0"
         >
@@ -447,7 +482,11 @@ const ACTION_CONFIG: Record<
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function OfficeDashboardPage({ user, onNavigate, onNavigateWithPayload }: Props) {
+export default function OfficeDashboardPage({
+  user,
+  onNavigate,
+  onNavigateWithPayload,
+}: Props) {
   const { theme } = useTheme();
 
   const [items, setItems] = useState<OfficeInventoryItem[]>([]);
@@ -457,6 +496,15 @@ export default function OfficeDashboardPage({ user, onNavigate, onNavigateWithPa
   const [approvalRequest, setApprovalRequest] = useState<SupplyRequest | null>(
     null,
   );
+
+  // ── Alert dismiss state ──────────────────────────────────────────────────────
+  const [dismissedAlertSignature, setDismissedAlertSignature] = useState<
+    string | null
+  >(_dismissedAlertSignature);
+  const handleDismissAlert = useCallback((signature: string) => {
+    _dismissedAlertSignature = signature;
+    setDismissedAlertSignature(signature);
+  }, []);
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -480,93 +528,64 @@ export default function OfficeDashboardPage({ user, onNavigate, onNavigateWithPa
   }, []);
 
   useEffect(() => {
-    setLoading(true);
+  setLoading(true);
 
-    // Listen to supply_requests — fires whenever an employee submits,
-    // or any status changes (approved, delivered, failed, rejected)
-    const supplyQ = query(
-      collection(db, "supply_requests"),
-      orderBy("createdAt", "desc"),
-    );
+  const supplyQ = query(
+    collection(db, "supply_requests"),
+    orderBy("createdAt", "desc"),
+    limit(50)
+  );
 
-    // Listen to office_inventory — fires when stock changes (delivery, adjustment, fulfillment)
-    const inventoryQ = query(
-      collection(db, "office_inventory"),
-      orderBy("name", "asc"),
-    );
+  const inventoryQ = query(
+    collection(db, "office_inventory"),
+    orderBy("name", "asc")
+  );
 
-    // Listen to stock_transactions — fires when activity log updates
-    const txQ = query(
-      collection(db, "stock_transactions"),
-      orderBy("createdAt", "desc"),
-    );
+  const txQ = query(
+    collection(db, "office_stock_transactions"),
+    orderBy("createdAt", "desc"),
+    limit(100)
+  );
 
-    let settled = 0;
-    const onSettle = () => {
-      settled++;
-      if (settled === 1) setLoading(false); // show UI after first collection resolves
-    };
+  let settled = 0;
+  const onSettle = () => {
+    settled++;
+    if (settled === 1) setLoading(false);
+  };
 
-    const unsubRequests = onSnapshot(
-      supplyQ,
-      async () => {
-        try {
-          const reqs = await getAllSupplyRequests();
-          setRequests(reqs);
-        } catch (err) {
-          console.error("Dashboard supply_requests listener error:", err);
-        } finally {
-          onSettle();
-        }
-      },
-      (err) => {
-        console.error("Dashboard supply_requests listener error:", err);
-        onSettle();
-      },
-    );
+  const unsubRequests = onSnapshot(
+    supplyQ,
+    (snapshot) => {
+      setRequests(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as SupplyRequest[]);
+      onSettle();
+    },
+    (err) => { console.error("supply_requests listener error:", err); onSettle(); }
+  );
 
-    const unsubInventory = onSnapshot(
-      inventoryQ,
-      async () => {
-        try {
-          const inv = await getAllInventoryItems();
-          setItems(inv);
-        } catch (err) {
-          console.error("Dashboard inventory listener error:", err);
-        } finally {
-          onSettle();
-        }
-      },
-      (err) => {
-        console.error("Dashboard inventory listener error:", err);
-        onSettle();
-      },
-    );
+  const unsubInventory = onSnapshot(
+    inventoryQ,
+    (snapshot) => {
+      setItems(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as OfficeInventoryItem[]);
+      onSettle();
+    },
+    (err) => { console.error("inventory listener error:", err); onSettle(); }
+  );
 
-    const unsubTransactions = onSnapshot(
-      txQ,
-      async () => {
-        try {
-          const txs = await getAllStockTransactions();
-          setTransactions(txs);
-        } catch (err) {
-          console.error("Dashboard transactions listener error:", err);
-        } finally {
-          onSettle();
-        }
-      },
-      (err) => {
-        console.error("Dashboard transactions listener error:", err);
-        onSettle();
-      },
-    );
+  const unsubTransactions = onSnapshot(
+    txQ,
+    (snapshot) => {
+      setTransactions(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as StockTransaction[]);
+      onSettle();
+    },
+    (err) => { console.error("transactions listener error:", err); onSettle(); }
+  );
 
-    return () => {
-      unsubRequests();
-      unsubInventory();
-      unsubTransactions();
-    };
-  }, []);
+  return () => {
+    unsubRequests();
+    unsubInventory();
+    unsubTransactions();
+  };
+}, []);
 
   // ── KPI computations ────────────────────────────────────────────────────────
 
@@ -627,20 +646,19 @@ export default function OfficeDashboardPage({ user, onNavigate, onNavigateWithPa
 
   // ── Recent requests ─────────────────────────────────────────────────────────
 
-  const recentRequests = useMemo(() => {
-    return [...requests]
-      .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))
-      .slice(0, 5);
-  }, [requests]);
+ const recentRequests = useMemo(() => {
+  return [...requests]
+    .sort((a, b) => toISOString(b.createdAt).localeCompare(toISOString(a.createdAt)))
+    .slice(0, 5);
+}, [requests]);
 
   // ── Recent activity ─────────────────────────────────────────────────────────
 
-  const recentActivity = useMemo(() => {
-    return [...transactions]
-      .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))
-      .slice(0, 6);
-  }, [transactions]);
-
+const recentActivity = useMemo(() => {
+  return [...transactions]
+    .sort((a, b) => toISOString(b.createdAt).localeCompare(toISOString(a.createdAt)))
+    .slice(0, 6);
+}, [transactions]);
   // ── Inventory table (recent items) ─────────────────────────────────────────
 
   const inventoryPreview = useMemo(() => {
@@ -658,14 +676,13 @@ export default function OfficeDashboardPage({ user, onNavigate, onNavigateWithPa
         return acc;
       }, {});
 
-    const sevenDaysAgo = new Date(
-      Date.now() - 7 * 24 * 60 * 60 * 1000,
-    ).toISOString();
-    const recentlyActiveIds = new Set(
-      transactions
-        .filter((t) => t.createdAt >= sevenDaysAgo)
-        .map((t) => t.itemId),
-    );
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+const recentlyActiveIds = new Set(
+  transactions
+    .filter((t) => toISOString(t.createdAt) >= sevenDaysAgo)
+    .map((t) => t.itemId),
+);
+    
 
     const priorityScore = (item: OfficeInventoryItem): number => {
       const hasPending = pendingItemIds.has(item.id);
@@ -684,7 +701,12 @@ export default function OfficeDashboardPage({ user, onNavigate, onNavigateWithPa
         _pendingCount: pendingCountByItemId[item.id] ?? 0,
       }))
       .filter((item) => item._priority < 5)
-      .sort((a, b) => a._priority - b._priority || a.name.localeCompare(b.name))
+      .sort(
+        (a, b) =>
+          a._priority - b._priority ||
+          a.currentStock - b.currentStock ||
+          a.name.localeCompare(b.name),
+      )
       .slice(0, 10);
   }, [items, requests, transactions]);
 
@@ -724,98 +746,6 @@ export default function OfficeDashboardPage({ user, onNavigate, onNavigateWithPa
               Overview for {today}
             </p>
           </div>
-
-          {/* Quick-action buttons */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onNavigate?.("inventory")}
-              style={{
-                backgroundColor: theme.surface,
-                color: theme.text,
-                borderColor: theme.border,
-              }}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border whitespace-nowrap"
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = theme.bgHover)
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = theme.surface)
-              }
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <line x1="12" y1="5" x2="12" y2="19" />
-              </svg>
-              Add delivery
-            </button>
-            <button
-              onClick={() => onNavigate?.("inventory")}
-              style={{
-                backgroundColor: theme.surface,
-                color: theme.text,
-                borderColor: theme.border,
-              }}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border whitespace-nowrap"
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = theme.bgHover)
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = theme.surface)
-              }
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-              </svg>
-              Adjust stock
-            </button>
-            <button
-              onClick={() => onNavigate?.("inventory")}
-              style={{
-                backgroundColor: theme.primary,
-                color: theme.primaryText,
-              }}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap"
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = theme.primaryHover)
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = theme.primary)
-              }
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              New item
-            </button>
-          </div>
         </div>
 
         {/* Alert banner */}
@@ -824,6 +754,8 @@ export default function OfficeDashboardPage({ user, onNavigate, onNavigateWithPa
           pendingCount={kpi.pendingReqs}
           onViewRequests={() => onNavigate?.("supply_requests")}
           theme={theme}
+          dismissedSignature={dismissedAlertSignature}
+          onDismiss={handleDismissAlert}
         />
 
         {/* ── KPI row ── */}
@@ -945,11 +877,17 @@ export default function OfficeDashboardPage({ user, onNavigate, onNavigateWithPa
 
       {/* ── Scrollable body ── */}
       <style>{`
-        .office-dashboard-scroll::-webkit-scrollbar { width: 6px; }
-        .office-dashboard-scroll::-webkit-scrollbar-track { background: transparent; }
-        .office-dashboard-scroll::-webkit-scrollbar-thumb { background: ${theme.border}; border-radius: 99px; }
-        .office-dashboard-scroll::-webkit-scrollbar-thumb:hover { background: ${theme.subtext}; }
-      `}</style>
+  .office-dashboard-scroll::-webkit-scrollbar { width: 6px; }
+  .office-dashboard-scroll::-webkit-scrollbar-track { background: transparent; }
+  .office-dashboard-scroll::-webkit-scrollbar-thumb { background: ${theme.border}; border-radius: 99px; }
+  .office-dashboard-scroll::-webkit-scrollbar-thumb:hover { background: ${theme.subtext}; }
+
+  /* Add these three lines for the table's horizontal scrollbar */
+  .needs-attention-scroll::-webkit-scrollbar { height: 6px; }
+  .needs-attention-scroll::-webkit-scrollbar-track { background: ${theme.surfaceRaised}; }
+  .needs-attention-scroll::-webkit-scrollbar-thumb { background: ${theme.border}; border-radius: 99px; }
+  .needs-attention-scroll::-webkit-scrollbar-thumb:hover { background: ${theme.subtext}; }
+`}</style>
       <div className="office-dashboard-scroll flex-1 overflow-y-auto px-5 pb-5">
         {/* ── Two-column layout ── */}
         <div className="flex gap-4 items-start">
@@ -992,12 +930,12 @@ export default function OfficeDashboardPage({ user, onNavigate, onNavigateWithPa
               {inventoryPreview.length === 0 ? (
                 <div className="px-4 pb-5 pt-2 text-center">
                   <p style={{ color: theme.subtext }} className="text-xs">
-                    🎉 All items are well-stocked. No action needed.
+                    All items are well-stocked. No action needed.
                   </p>
                 </div>
               ) : (
                 <>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto needs-attention-scroll">
                     <table
                       className="w-full text-sm"
                       style={{ borderCollapse: "collapse" }}
@@ -1235,7 +1173,12 @@ export default function OfficeDashboardPage({ user, onNavigate, onNavigateWithPa
                               {/* Quick actions */}
                               <td className="px-4 py-2.5 whitespace-nowrap text-right">
                                 <button
-                                  onClick={() => onNavigate?.("inventory")}
+                                  onClick={() =>
+                                    onNavigateWithPayload?.({
+                                      tab: "inventory_deliver",
+                                      deliverItem: item,
+                                    })
+                                  }
                                   style={{
                                     backgroundColor: theme.primary,
                                     color: theme.primaryText,
@@ -1458,17 +1401,22 @@ export default function OfficeDashboardPage({ user, onNavigate, onNavigateWithPa
                           </div>
                           {/* Out for delivery: no action buttons, status badge is enough */}
                           {!isOutForDelivery && (
-  <button
-    onClick={() => onNavigateWithPayload?.({ tab: "supply_requests", approvalRequest: r })}
-    style={{
-      backgroundColor: theme.primary,
-      color: theme.primaryText,
-    }}
-    className="text-[10px] font-medium px-2 py-1 rounded-md flex-shrink-0"
-  >
-    Details
-  </button>
-)}
+                            <button
+                              onClick={() =>
+                                onNavigateWithPayload?.({
+                                  tab: "supply_requests",
+                                  approvalRequest: r,
+                                })
+                              }
+                              style={{
+                                backgroundColor: theme.primary,
+                                color: theme.primaryText,
+                              }}
+                              className="text-[10px] font-medium px-2 py-1 rounded-md flex-shrink-0"
+                            >
+                              Details
+                            </button>
+                          )}
                         </div>
                       );
                     })}
@@ -1596,14 +1544,20 @@ export default function OfficeDashboardPage({ user, onNavigate, onNavigateWithPa
         </div>
       </div>
       <PartialApprovalModal
-  visible={approvalRequest !== null}
-  request={approvalRequest}
-  onClose={() => setApprovalRequest(null)}
-  onApproveAll={async (req) => { /* your handler */ }}
-  onApprovePartial={async (requestId, lines) => { /* your handler */ }}
-  onReject={async (requestId) => { /* your reject service call here */ }}
-  theme={theme}
-/>
+        visible={approvalRequest !== null}
+        request={approvalRequest}
+        onClose={() => setApprovalRequest(null)}
+        onApproveAll={async (req) => {
+          /* your handler */
+        }}
+        onApprovePartial={async (requestId, lines) => {
+          /* your handler */
+        }}
+        onReject={async (requestId) => {
+          /* your reject service call here */
+        }}
+        theme={theme}
+      />
     </div>
   );
 }

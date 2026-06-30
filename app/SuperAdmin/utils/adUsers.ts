@@ -2,19 +2,27 @@
 import { ADUser, UserRole, UserPermissions } from "../../../types";
 import { db } from "../../../firebase";
 import {
-  collection, doc, getDocs, setDoc, writeBatch, serverTimestamp, getDoc,
+  collection,
+  doc,
+  getDocs,
+  setDoc,
+  writeBatch,
+  serverTimestamp,
+  getDoc,
 } from "firebase/firestore";
 
-const BACKEND_URL = "http://10.10.10.98:3000";
+const BACKEND_URL = "http://10.10.100.112:3000";
 const INTERNAL_SECRET = "silverdab_internal_2024";
 const CACHE_MINUTES = 10;
 
 let _serviceToken: string | null = null;
 
 const DEFAULT_PERMISSIONS: UserPermissions = {
+   itAccess: false,
   itInventory: false,
   consumables: false,
   tickets: false,
+  officeSupplies: false,
 };
 
 async function getServiceToken(): Promise<string> {
@@ -36,50 +44,56 @@ export async function fetchAllADUsers(): Promise<ADUser[]> {
     });
     const data = await res.json();
     if (!data.success) return [];
-    return data.employees.map((u: any): ADUser => ({
-      username:    u.username    ?? "",
-      displayName: u.displayName ?? u.username ?? "",
-      email:       u.email       ?? `${u.username}@ocgbim.com`,
-      department:  u.department  ?? "",
-      title:       u.title       ?? "",
-      phone:       u.phone       ?? "",
-      role:        "employee",
-      permissions: DEFAULT_PERMISSIONS,
-    }));
+    return data.employees.map(
+      (u: any): ADUser => ({
+        username: u.username ?? "",
+        displayName: u.displayName ?? u.username ?? "",
+        email: u.email ?? `${u.username}@ocgbim.com`,
+        department: u.department ?? "",
+        title: u.title ?? "",
+        phone: u.phone ?? "",
+        role: "employee",
+        permissions: DEFAULT_PERMISSIONS,
+      }),
+    );
   } catch (err) {
     console.error("fetchAllADUsers error:", err);
     return [];
   }
 }
-
-async function syncADToFirestore(adUsers: ADUser[]): Promise<void> {
+async function syncADToFirestore(
+  adUsers: ADUser[],
+  resetRoles = false,   // ← NEW
+): Promise<void> {
   const BATCH_SIZE = 400;
 
-  // Get existing docs to preserve role AND permissions
   const existing = await getDocs(collection(db, "employee_users"));
-  const existingData = new Map<string, { role: string; permissions: UserPermissions }>();
+  const existingData = new Map
+    <string,
+    { role: string; permissions: UserPermissions }
+  >();
   existing.docs.forEach((d) => {
     const username = d.data().username?.toLowerCase().trim();
     if (username) {
       existingData.set(username, {
         role: d.data().role ?? "employee",
         permissions: {
+          itAccess: d.data().permissions?.itAccess ?? false,        // ← keep in sync
           itInventory: d.data().permissions?.itInventory ?? false,
           consumables: d.data().permissions?.consumables ?? false,
-          tickets:     d.data().permissions?.tickets     ?? false,
+          tickets: d.data().permissions?.tickets ?? false,
+          officeSupplies: d.data().permissions?.officeSupplies ?? false,
         },
       });
     }
   });
 
-  // Delete all existing docs
   for (let i = 0; i < existing.docs.length; i += BATCH_SIZE) {
     const batch = writeBatch(db);
     existing.docs.slice(i, i + BATCH_SIZE).forEach((d) => batch.delete(d.ref));
     await batch.commit();
   }
 
-  // Re-add with displayName as doc ID, preserving role + permissions
   for (let i = 0; i < adUsers.length; i += BATCH_SIZE) {
     const batch = writeBatch(db);
     const chunk = adUsers.slice(i, i + BATCH_SIZE);
@@ -90,13 +104,14 @@ async function syncADToFirestore(adUsers: ADUser[]): Promise<void> {
       const preserved = existingData.get(usernameKey);
 
       batch.set(ref, {
-        username:    usernameKey,
+        username: usernameKey,
         displayName: u.displayName ?? u.username,
-        email:       u.email || `${u.username}@ocgbim.com`,
-        department:  u.department ?? "",
-        title:       u.title ?? "",
-        phone:       u.phone ?? "",
-        role:        preserved?.role ?? "employee",
+        email: u.email || `${u.username}@ocgbim.com`,
+        department: u.department ?? "",
+        title: u.title ?? "",
+        phone: u.phone ?? "",
+        // ✅ Force "employee" when resetRoles is true, otherwise preserve as before
+        role: resetRoles ? "employee" : (preserved?.role ?? "employee"),
         permissions: preserved?.permissions ?? DEFAULT_PERMISSIONS,
       });
     }
@@ -114,17 +129,22 @@ async function getUsersFromFirestore(): Promise<ADUser[]> {
   return snap.docs.map((d) => {
     const data = d.data();
     return {
-      username:    data.username    ?? d.id,
+      username: data.username ?? d.id,
       displayName: data.displayName ?? d.id,
-      email:       data.email       ?? `${d.id}@ocgbim.com`,
-      department:  data.department  ?? "",
-      title:       data.title       ?? "",
-      phone:       data.phone       ?? "",
-      role:        (data.role as UserRole) ?? "employee",
+      email: data.email ?? `${d.id}@ocgbim.com`,
+      department: data.department ?? "",
+      title: data.title ?? "",
+      phone: data.phone ?? "",
+      role: (data.role as UserRole) ?? "employee",
       permissions: {
+        itAccess:      data.permissions?.itAccess      ?? false,
         itInventory: data.permissions?.itInventory ?? false,
         consumables: data.permissions?.consumables ?? false,
-        tickets:     data.permissions?.tickets     ?? false,
+        tickets: data.permissions?.tickets ?? false,
+        officeSupplies:
+          data.permissions?.officeSupplies ??
+          data.permissions?.officesupplies ??
+          false,
       },
     };
   });
@@ -142,15 +162,16 @@ async function isCacheStale(): Promise<boolean> {
     return true;
   }
 }
-
-export async function loadUsers(forceSync = false): Promise<{ users: ADUser[]; synced: boolean }> {
-  const stale = forceSync || await isCacheStale();
+export async function loadUsers(
+  forceSync = false,
+  resetRoles = false,   // ← NEW
+): Promise<{ users: ADUser[]; synced: boolean }> {
+  const stale = forceSync || (await isCacheStale());
 
   if (stale) {
     const adUsers = await fetchAllADUsers();
     if (adUsers.length > 0) {
-      await syncADToFirestore(adUsers);
-      // Return from Firestore after sync so permissions/roles are included
+      await syncADToFirestore(adUsers, resetRoles);
       const synced = await getUsersFromFirestore();
       return { users: synced, synced: true };
     }

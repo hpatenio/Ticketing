@@ -1,25 +1,21 @@
 // app/Admin/OfficeInventory/MonthlyReportPage.tsx
-//
-// Changes from original:
-//  1. Added import of exportMonthlyReportPdf
-//  2. exportCsv kept but both buttons now call exportMonthlyReportPdf (allRows variant & filtered variant)
-//  3. "CSV" button renamed "Export PDF", "Print / PDF" button wires to same export but for all categories
-//  4. A loading/generating state is shown while the PDF is being built
-//  5. No other logic changes — all existing data fetching & computation is untouched
+
 
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useTheme } from "../../../theme/ThemeContext";
 import { ADUser } from "../../../types";
 import {
-  getAllInventoryItems,
-  getAllStockTransactions,
+  subscribeToInventoryItems,
+  subscribeToStockTransactions,
 } from "../../../Services/officeInventory";
 import { OfficeInventoryItem, StockTransaction } from "../../../types";
-import { exportMonthlyReportPdf } from "../../../Services/exportMonthlyReportPdf";
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+
 type CategoryTab = "office_supplies" | "cleaning" | "ppe" | "medicine";
+
 
 type MonthlyItemRow = {
   id: string;
@@ -38,15 +34,18 @@ type MonthlyItemRow = {
   activityDots: { type: "consumed" | "delivered" | "none"; date: string }[];
 };
 
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const CATEGORY_TABS: { label: string; value: CategoryTab | "all" }[] = [
+
+const CATEGORY_TABS: { label: string; value: CategoryTab | "all"; count?: number }[] = [
   { label: "All", value: "all" },
   { label: "Office supplies", value: "office_supplies" },
   { label: "Cleaning", value: "cleaning" },
   { label: "PPE", value: "ppe" },
   { label: "Medicine", value: "medicine" },
 ];
+
 
 const CATEGORY_MAP: Record<string, string> = {
   office_supplies: "Office Supplies",
@@ -55,21 +54,22 @@ const CATEGORY_MAP: Record<string, string> = {
   medicine: "Medicine",
 };
 
+
 function formatPeso(amount: number): string {
-  return `₱${Math.abs(amount).toLocaleString("en-PH", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  })}`;
+  return `₱${Math.abs(amount).toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
+
 
 function getYYYYMM(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
+
 function parseYYYYMM(yyyymm: string): { year: number; month: number } {
   const [y, m] = yyyymm.split("-").map(Number);
   return { year: y, month: m };
 }
+
 
 function monthLabel(yyyymm: string): string {
   const { year, month } = parseYYYYMM(yyyymm);
@@ -79,11 +79,13 @@ function monthLabel(yyyymm: string): string {
   });
 }
 
+
 function prevMonth(yyyymm: string): string {
   const { year, month } = parseYYYYMM(yyyymm);
   const d = new Date(year, month - 2, 1);
   return getYYYYMM(d);
 }
+
 
 function nextMonth(yyyymm: string): string {
   const { year, month } = parseYYYYMM(yyyymm);
@@ -91,10 +93,13 @@ function nextMonth(yyyymm: string): string {
   return getYYYYMM(d);
 }
 
+
 function isCurrentOrFuture(yyyymm: string): boolean {
   return yyyymm >= getYYYYMM(new Date());
 }
 
+
+// Build activity sparkline dots (up to ~30 slots representing days of the month)
 function buildActivityDots(
   txs: StockTransaction[],
   yyyymm: string,
@@ -103,17 +108,13 @@ function buildActivityDots(
   const daysInMonth = new Date(year, month, 0).getDate();
   const dots: { type: "consumed" | "delivered" | "none"; date: string }[] = [];
 
+
   for (let d = 1; d <= daysInMonth; d++) {
     const dayStr = `${yyyymm}-${String(d).padStart(2, "0")}`;
-    const dayTxs = txs.filter(
-      (tx) => (tx.transactionDate ?? tx.createdAt?.slice(0, 10)) === dayStr,
-    );
+    const dayTxs = txs.filter((tx) => (tx.transactionDate ?? tx.createdAt?.slice(0, 10)) === dayStr);
     const hasDelivery = dayTxs.some((tx) => tx.type === "delivery");
     const hasConsumed = dayTxs.some(
-      (tx) =>
-        tx.type === "manual_adjustment" ||
-        tx.type === "supply_request_fulfilled" ||
-        tx.type === "ticket_deduction",
+      (tx) => tx.type === "manual_adjustment" || tx.type === "supply_request_fulfilled" || tx.type === "ticket_deduction",
     );
     if (hasDelivery) dots.push({ type: "delivered", date: dayStr });
     else if (hasConsumed) dots.push({ type: "consumed", date: dayStr });
@@ -122,7 +123,9 @@ function buildActivityDots(
   return dots;
 }
 
-// ─── Activity Sparkline ───────────────────────────────────────────────────────
+
+// ─── Activity Sparkline ────────────────────────────────────────────────────────
+
 
 function ActivitySparkline({
   dots,
@@ -146,8 +149,8 @@ function ActivitySparkline({
               dot.type === "delivered"
                 ? "#3b82f6"
                 : dot.type === "consumed"
-                ? "#94a3b8"
-                : theme.border,
+                  ? "#94a3b8"
+                  : theme.border,
             opacity: dot.type === "none" ? 0.4 : 1,
           }}
         />
@@ -156,7 +159,9 @@ function ActivitySparkline({
   );
 }
 
-// ─── KPI Cards ────────────────────────────────────────────────────────────────
+
+// ─── Summary KPI cards ────────────────────────────────────────────────────────
+
 
 function KpiCard({
   label,
@@ -181,10 +186,7 @@ function KpiCard({
       }}
       className="rounded-xl border p-4"
     >
-      <p
-        style={{ color: theme.subtext }}
-        className="text-[10px] font-semibold uppercase tracking-wide mb-1"
-      >
+      <p style={{ color: theme.subtext }} className="text-[10px] font-semibold uppercase tracking-wide mb-1">
         {label}
       </p>
       <p
@@ -202,7 +204,41 @@ function KpiCard({
   );
 }
 
-// ─── Month Selector ───────────────────────────────────────────────────────────
+
+// ─── Export helpers ────────────────────────────────────────────────────────────
+
+
+function exportCsv(rows: MonthlyItemRow[], month: string) {
+  const headers = [
+    "Item Code", "Item Name", "Brand", "Category", "Unit",
+    "Price/Unit", "Beg. Inventory", "Consumed", "Consumption Value",
+    "Delivered", "Delivery Value", "Ending Inventory",
+  ];
+  const lines = rows.map((r) =>
+    [
+      r.itemCode, r.name, r.brand, CATEGORY_MAP[r.category] ?? r.category,
+      r.unit, r.pricePerUnit, r.beginningInventory, r.totalConsumed,
+      r.consumptionAmount, r.totalDelivered, r.deliveryAmount, r.endingInventory,
+    ].map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","),
+  );
+  const csv = [headers.join(","), ...lines].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `monthly_report_${month}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+
+function printReport() {
+  window.print();
+}
+
+
+// ─── Month selector ────────────────────────────────────────────────────────────
+
 
 function MonthSelector({
   value,
@@ -213,12 +249,14 @@ function MonthSelector({
   onChange: (v: string) => void;
   theme: any;
 }) {
+  // Build last 24 months
   const options: string[] = [];
   const now = new Date();
   for (let i = 0; i < 24; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     options.push(getYYYYMM(d));
   }
+
 
   return (
     <div className="flex items-center gap-1">
@@ -266,54 +304,16 @@ function MonthSelector({
   );
 }
 
-// ─── PDF Export Icon ──────────────────────────────────────────────────────────
-
-function IconPdf() {
-  return (
-    <svg
-      width="13"
-      height="13"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
-      <polyline points="10 9 9 9 8 9" />
-    </svg>
-  );
-}
-
-function IconPrint() {
-  return (
-    <svg
-      width="13"
-      height="13"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <polyline points="6 9 6 2 18 2 18 9" />
-      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-      <rect x="6" y="14" width="12" height="8" />
-    </svg>
-  );
-}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+
 type Props = { user?: ADUser };
+
 
 export default function MonthlyReportPage({ user }: Props) {
   const { theme } = useTheme();
+
 
   const [selectedMonth, setSelectedMonth] = useState<string>(getYYYYMM(new Date()));
   const [activeTab, setActiveTab] = useState<CategoryTab | "all">("all");
@@ -321,45 +321,66 @@ export default function MonthlyReportPage({ user }: Props) {
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [generating, setGenerating] = useState(false);
 
-  const loadData = useCallback(async () => {
+
+  // ── Live data via Firestore onSnapshot listeners ─────────────────────────────
+  // Replaces the old one-shot getAllInventoryItems()/getAllStockTransactions()
+  // fetch-on-mount. Any write from Add Delivery, Adjust Stock, supply request
+  // approval/rejection, etc. — from ANYWHERE in the app — now pushes straight
+  // into this page's state automatically, with no refresh or remount needed.
+  useEffect(() => {
     setLoading(true);
     setError("");
-    try {
-      const [inv, txs] = await Promise.all([
-        getAllInventoryItems(),
-        getAllStockTransactions(),
-      ]);
+
+
+    let itemsLoaded = false;
+    let txsLoaded = false;
+    const maybeStopLoading = () => {
+      if (itemsLoaded && txsLoaded) setLoading(false);
+    };
+
+
+    const unsubItems = subscribeToInventoryItems((inv) => {
       setItems(inv);
+      itemsLoaded = true;
+      maybeStopLoading();
+    });
+
+
+    const unsubTxs = subscribeToStockTransactions((txs) => {
       setTransactions(txs);
-    } catch (err) {
-      console.error("Failed to load report data:", err);
-      setError("Failed to load data.");
-    } finally {
-      setLoading(false);
-    }
+      txsLoaded = true;
+      maybeStopLoading();
+    });
+
+
+    return () => {
+      unsubItems();
+      unsubTxs();
+    };
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
 
-  // ── Compute monthly rows ──────────────────────────────────────────────────
+  // ── Compute monthly rows ─────────────────────────────────────────────────────
   const monthlyRows = useMemo((): MonthlyItemRow[] => {
-    console.log("first item raw:", JSON.stringify(items[0]));
     const { year, month } = parseYYYYMM(selectedMonth);
     const startISO = new Date(year, month - 1, 1).toISOString().slice(0, 10);
-    const endISO   = new Date(year, month, 0).toISOString().slice(0, 10);
+    const endISO = new Date(year, month, 0).toISOString().slice(0, 10);
 
+
+    // Transactions in selected month
     const monthTxs = transactions.filter((tx) => {
       const d = tx.transactionDate ?? tx.createdAt?.slice(0, 10) ?? "";
       return d >= startISO && d <= endISO;
     });
- console.log("sample tx totalAmount:", transactions[0]?.totalAmount, typeof transactions[0]?.totalAmount);
+
+
     return items.map((item) => {
       const monthForItem = monthTxs.filter((tx) => tx.itemId === item.id);
 
+
+      // Beginning inventory = current stock minus net of all changes from
+      // the start of this month onward (i.e. roll back to month start).
       const sumFromStart = transactions
         .filter((tx) => {
           const d = tx.transactionDate ?? tx.createdAt?.slice(0, 10) ?? "";
@@ -367,7 +388,9 @@ export default function MonthlyReportPage({ user }: Props) {
         })
         .reduce((acc, tx) => acc + tx.quantityChange, 0);
 
+
       const beginningInventory = Math.max(0, item.currentStock - sumFromStart);
+
 
       const totalConsumed = monthForItem
         .filter(
@@ -378,6 +401,7 @@ export default function MonthlyReportPage({ user }: Props) {
         )
         .reduce((acc, tx) => acc + Math.abs(tx.quantityChange), 0);
 
+
       const consumptionAmount = monthForItem
         .filter(
           (tx) =>
@@ -385,18 +409,24 @@ export default function MonthlyReportPage({ user }: Props) {
             tx.type === "supply_request_fulfilled" ||
             tx.type === "ticket_deduction",
         )
-        .reduce((acc, tx) => acc + Number(tx.totalAmount), 0);
+        .reduce((acc, tx) => acc + tx.totalAmount, 0);
+
 
       const totalDelivered = monthForItem
         .filter((tx) => tx.type === "delivery")
         .reduce((acc, tx) => acc + tx.quantityChange, 0);
 
+
       const deliveryAmount = monthForItem
         .filter((tx) => tx.type === "delivery")
-        .reduce((acc, tx) => acc + Number(tx.totalAmount), 0);
+        .reduce((acc, tx) => acc + tx.totalAmount, 0);
+
 
       const endingInventory = beginningInventory - totalConsumed + totalDelivered;
-      const activityDots    = buildActivityDots(monthForItem, selectedMonth);
+
+
+      const activityDots = buildActivityDots(monthForItem, selectedMonth);
+
 
       return {
         id: item.id,
@@ -417,6 +447,8 @@ export default function MonthlyReportPage({ user }: Props) {
     });
   }, [items, transactions, selectedMonth]);
 
+
+  // ── Tab counts ────────────────────────────────────────────────────────────────
   const tabCounts = useMemo(() => {
     const counts: Record<string, number> = { all: monthlyRows.length };
     monthlyRows.forEach((r) => {
@@ -425,52 +457,31 @@ export default function MonthlyReportPage({ user }: Props) {
     return counts;
   }, [monthlyRows]);
 
+
+  // ── Filtered rows ─────────────────────────────────────────────────────────────
   const filteredRows = useMemo(() => {
-    const rows = activeTab === "all"
-      ? monthlyRows
-      : monthlyRows.filter((r) => r.category === activeTab);
-    return [...rows].sort((a, b) => a.name.localeCompare(b.name));
+    if (activeTab === "all") return monthlyRows;
+    return monthlyRows.filter((r) => r.category === activeTab);
   }, [monthlyRows, activeTab]);
 
+
+  // ── KPI summary ───────────────────────────────────────────────────────────────
   const kpi = useMemo(() => {
     const totalConsumptionValue = monthlyRows.reduce((s, r) => s + r.consumptionAmount, 0);
-    const totalDeliveryValue    = monthlyRows.reduce((s, r) => s + r.deliveryAmount, 0);
-    const itemsConsumed         = monthlyRows.filter((r) => r.totalConsumed > 0).length;
-    const netStockChange        = totalDeliveryValue - totalConsumptionValue;
+    const totalDeliveryValue = monthlyRows.reduce((s, r) => s + r.deliveryAmount, 0);
+    const itemsConsumed = monthlyRows.filter((r) => r.totalConsumed > 0).length;
+    const netStockChange = totalDeliveryValue - totalConsumptionValue;
     return { totalConsumptionValue, totalDeliveryValue, itemsConsumed, netStockChange };
   }, [monthlyRows]);
 
+
+  // ── Tab totals (consumed + delivered) for footer ──────────────────────────────
   const tabTotals = useMemo(() => {
-    const totalConsumedP  = filteredRows.reduce((s, r) => s + r.consumptionAmount, 0);
+    const totalConsumedP = filteredRows.reduce((s, r) => s + r.consumptionAmount, 0);
     const totalDeliveredP = filteredRows.reduce((s, r) => s + r.deliveryAmount, 0);
     return { totalConsumedP, totalDeliveredP };
   }, [filteredRows]);
 
-  // ── PDF export handler ────────────────────────────────────────────────────
-  // "Export PDF" exports only the currently visible tab (filtered).
-  // "Print / PDF" always exports ALL categories (full report).
-  const handleExportPdf = useCallback(
-    async (exportAll: boolean) => {
-      if (generating) return;
-      setGenerating(true);
-      try {
-        const rows = exportAll ? monthlyRows : filteredRows;
-        await exportMonthlyReportPdf(rows, selectedMonth);
-      } catch (err) {
-        console.error("PDF generation failed:", err);
-      } finally {
-        setGenerating(false);
-      }
-    },
-    [generating, monthlyRows, filteredRows, selectedMonth],
-  );
-
-  // ── Button shared style helper ────────────────────────────────────────────
-  const btnStyle = {
-    backgroundColor: theme.surface,
-    color: theme.text,
-    borderColor: theme.border,
-  };
 
   return (
     <div
@@ -485,71 +496,58 @@ export default function MonthlyReportPage({ user }: Props) {
               Monthly consumables report
             </h1>
             <p style={{ color: theme.subtext }} className="text-xs mt-0.5">
-              Generated{" "}
-              {new Date().toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })}
+              Generated {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
               {user ? ` · ${user.displayName}` : ""}
             </p>
           </div>
 
+
           <div className="flex items-center gap-2 flex-shrink-0">
             <MonthSelector value={selectedMonth} onChange={setSelectedMonth} theme={theme} />
 
-            {/* ── Export PDF (current tab / filtered) ── */}
-            <button
-              onClick={() => handleExportPdf(false)}
-              disabled={filteredRows.length === 0 || generating}
-              style={btnStyle}
-              className="flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-lg border disabled:opacity-50 whitespace-nowrap relative"
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = theme.bgHover)}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = theme.surface)}
-              title={
-                activeTab === "all"
-                  ? "Export all categories as PDF"
-                  : `Export ${CATEGORY_MAP[activeTab] ?? activeTab} as PDF`
-              }
-            >
-              {generating ? (
-                <>
-                  <svg
-                    className="animate-spin"
-                    width="13"
-                    height="13"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-                  </svg>
-                  Generating…
-                </>
-              ) : (
-                <>
-                  <IconPdf />
-                  Export PDF
-                </>
-              )}
-            </button>
 
-            {/* ── Print / Full PDF (always all categories) ── */}
             <button
-              onClick={() => handleExportPdf(true)}
-              disabled={monthlyRows.length === 0 || generating}
-              style={btnStyle}
+              onClick={() => exportCsv(filteredRows, selectedMonth)}
+              disabled={filteredRows.length === 0}
+              style={{
+                backgroundColor: theme.surface,
+                color: theme.text,
+                borderColor: theme.border,
+              }}
               className="flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-lg border disabled:opacity-50 whitespace-nowrap"
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = theme.bgHover)}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = theme.surface)}
-              title="Download full report PDF (all categories)"
             >
-              <IconPrint />
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              CSV
+            </button>
+
+
+            <button
+              onClick={printReport}
+              style={{
+                backgroundColor: theme.surface,
+                color: theme.text,
+                borderColor: theme.border,
+              }}
+              className="flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-lg border whitespace-nowrap"
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = theme.bgHover)}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = theme.surface)}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9" />
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                <rect x="6" y="14" width="12" height="8" />
+              </svg>
               Print / PDF
             </button>
           </div>
         </div>
+
 
         {/* ── KPI Cards ── */}
         {!loading && (
@@ -583,35 +581,13 @@ export default function MonthlyReportPage({ user }: Props) {
           </div>
         )}
 
+
         {error && (
           <div className="rounded-lg border border-rose-200 bg-rose-50 text-rose-700 text-xs px-3 py-2 mb-3">
             ⚠ {error}
           </div>
         )}
 
-        {/* Generating banner */}
-        {generating && (
-          <div
-            style={{ backgroundColor: theme.surface, borderColor: theme.border }}
-            className="rounded-lg border px-3 py-2 mb-3 flex items-center gap-2 text-xs"
-          >
-            <svg
-              className="animate-spin"
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              style={{ color: theme.primary }}
-            >
-              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-            </svg>
-            <span style={{ color: theme.text }}>
-              Building PDF report — this may take a moment…
-            </span>
-          </div>
-        )}
 
         {/* ── Category tabs ── */}
         <div
@@ -620,26 +596,20 @@ export default function MonthlyReportPage({ user }: Props) {
         >
           {CATEGORY_TABS.map((tab) => {
             const isActive = activeTab === tab.value;
-            const count    = tabCounts[tab.value] ?? 0;
+            const count = tabCounts[tab.value] ?? 0;
             return (
               <button
                 key={tab.value}
                 onClick={() => setActiveTab(tab.value)}
                 style={{
                   color: isActive ? theme.primary : theme.subtext,
-                  borderBottom: isActive
-                    ? `2px solid ${theme.primary}`
-                    : "2px solid transparent",
+                  borderBottom: isActive ? `2px solid ${theme.primary}` : "2px solid transparent",
                   backgroundColor: "transparent",
                   flexShrink: 0,
                 }}
                 className="px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors focus:outline-none"
-                onMouseEnter={(e) => {
-                  if (!isActive) e.currentTarget.style.color = theme.text;
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) e.currentTarget.style.color = theme.subtext;
-                }}
+                onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.color = theme.text; }}
+                onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.color = theme.subtext; }}
               >
                 {tab.label}
                 <span
@@ -656,6 +626,7 @@ export default function MonthlyReportPage({ user }: Props) {
           })}
         </div>
       </div>
+
 
       {/* ── Table ── */}
       {loading ? (
@@ -712,11 +683,11 @@ export default function MonthlyReportPage({ user }: Props) {
                 <tr
                   key={row.id}
                   style={{
-                    backgroundColor:
-                      index % 2 === 0 ? theme.surface : theme.background,
+                    backgroundColor: index % 2 === 0 ? theme.surface : theme.background,
                     borderBottom: `1px solid ${theme.border}`,
                   }}
                 >
+                  {/* Price */}
                   <td className="px-3 py-2.5 whitespace-nowrap">
                     <div>
                       <p style={{ color: theme.text }} className="text-sm font-medium">
@@ -728,66 +699,66 @@ export default function MonthlyReportPage({ user }: Props) {
                     </div>
                   </td>
 
+
+                  {/* Beginning inventory */}
                   <td className="px-3 py-2.5 whitespace-nowrap text-right">
                     <span style={{ color: theme.text }} className="text-sm font-medium">
                       {row.beginningInventory}
                     </span>
                   </td>
 
+
+                  {/* Activity dots */}
                   <td className="px-3 py-2.5" style={{ minWidth: 220 }}>
                     <ActivitySparkline dots={row.activityDots} theme={theme} />
                   </td>
 
+
+                  {/* Consumed qty */}
                   <td className="px-3 py-2.5 whitespace-nowrap text-right">
                     <span
-                      style={{
-                        color: row.totalConsumed > 0 ? "#dc2626" : theme.subtext,
-                      }}
+                      style={{ color: row.totalConsumed > 0 ? "#dc2626" : theme.subtext }}
                       className="text-sm font-semibold"
                     >
                       {row.totalConsumed > 0 ? `-${row.totalConsumed}` : "0"}
                     </span>
                   </td>
 
+
+                  {/* Consumed ₱ */}
                   <td className="px-3 py-2.5 whitespace-nowrap text-right">
                     <span
-                      style={{
-                        color:
-                          row.consumptionAmount > 0 ? "#dc2626" : theme.subtext,
-                      }}
+                      style={{ color: row.consumptionAmount > 0 ? "#dc2626" : theme.subtext }}
                       className="text-sm"
                     >
-                      {row.consumptionAmount > 0
-                        ? formatPeso(row.consumptionAmount)
-                        : "—"}
+                      {row.consumptionAmount > 0 ? formatPeso(row.consumptionAmount) : "—"}
                     </span>
                   </td>
 
+
+                  {/* Delivered qty */}
                   <td className="px-3 py-2.5 whitespace-nowrap text-right">
                     <span
-                      style={{
-                        color: row.totalDelivered > 0 ? "#16a34a" : theme.subtext,
-                      }}
+                      style={{ color: row.totalDelivered > 0 ? "#16a34a" : theme.subtext }}
                       className="text-sm font-semibold"
                     >
                       {row.totalDelivered > 0 ? `+${row.totalDelivered}` : "0"}
                     </span>
                   </td>
 
+
+                  {/* Delivery ₱ */}
                   <td className="px-3 py-2.5 whitespace-nowrap text-right">
                     <span
-                      style={{
-                        color:
-                          row.deliveryAmount > 0 ? "#16a34a" : theme.subtext,
-                      }}
+                      style={{ color: row.deliveryAmount > 0 ? "#16a34a" : theme.subtext }}
                       className="text-sm"
                     >
-                      {row.deliveryAmount > 0
-                        ? formatPeso(row.deliveryAmount)
-                        : "—"}
+                      {row.deliveryAmount > 0 ? formatPeso(row.deliveryAmount) : "—"}
                     </span>
                   </td>
 
+
+                  {/* Ending inventory */}
                   <td className="px-3 py-2.5 whitespace-nowrap text-right">
                     <span
                       style={{
@@ -795,8 +766,8 @@ export default function MonthlyReportPage({ user }: Props) {
                           row.endingInventory === 0
                             ? "#dc2626"
                             : row.endingInventory <= 5
-                            ? "#d97706"
-                            : theme.text,
+                              ? "#d97706"
+                              : theme.text,
                       }}
                       className="text-sm font-semibold"
                     >
@@ -805,6 +776,7 @@ export default function MonthlyReportPage({ user }: Props) {
                   </td>
                 </tr>
               ))}
+
 
               {/* ── Footer totals row ── */}
               <tr
@@ -833,9 +805,7 @@ export default function MonthlyReportPage({ user }: Props) {
                 </td>
                 <td className="px-3 py-2.5 text-right">
                   <span style={{ color: "#16a34a" }} className="text-sm font-bold">
-                    {tabTotals.totalDeliveredP > 0
-                      ? formatPeso(tabTotals.totalDeliveredP)
-                      : "—"}
+                    {tabTotals.totalDeliveredP > 0 ? formatPeso(tabTotals.totalDeliveredP) : "—"}
                   </span>
                 </td>
                 <td className="px-3 py-2.5 text-right" />
@@ -843,55 +813,23 @@ export default function MonthlyReportPage({ user }: Props) {
             </tbody>
           </table>
 
-          {/* ── Activity legend ── */}
+
+          {/* ── Legend ── */}
           <div className="flex items-center gap-4 mt-3 px-1">
-            <span
-              style={{ color: theme.subtext }}
-              className="text-[11px] font-medium uppercase tracking-wide"
-            >
+            <span style={{ color: theme.subtext }} className="text-[11px] font-medium uppercase tracking-wide">
               Activity legend:
             </span>
             <div className="flex items-center gap-1.5">
-              <span
-                style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: "50%",
-                  backgroundColor: "#3b82f6",
-                  display: "inline-block",
-                }}
-              />
-              <span style={{ color: theme.subtext }} className="text-[11px]">
-                Delivery
-              </span>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: "#3b82f6", display: "inline-block" }} />
+              <span style={{ color: theme.subtext }} className="text-[11px]">Delivery</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span
-                style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: "50%",
-                  backgroundColor: "#94a3b8",
-                  display: "inline-block",
-                }}
-              />
-              <span style={{ color: theme.subtext }} className="text-[11px]">
-                Consumed
-              </span>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: "#94a3b8", display: "inline-block" }} />
+              <span style={{ color: theme.subtext }} className="text-[11px]">Consumed</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span
-                style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: "50%",
-                  backgroundColor: "#e2e8f0",
-                  display: "inline-block",
-                }}
-              />
-              <span style={{ color: theme.subtext }} className="text-[11px]">
-                No activity
-              </span>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: "#e2e8f0", display: "inline-block" }} />
+              <span style={{ color: theme.subtext }} className="text-[11px]">No activity</span>
             </div>
           </div>
         </div>
@@ -899,3 +837,6 @@ export default function MonthlyReportPage({ user }: Props) {
     </div>
   );
 }
+
+
+

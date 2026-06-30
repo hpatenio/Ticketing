@@ -13,6 +13,7 @@ import {
   orderBy,
   where,
   Timestamp,
+  onSnapshot,
 } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
@@ -147,6 +148,33 @@ export async function markDelivered(id: string, byName: string) {
     deliveredAt: new Date().toISOString(),
     deliveredByName: byName,
   });
+}
+export function subscribeToInventoryItems(
+  cb: (items: OfficeInventoryItem[]) => void,
+): () => void {
+  const q = query(collection(db, ITEMS_COL), where("isActive", "==", true));
+  return onSnapshot(
+    q,
+    (snap) => {
+      console.log("[subscribeToInventoryItems] fired, count:", snap.docs.length);
+      cb(snap.docs.map((d) => toItem(d.id, d.data())));
+    },
+    (err) => console.error("[subscribeToInventoryItems] ERROR:", err),
+  );
+}
+
+export function subscribeToStockTransactions(
+  cb: (txs: StockTransaction[]) => void,
+): () => void {
+  const q = query(collection(db, TX_COL), orderBy("createdAt", "desc"));
+  return onSnapshot(
+    q,
+    (snap) => {
+      console.log("[subscribeToStockTransactions] fired, count:", snap.docs.length);
+      cb(snap.docs.map((d) => toTransaction(d.id, d.data())));
+    },
+    (err) => console.error("[subscribeToStockTransactions] ERROR:", err),
+  );
 }
 
 export async function markFailedDelivery(

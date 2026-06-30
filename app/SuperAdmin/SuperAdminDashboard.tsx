@@ -9,7 +9,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ADUser } from "../../types";
 import Sidebar from "../../components/Navigations/Sidebar";
-import BottomNavBar from "../../components/Navigations/BottmNavBar";
+import MobileNavBar from "../../components/Navigations/BottmNavBar";
 import ITInventoryPage from "../Admin/IT Modules/ITInventory/ITInventoryPage";
 import ITInventorySummary, {
   InventoryFilter,
@@ -43,22 +43,14 @@ type Props = {
 export default function SuperAdminDashboard({ user, onLogout }: Props) {
   const [activeKey, setActiveKey] = useState("dashboard");
   const [hydrated, setHydrated] = useState(false);
-
-  // ── IT Inventory filter (from ITInventorySummary dashboard cards) ──────────
-  const [inventoryFilter, setInventoryFilter] =
-    useState<InventoryFilter | null>(null);
-
-// ── Office Inventory filter (from OfficeDashboardPage KPI cards) ──────────
-  const [officeInventoryFilter, setOfficeInventoryFilter] =
-    useState<DashboardInventoryFilter>(null);
-
-  // ── Pending approval from dashboard "Details" button ──────────────────────
+  const [inventoryFilter, setInventoryFilter] = useState<InventoryFilter | null>(null);
+  const [officeInventoryFilter, setOfficeInventoryFilter] = useState<DashboardInventoryFilter>(null);
   const [pendingApproval, setPendingApproval] = useState<import("../../types").SupplyRequest | null>(null);
+  const [pendingDeliverItem, setPendingDeliverItem] = useState<import("../../types").OfficeInventoryItem | null>(null); // ← moved here
 
   const { width } = useWindowDimensions();
   const { theme } = useTheme();
-  const isMobile =
-    Platform.OS === "android" || Platform.OS === "ios" || width < 768;
+  const isMobile = Platform.OS === "android" || Platform.OS === "ios" || width < 768;
 
   useEffect(() => {
     const init = async () => {
@@ -80,14 +72,15 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
     if (hydrated) AsyncStorage.setItem(ACTIVE_KEY_STORAGE, activeKey);
   }, [activeKey, hydrated]);
 
+  // ── Single early return, after ALL hooks ──────────────────────────────────
   if (!hydrated) return null;
 
-  // ── IT Inventory filter navigate (from DashboardHome summary) ─────────────
+  // ── Handlers and renderContent below (not hooks, so fine after return) ────
   const handleFilterNavigate = (filter: InventoryFilter | null) => {
     setInventoryFilter(filter);
     setActiveKey("inventory");
   };
-// ── Office dashboard KPI card navigate ────────────────────────────────────
+
   const handleOfficeDashboardNavigate = (
     tab: "inventory" | "supply_requests" | "monthly_report" | "activity",
     filter?: DashboardInventoryFilter,
@@ -107,13 +100,19 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
   };
 
   const handleOfficeDashboardNavigateWithPayload = (payload: {
-    tab: "inventory" | "supply_requests" | "monthly_report" | "activity";
+    tab: "inventory" | "supply_requests" | "monthly_report" | "activity" | "inventory_deliver";
     approvalRequest?: import("../../types").SupplyRequest;
+    deliverItem?: import("../../types").OfficeInventoryItem;
   }) => {
-    if (payload.approvalRequest) {
-      setPendingApproval(payload.approvalRequest);
-    }
-    handleOfficeDashboardNavigate(payload.tab);
+    if (payload.approvalRequest) setPendingApproval(payload.approvalRequest);
+    if (payload.deliverItem) setPendingDeliverItem(payload.deliverItem);
+
+    const tab =
+      payload.tab === "inventory_deliver"
+        ? ("inventory" as const)
+        : payload.tab;
+
+    handleOfficeDashboardNavigate(tab);
   };
 
   const renderContent = () => {
@@ -143,13 +142,15 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
             onNavigateWithPayload={handleOfficeDashboardNavigateWithPayload}
           />
         );
-      case "officeinventory":
-        return (
-          <OfficeInventoryPage
-            initialFilter={officeInventoryFilter}
-            isSuperAdmin={true}
-          />
-        );
+     case "officeinventory":
+  return (
+    <OfficeInventoryPage
+      initialFilter={officeInventoryFilter}
+      initialDeliverItem={pendingDeliverItem}
+      onDeliverModalOpened={() => setPendingDeliverItem(null)}
+      isSuperAdmin={true}
+    />
+  );
  case "supplyrequest":
         return (
           <SupplyRequestsPage
@@ -197,6 +198,14 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
 
   const needsScroll = activeKey === "dashboard";
 
+  const handleNavigate = (key: string) => {
+    // Clear IT inventory filter when leaving that page
+    if (key !== "inventory") setInventoryFilter(null);
+    // Clear office inventory filter when leaving that page
+    if (key !== "officeinventory") setOfficeInventoryFilter(null);
+    setActiveKey(key);
+  };
+
   return (
     <View
       style={{
@@ -209,13 +218,7 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
         <Sidebar
           user={user}
           activeKey={activeKey}
-          onNavigate={(key) => {
-            // Clear IT inventory filter when leaving that page
-            if (key !== "inventory") setInventoryFilter(null);
-            // Clear office inventory filter when leaving that page
-            if (key !== "officeinventory") setOfficeInventoryFilter(null);
-            setActiveKey(key);
-          }}
+          onNavigate={handleNavigate}
           onLogout={onLogout}
         />
       )}
@@ -227,6 +230,16 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
           backgroundColor: theme.background,
         }}
       >
+        {/* ── Mobile top bar (hamburger + logo) renders FIRST, above content ── */}
+        {isMobile && (
+          <MobileNavBar
+            user={user}
+            activeKey={activeKey}
+            onNavigate={handleNavigate}
+            onLogout={onLogout}
+          />
+        )}
+
         {needsScroll ? (
           <ScrollView
             style={{ flex: 1, height: 0 }}
@@ -236,18 +249,6 @@ export default function SuperAdminDashboard({ user, onLogout }: Props) {
           </ScrollView>
         ) : (
           <View style={{ flex: 1 }}>{renderContent()}</View>
-        )}
-
-        {isMobile && (
-          <BottomNavBar
-            user={user}
-            activeKey={activeKey}
-            onNavigate={(key) => {
-              if (key !== "inventory") setInventoryFilter(null);
-              if (key !== "officeinventory") setOfficeInventoryFilter(null);
-              setActiveKey(key);
-            }}
-          />
         )}
       </View>
     </View>

@@ -721,6 +721,7 @@ function RequestRow({
       <td className="px-3 py-3 whitespace-nowrap text-right">
         {isPending ? (
           <div className="inline-flex items-center gap-1.5">
+            <div className="inline-flex items-center gap-1.5">
             <button
               onClick={() => onApprove(request)}
               disabled={isApproving}
@@ -730,16 +731,10 @@ function RequestRow({
               }}
               className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg disabled:opacity-60"
             >
-              {isApproving ? "Approving…" : "✓ Approve"}
+              {isApproving ? "Reviewing…" : "Review"}
             </button>
-            <button
-              onClick={() => onReject(request)}
-              disabled={isApproving}
-              style={{ borderColor: theme.border, color: theme.subtext }}
-              className="px-2.5 py-1.5 text-xs font-medium rounded-lg border disabled:opacity-60"
-            >
-              ✕
-            </button>
+          </div>
+           
           </div>
         ) : request.status === "out_for_delivery" ? (
           <div className="inline-flex items-center gap-1.5">

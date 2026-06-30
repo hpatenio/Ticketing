@@ -736,7 +736,6 @@ useEffect(() => {
       setLoading(false);
     }
   );
-
   // Clean up listener when component unmounts
   return () => unsubscribe();
 }, []);

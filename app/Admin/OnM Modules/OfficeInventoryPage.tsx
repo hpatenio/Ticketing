@@ -284,11 +284,15 @@ export type InventoryFilter = {
 type Props = {
   initialFilter?: InventoryFilter;
   isSuperAdmin?: boolean;
+  initialDeliverItem?: OfficeInventoryItem | null;
+  onDeliverModalOpened?: () => void;
 };
 
 const OfficeInventoryPage: React.FC<Props> = ({
   initialFilter = null,
   isSuperAdmin = false,
+  initialDeliverItem = null,
+  onDeliverModalOpened,
 }) => {
   const { theme } = useTheme();
 
@@ -337,9 +341,19 @@ const [sortDir, setSortDir] = useState<SortDir>("asc");
     }
   }, []);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+useEffect(() => {
+  fetchData();
+}, [fetchData]);
+
+useEffect(() => {
+  if (initialDeliverItem && !loading && data.length > 0) {
+    // Find the fresh copy from loaded data (has current stock)
+    const freshItem = data.find((d) => d.id === initialDeliverItem.id) ?? initialDeliverItem;
+    setDeliverTarget(freshItem);
+    setDeliverModalOpen(true);
+    onDeliverModalOpened?.();
+  }
+}, [initialDeliverItem, loading, data]);
 
   const handleArchive = useCallback(
     async (id: string) => {
@@ -564,12 +578,6 @@ const [sortDir, setSortDir] = useState<SortDir>("asc");
               <IconBtn title="Edit item" onClick={() => setEditTarget(item)}>
                 <EditIcon />
               </IconBtn>
-              <IconBtn
-                title="Archive item"
-                onClick={() => handleArchive(item.id)}
-              >
-                <TrashIcon />
-              </IconBtn>
             </div>
           </td>
         </tr>
@@ -759,6 +767,12 @@ const [sortDir, setSortDir] = useState<SortDir>("asc");
       </div>
 
       {/* ── Scrollable table ── */}
+      <style>{`
+        .office-inventory-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .office-inventory-scroll::-webkit-scrollbar-track { background: transparent; }
+        .office-inventory-scroll::-webkit-scrollbar-thumb { background: ${theme.border}; border-radius: 99px; }
+        .office-inventory-scroll::-webkit-scrollbar-thumb:hover { background: ${theme.subtext}; }
+      `}</style>
       {loading ? (
         <div className="flex flex-1 items-center justify-center py-20">
           <div
@@ -775,7 +789,7 @@ const [sortDir, setSortDir] = useState<SortDir>("asc");
       ) : (
         <div
           style={{ borderColor: theme.border }}
-          className="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4"
+          className="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4 office-inventory-scroll"
         >
           <table
             className="min-w-full text-sm border rounded-lg"

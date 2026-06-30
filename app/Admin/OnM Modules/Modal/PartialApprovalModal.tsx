@@ -96,18 +96,20 @@ const PartialApprovalModal: React.FC<Props> = ({
   const someSkipped = lines.some((l) => l.skipped);
 
   // ── Line updaters ──────────────────────────────────────────────────────────
-  const updateQty = (itemId: string, raw: string) => {
-    setLines((prev) =>
-      prev.map((l) => {
-        if (l.item.itemId !== itemId) return l;
-        const parsed = parseInt(raw, 10);
-        const qty = isNaN(parsed)
-          ? 0
-          : clamp(parsed, 0, Math.min(l.item.quantityRequested, l.liveStock));
-        return { ...l, qtyToDispense: qty };
-      }),
-    );
-  };
+ const updateQty = (itemId: string, raw: string) => {
+  setLines((prev) =>
+    prev.map((l) => {
+      if (l.item.itemId !== itemId) return l;
+      const parsed = parseInt(raw, 10);
+      const qty = isNaN(parsed)
+        ? 1
+        : clamp(parsed, 1, Math.min(l.item.quantityRequested, l.liveStock));
+      // If they force-type 0, auto-skip the line
+      const shouldSkip = !isNaN(parsed) && parsed <= 0;
+      return { ...l, qtyToDispense: shouldSkip ? 0 : qty, skipped: shouldSkip };
+    }),
+  );
+};
 
   const toggleSkip = (itemId: string) => {
     setLines((prev) =>
@@ -371,7 +373,7 @@ const PartialApprovalModal: React.FC<Props> = ({
                       {/* Dispense qty input */}
                       <input
                         type="number"
-                        min={0}
+                        min={1}
                         max={Math.min(
                           line.item.quantityRequested,
                           line.liveStock,

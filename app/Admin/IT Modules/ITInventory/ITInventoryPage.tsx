@@ -813,10 +813,7 @@ const ITInventoryPage: React.FC<Props> = ({
           <td className="px-3 py-1 min-w-[130px]">
             <button
               type="button"
-              onDoubleClick={() => {
-                setEditingNoteTag(item.assetTag);
-                setDraftNote(item.notes ?? "");
-              }}
+              onDoubleClick={() => handleEdit(item)}
               className="text-left w-full"
             >
               <p
