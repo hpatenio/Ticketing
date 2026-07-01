@@ -81,7 +81,7 @@ const headerFontSmall: Partial<ExcelJS.Font> = {
 
 const headerCenter: Partial<ExcelJS.Alignment> = {
   horizontal: "center",
-  vertical: "center",
+  vertical: "middle",
   wrapText: true,
 };
 

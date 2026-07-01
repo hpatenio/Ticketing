@@ -8,6 +8,11 @@ import {
   subscribeToInventoryItems,
   subscribeToStockTransactions,
 } from "../../../Services/officeInventory";
+import { exportMonthlyReportPdf } from "../../../Services/exportMonthlyReportPdf";
+import {
+  exportMonthlyReportExcel,
+  ExcelExportCategory,
+} from "../../../Services/exportMonthlyReportExcel";
 import { OfficeInventoryItem, StockTransaction } from "../../../types";
 
 
@@ -70,6 +75,13 @@ function parseYYYYMM(yyyymm: string): { year: number; month: number } {
   return { year: y, month: m };
 }
 
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+function formatYearMonthDay(year: number, month: number, day: number): string {
+  return `${year}-${pad2(month)}-${pad2(day)}`;
+}
 
 function monthLabel(yyyymm: string): string {
   const { year, month } = parseYYYYMM(yyyymm);
@@ -77,6 +89,12 @@ function monthLabel(yyyymm: string): string {
     month: "long",
     year: "numeric",
   });
+}
+
+
+function daysInMonth(yyyymm: string): number {
+  const { year, month } = parseYYYYMM(yyyymm);
+  return new Date(year, month, 0).getDate();
 }
 
 
@@ -94,12 +112,17 @@ function nextMonth(yyyymm: string): string {
 }
 
 
-function isCurrentOrFuture(yyyymm: string): boolean {
-  return yyyymm >= getYYYYMM(new Date());
+function isFutureMonth(yyyymm: string): boolean {
+  return yyyymm > getYYYYMM(new Date());
 }
 
 
 // Build activity sparkline dots (up to ~30 slots representing days of the month)
+function normalizeDateString(value: string | undefined): string {
+  if (!value) return "";
+  return value.slice(0, 10);
+}
+
 function buildActivityDots(
   txs: StockTransaction[],
   yyyymm: string,
@@ -108,10 +131,11 @@ function buildActivityDots(
   const daysInMonth = new Date(year, month, 0).getDate();
   const dots: { type: "consumed" | "delivered" | "none"; date: string }[] = [];
 
-
   for (let d = 1; d <= daysInMonth; d++) {
     const dayStr = `${yyyymm}-${String(d).padStart(2, "0")}`;
-    const dayTxs = txs.filter((tx) => (tx.transactionDate ?? tx.createdAt?.slice(0, 10)) === dayStr);
+    const dayTxs = txs.filter(
+      (tx) => normalizeDateString(tx.transactionDate ?? tx.createdAt) === dayStr,
+    );
     const hasDelivery = dayTxs.some((tx) => tx.type === "delivery");
     const hasConsumed = dayTxs.some(
       (tx) => tx.type === "manual_adjustment" || tx.type === "supply_request_fulfilled" || tx.type === "ticket_deduction",
@@ -232,8 +256,83 @@ function exportCsv(rows: MonthlyItemRow[], month: string) {
 }
 
 
-function printReport() {
-  window.print();
+function exportPdfReport(rows: MonthlyItemRow[], month: string) {
+  exportMonthlyReportPdf(rows, month);
+}
+
+async function exportExcelReport(
+  rows: MonthlyItemRow[],
+  txs: StockTransaction[],
+  month: string,
+) {
+  const categories = buildExcelCategories(rows, txs, month);
+  await exportMonthlyReportExcel(categories, month);
+}
+
+function buildExcelCategories(
+  rows: MonthlyItemRow[],
+  txs: StockTransaction[],
+  yyyymm: string,
+): ExcelExportCategory[] {
+  const numDays = daysInMonth(yyyymm);
+  const { year, month } = parseYYYYMM(yyyymm);
+  const startISO = formatYearMonthDay(year, month, 1);
+  const endISO = formatYearMonthDay(year, month, numDays);
+
+  const normalizedTxs = txs.map((tx) => ({
+    ...tx,
+    transactionDate: normalizeDateString(tx.transactionDate ?? tx.createdAt),
+    createdAt: normalizeDateString(tx.createdAt),
+  }));
+
+  const categories: ExcelExportCategory[] = [
+    "office_supplies",
+    "cleaning",
+    "ppe",
+    "medicine",
+  ].map((categoryKey) => {
+    const rowsForCategory = rows.filter((row) => row.category === categoryKey);
+    return {
+      categoryKey,
+      rows: rowsForCategory.map((row) => {
+        const dailyConsumption = Array(numDays).fill(0);
+        normalizedTxs
+          .filter(
+            (tx) =>
+              tx.itemId === row.id &&
+              tx.transactionDate >= startISO &&
+              tx.transactionDate <= endISO &&
+              [
+                "manual_adjustment",
+                "supply_request_fulfilled",
+                "ticket_deduction",
+              ].includes(tx.type),
+          )
+          .forEach((tx) => {
+            const day = Number(tx.transactionDate.slice(-2));
+            if (day >= 1 && day <= numDays) {
+              dailyConsumption[day - 1] += Math.abs(tx.quantityChange);
+            }
+          });
+
+        return {
+          id: row.id,
+          itemCode: row.itemCode,
+          name: row.name,
+          brand: row.brand,
+          unit: row.unit,
+          pricePerUnit: row.pricePerUnit,
+          beginningInventory: row.beginningInventory,
+          dailyConsumption,
+          totalConsumed: row.totalConsumed,
+          totalDelivered: row.totalDelivered,
+          endingInventory: row.endingInventory,
+        };
+      }),
+    };
+  });
+
+  return categories.filter((category) => category.rows.length > 0);
 }
 
 
@@ -289,12 +388,12 @@ function MonthSelector({
       </select>
       <button
         onClick={() => onChange(nextMonth(value))}
-        disabled={isCurrentOrFuture(nextMonth(value))}
+        disabled={isFutureMonth(nextMonth(value))}
         style={{
           backgroundColor: theme.surface,
           borderColor: theme.border,
           color: theme.text,
-          opacity: isCurrentOrFuture(nextMonth(value)) ? 0.35 : 1,
+          opacity: isFutureMonth(nextMonth(value)) ? 0.35 : 1,
         }}
         className="w-8 h-9 flex items-center justify-center rounded-lg border text-sm"
       >
@@ -364,87 +463,89 @@ export default function MonthlyReportPage({ user }: Props) {
   // ── Compute monthly rows ─────────────────────────────────────────────────────
   const monthlyRows = useMemo((): MonthlyItemRow[] => {
     const { year, month } = parseYYYYMM(selectedMonth);
-    const startISO = new Date(year, month - 1, 1).toISOString().slice(0, 10);
-    const endISO = new Date(year, month, 0).toISOString().slice(0, 10);
+    const startISO = formatYearMonthDay(year, month, 1);
+    const endISO = formatYearMonthDay(year, month, new Date(year, month, 0).getDate());
 
+    const normalizedTransactions = transactions.map((tx) => ({
+      ...tx,
+      transactionDate: normalizeDateString(tx.transactionDate ?? tx.createdAt),
+      createdAt: normalizeDateString(tx.createdAt),
+    }));
 
     // Transactions in selected month
-    const monthTxs = transactions.filter((tx) => {
-      const d = tx.transactionDate ?? tx.createdAt?.slice(0, 10) ?? "";
+    const monthTxs = normalizedTransactions.filter((tx) => {
+      const d = tx.transactionDate;
       return d >= startISO && d <= endISO;
     });
 
+    return items
+      .map((item) => {
+        const monthForItem = monthTxs.filter((tx) => tx.itemId === item.id);
 
-    return items.map((item) => {
-      const monthForItem = monthTxs.filter((tx) => tx.itemId === item.id);
-
-
-      // Beginning inventory = current stock minus net of all changes from
-      // the start of this month onward (i.e. roll back to month start).
-      const sumFromStart = transactions
-        .filter((tx) => {
-          const d = tx.transactionDate ?? tx.createdAt?.slice(0, 10) ?? "";
-          return d >= startISO && tx.itemId === item.id;
-        })
-        .reduce((acc, tx) => acc + tx.quantityChange, 0);
+        // Beginning inventory = current stock minus net of all changes from
+        // the start of this month onward (i.e. roll back to month start).
+        const sumFromStart = normalizedTransactions
+          .filter((tx) => tx.transactionDate >= startISO && tx.itemId === item.id)
+          .reduce((acc, tx) => acc + tx.quantityChange, 0);
 
 
-      const beginningInventory = Math.max(0, item.currentStock - sumFromStart);
+        const beginningInventory = Math.max(0, item.currentStock - sumFromStart);
 
 
-      const totalConsumed = monthForItem
-        .filter(
-          (tx) =>
-            tx.type === "manual_adjustment" ||
-            tx.type === "supply_request_fulfilled" ||
-            tx.type === "ticket_deduction",
-        )
-        .reduce((acc, tx) => acc + Math.abs(tx.quantityChange), 0);
+        const totalConsumed = monthForItem
+          .filter(
+            (tx) =>
+              tx.type === "manual_adjustment" ||
+              tx.type === "supply_request_fulfilled" ||
+              tx.type === "ticket_deduction",
+          )
+          .reduce((acc, tx) => acc + Math.abs(tx.quantityChange), 0);
 
 
-      const consumptionAmount = monthForItem
-        .filter(
-          (tx) =>
-            tx.type === "manual_adjustment" ||
-            tx.type === "supply_request_fulfilled" ||
-            tx.type === "ticket_deduction",
-        )
-        .reduce((acc, tx) => acc + tx.totalAmount, 0);
+        const consumptionAmount = monthForItem
+          .filter(
+            (tx) =>
+              tx.type === "manual_adjustment" ||
+              tx.type === "supply_request_fulfilled" ||
+              tx.type === "ticket_deduction",
+          )
+          .reduce((acc, tx) => acc + tx.totalAmount, 0);
 
 
-      const totalDelivered = monthForItem
-        .filter((tx) => tx.type === "delivery")
-        .reduce((acc, tx) => acc + tx.quantityChange, 0);
+        const totalDelivered = monthForItem
+          .filter((tx) => tx.type === "delivery")
+          .reduce((acc, tx) => acc + tx.quantityChange, 0);
 
 
-      const deliveryAmount = monthForItem
-        .filter((tx) => tx.type === "delivery")
-        .reduce((acc, tx) => acc + tx.totalAmount, 0);
+        const deliveryAmount = monthForItem
+          .filter((tx) => tx.type === "delivery")
+          .reduce((acc, tx) => acc + tx.totalAmount, 0);
 
 
-      const endingInventory = beginningInventory - totalConsumed + totalDelivered;
+        const endingInventory = beginningInventory - totalConsumed + totalDelivered;
 
 
-      const activityDots = buildActivityDots(monthForItem, selectedMonth);
+        const activityDots = buildActivityDots(monthForItem, selectedMonth);
 
 
-      return {
-        id: item.id,
-        itemCode: item.itemCode,
-        name: item.name,
-        brand: item.brand ?? "",
-        category: item.category,
-        unit: item.unit,
-        pricePerUnit: item.pricePerUnit,
-        beginningInventory,
-        totalConsumed,
-        consumptionAmount,
-        totalDelivered,
-        deliveryAmount,
-        endingInventory,
-        activityDots,
-      };
-    });
+        return {
+          id: item.id,
+          itemCode: item.itemCode,
+          name: item.name,
+          brand: item.brand ?? "",
+          category: item.category,
+          unit: item.unit,
+          pricePerUnit: item.pricePerUnit,
+          beginningInventory,
+          totalConsumed,
+          consumptionAmount,
+          totalDelivered,
+          deliveryAmount,
+          endingInventory,
+          activityDots,
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [items, transactions, selectedMonth]);
 
 
@@ -507,7 +608,7 @@ export default function MonthlyReportPage({ user }: Props) {
 
 
             <button
-              onClick={() => exportCsv(filteredRows, selectedMonth)}
+              onClick={() => void exportExcelReport(filteredRows, transactions, selectedMonth)}
               disabled={filteredRows.length === 0}
               style={{
                 backgroundColor: theme.surface,
@@ -523,12 +624,12 @@ export default function MonthlyReportPage({ user }: Props) {
                 <polyline points="7 10 12 15 17 10" />
                 <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
-              CSV
+              Excel
             </button>
 
-
             <button
-              onClick={printReport}
+              onClick={() => exportPdfReport(filteredRows, selectedMonth)}
+              disabled={filteredRows.length === 0}
               style={{
                 backgroundColor: theme.surface,
                 color: theme.text,
@@ -543,7 +644,7 @@ export default function MonthlyReportPage({ user }: Props) {
                 <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
                 <rect x="6" y="14" width="12" height="8" />
               </svg>
-              Print / PDF
+              PDF
             </button>
           </div>
         </div>

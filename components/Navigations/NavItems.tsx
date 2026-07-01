@@ -575,10 +575,10 @@ export function getNavSectionsForUser(user: {
   if (user.role === "employee") {
   const baseSection: NavSection = {
     items: [
-      { key: "dashboard",       label: "Dashboard",        icon: DashboardIcon    },
-      { key: "submitticket",    label: "Submit Ticket",    icon: SubmitTicketIcon },
-      { key: "mytickets",       label: "My Tickets",       icon: MyTicketsIcon    },
-      { key: "supplyinventory", label: "Supply Inventory", icon: SuppliesIcon     },
+      // { key: "dashboard",       label: "Dashboard",        icon: DashboardIcon    },
+      // { key: "submitticket",    label: "Submit Ticket",    icon: SubmitTicketIcon },
+      // { key: "mytickets",       label: "My Tickets",       icon: MyTicketsIcon    },
+      // { key: "supplyinventory", label: "Supply Inventory", icon: SuppliesIcon     },
     ],
   };
 

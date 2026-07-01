@@ -1423,7 +1423,7 @@ const recentlyActiveIds = new Set(
                 </div>
               )}
             </div>
-
+            
             {/* Recent activity */}
             <div
               style={{

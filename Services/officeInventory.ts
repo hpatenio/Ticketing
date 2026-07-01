@@ -85,6 +85,14 @@ const toItem = (id: string, data: any): OfficeInventoryItem => ({
       : (data.updatedAt ?? ""),
 });
 
+const parseDateField = (value: any): string => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (value instanceof Timestamp) return value.toDate().toISOString().slice(0, 10);
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+};
+
 const toTransaction = (id: string, data: any): StockTransaction => ({
   id,
   itemId: data.itemId,
@@ -98,11 +106,15 @@ const toTransaction = (id: string, data: any): StockTransaction => ({
   totalAmount: data.totalAmount,
   reason: data.reason ?? "",
   performedByName: data.performedByName,
-  transactionDate: data.transactionDate,
+  transactionDate: parseDateField(data.transactionDate),
   createdAt:
     data.createdAt instanceof Timestamp
       ? data.createdAt.toDate().toISOString()
-      : (data.createdAt ?? ""),
+      : typeof data.createdAt === "string"
+      ? data.createdAt
+      : data.createdAt
+      ? parseDateField(data.createdAt)
+      : "",
 });
 
 const toSupplyRequest = (id: string, data: any): SupplyRequest => ({
